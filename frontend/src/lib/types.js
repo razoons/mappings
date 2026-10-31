@@ -1,11 +1,11 @@
 import { bindsOf, isPlainObject, tagList } from './lists';
 
 /**
- * Types de sockets : un scalaire (`string`, `number`, `boolean`, `date`, `object`, `any`)
+ * Types de sockets : un scalaire (`string`, `number`, `integer`, `boolean`, `date`, `object`, `any`)
  * ou une liste de scalaires (`string[]`…).
  *
  * Champ d'un modèle : `{ id, name, type, item?, children?, collapsed?, required?, format? }` où `type` vaut
- * `string | number | boolean | date | object | array` et `item` le type des éléments d'un tableau
+ * `string | number | integer | boolean | date | object | array` et `item` le type des éléments d'un tableau
  * (`required` et `format` : voir lib/formats.js).
  */
 export const isList = (t) => t.endsWith('[]');
@@ -15,6 +15,7 @@ export const listOf = (s) => `${s}[]`;
 export const SOCKET_COLORS = {
   string: '#70b2ff',
   number: '#a1a1a1',
+  integer: '#5f9e6e',
   boolean: '#cca6d6',
   date: '#e8a33d',
   object: '#8f73e6',
@@ -24,13 +25,27 @@ export const SOCKET_COLORS = {
 const TYPE_LABELS = {
   string: 'Texte',
   number: 'Nombre',
+  integer: 'Entier',
   boolean: 'Booléen',
   date: 'Date',
   object: 'Objet',
   any: 'Tout',
 };
 
-export const socketTitle = (t) => (isList(t) ? `Liste de ${TYPE_LABELS[baseOf(t)].toLowerCase()}` : TYPE_LABELS[t]);
+const LIST_LABELS = {
+  string: 'Liste de textes',
+  number: 'Liste de nombres',
+  integer: 'Liste d’entiers',
+  boolean: 'Liste de booléens',
+  date: 'Liste de dates',
+  object: 'Liste d’objets',
+  any: 'Liste',
+};
+
+export const socketTitle = (t) => (isList(t) ? LIST_LABELS[baseOf(t)] : TYPE_LABELS[t]);
+
+/** Types numériques : un entier est aussi un nombre. */
+export const isNumeric = (t) => t === 'number' || t === 'integer';
 
 export const HEADER_COLORS = {
   source: '#2b6e4c',
@@ -48,15 +63,22 @@ export const HEADER_COLORS = {
 
 export const uid = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 
-/** Compatibilité des types de base ; une liste peut alimenter une entrée simple (évaluée par élément) et inversement. */
-export function canConnect(from, to) {
+/**
+ * Écart entre deux types de base (une liste peut alimenter une entrée simple, évaluée par élément) :
+ * `null` si aucun, `'conversion'` si la valeur est convertie implicitement (nombre → texte, nombre → entier…),
+ * `'incompatible'` si la conversion n'a pas de sens (texte → date…). Tout lien est permis : le contrôle le signale.
+ */
+export function typeMismatch(from, to) {
   const [f, t] = [baseOf(from), baseOf(to)];
-  if (f === t || f === 'any' || t === 'any') return true;
-  if (t === 'string') return true;
-  if (t === 'number' && (f === 'boolean' || f === 'date')) return true;
-  if (t === 'boolean' && f === 'number') return true;
-  return false;
+  if (f === t || f === 'any' || t === 'any' || (f === 'integer' && t === 'number')) return null;
+  if (t === 'string') return 'conversion';
+  if (isNumeric(t) && (isNumeric(f) || f === 'boolean' || f === 'date')) return 'conversion';
+  if (t === 'boolean' && isNumeric(f)) return 'conversion';
+  return 'incompatible';
 }
+
+/** Types qui se branchent sans perte de sens (choix du socket quand un lien crée un nœud). */
+export const canConnect = (from, to) => typeMismatch(from, to) !== 'incompatible';
 
 const TRUTHY = ['true', '1', 'oui', 'yes', 'vrai', 'y', 'o', 'x'];
 
@@ -76,6 +98,8 @@ function coerceScalar(v, type) {
       if (typeof v === 'boolean') return v ? 1 : 0;
       if (v instanceof Date) return v.getTime();
       return Number(String(v).trim().replace(',', '.'));
+    case 'integer':
+      return Math.trunc(coerceScalar(v, 'number'));
     case 'boolean':
       if (typeof v === 'boolean') return v;
       if (typeof v === 'number') return v !== 0;

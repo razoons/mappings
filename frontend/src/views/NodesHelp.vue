@@ -28,7 +28,8 @@
       <div class="help-content">
         <p class="intro">
           Un nœud reçoit des valeurs par ses sockets d’entrée (à gauche) et en produit par ses sockets de sortie (à droite).
-          Une entrée non reliée prend la valeur saisie dans le nœud.
+          Une entrée non reliée prend la valeur saisie dans le nœud. Tous les types peuvent être reliés : un type différent
+          est converti et signalé (⚠), un type incompatible est signalé en erreur (⛔, lien rouge en pointillés).
         </p>
         <ul class="legend">
           <li><span class="swatch" :style="{ background: SOCKET_COLORS.string }" /> valeur unique</li>

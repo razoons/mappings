@@ -7,7 +7,7 @@ import { computed } from 'vue';
 import { BaseEdge, getBezierPath, useVueFlow } from '@vue-flow/core';
 import { getSocket } from '../../lib/graph';
 import { GROUP_HEADER } from '../../lib/groups';
-import { baseOf, isList, SOCKET_COLORS } from '../../lib/types';
+import { baseOf, isList, SOCKET_COLORS, typeMismatch } from '../../lib/types';
 
 defineOptions({ inheritAttrs: false });
 
@@ -21,6 +21,7 @@ const props = defineProps({
   sourceNode: { type: Object, required: true },
   targetNode: { type: Object, required: true },
   sourceHandleId: { type: String, default: null },
+  targetHandleId: { type: String, default: null },
   sourceX: { type: Number, required: true },
   sourceY: { type: Number, required: true },
   targetX: { type: Number, required: true },
@@ -51,8 +52,11 @@ const path = computed(() => {
   });
 });
 
+/** Types incompatibles : lien rouge en pointillés serrés (le détail est dans les contrôles). */
 const style = computed(() => {
   const type = getSocket(props.sourceNode, props.sourceHandleId, 'source')?.type ?? 'any';
+  const into = getSocket(props.targetNode, props.targetHandleId, 'target')?.type;
+  if (into && typeMismatch(type, into) === 'incompatible') return { stroke: 'var(--danger)', strokeWidth: 2, strokeDasharray: '2 4' };
   return { stroke: SOCKET_COLORS[baseOf(type)], strokeWidth: 2, strokeDasharray: isList(type) ? '7 4' : undefined };
 });
 </script>

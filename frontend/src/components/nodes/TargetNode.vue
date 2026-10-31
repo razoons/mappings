@@ -65,7 +65,7 @@ const readOnly = useReadOnly(() => props.data.locked);
 const issues = computed(() => issuesOf(props.id));
 const counts = computed(() => countIssues(issues.value));
 const countLabel = computed(
-  () => `${counts.value.errors} erreur(s), ${counts.value.warnings} avertissement(s) — détail dans l’onglet Contrôles`,
+  () => `${counts.value.errors} erreur(s), ${counts.value.warnings} avertissement(s) — détail dans le panneau Contrôles`,
 );
 
 const connected = computed(() => new Set(edges.value.filter((e) => e.target === props.id).map((e) => e.targetHandle)));

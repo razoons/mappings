@@ -1,6 +1,6 @@
 # Mapping — éditeur nodal
 
-Éditeur visuel de mappings JSON : on relie les champs d'une **source** (structure + JSON d'exemple) à ceux d'une **cible**, en passant si besoin par des nœuds de transformation (texte, math, logique, listes, dates…). L'aperçu du JSON produit et les formules de chaque champ cible se mettent à jour en direct.
+Éditeur visuel de mappings JSON : on relie les champs d'une **source** (structure + JSON d'exemple) à ceux d'une **cible**, en passant si besoin par des nœuds de transformation (texte, math, logique, listes, dates…). Chaque champ cible affiche la valeur obtenue avec l’exemple, et le panneau **Contrôles** vérifie le mapping en direct.
 
 Application 100 % navigateur (aucun serveur), déployée sur **Firebase Hosting** : Vue 3 + Vite + Vuetify + [Vue Flow](https://vueflow.dev).
 
@@ -15,15 +15,20 @@ Application 100 % navigateur (aucun serveur), déployée sur **Firebase Hosting*
 | Délier | Attraper l'extrémité d'un lien et la lâcher dans le vide |
 | Structure d'une source / cible | Bouton `{ }` de l'en-tête (JSON), ou édition directe des champs (glisser `⋮⋮` pour les déplacer) |
 | Replier, supprimer | Clic droit sur un nœud (agit sur toute la sélection) ; `Suppr` |
-| Grouper | `Ctrl G` sur la sélection, « Grouper » au clic droit, ou « Groupe » dans le menu d’ajout. Glisser un nœud dans / hors d’un cadre l’y range / l’en sort. Replié, un groupe se réduit à son en-tête et ses liens y aboutissent. Supprimer un groupe garde ses nœuds. |
+| Dupliquer | « Dupliquer » au clic droit ou `Ctrl D` : la copie (avec les liens internes à la sélection ; un groupe avec ses nœuds) suit la souris, un clic gauche la dépose — dans un groupe si on clique dessus ; `Échap` ou clic droit annule |
+| Grouper | `Ctrl G` sur la sélection, « Grouper » au clic droit, ou « Groupe » dans le menu d’ajout. Glisser un nœud dans / hors d’un cadre l’y range / l’en sort (c’est le pointeur au lâcher qui compte). Le cadre s’ajuste tout seul à ses nœuds : il grandit ou rétrécit quand on les déplace, les replie ou les modifie. Replié, un groupe se réduit à son en-tête et ses liens y aboutissent. Supprimer un groupe garde ses nœuds. La pastille de l’en-tête choisit sa couleur. |
 
 Le mapping en cours est conservé dans le navigateur. **Ouvrir** (`Ctrl O`) charge un fichier `.json` choisi dans l’explorateur ; **Exporter** (`Ctrl S`) demande à chaque fois où l’enregistrer (sous Chrome / Edge ; les autres navigateurs le téléchargent).
 
 Verrouillage : le cadenas d’en-tête (ou « Verrouiller » au clic droit) fige un nœud — ni déplacement, ni suppression, ni modification ; le cadenas des contrôles en bas à gauche verrouille tout le schéma (ni ajout, ni lien, ni modification). Le repli reste toujours possible.
 
-Règles des champs : `*` à côté du nom rend un champ obligatoire, `⚙` (au survol) définit son format — longueur min. / max. et expression régulière pour un texte, bornes et « entier » pour un nombre, bornes pour une date, nombre d’éléments pour une liste. Chaque champ cible est contrôlé (onglet **Contrôles** de l’aperçu, compteur dans l’en-tête de la cible, ligne surlignée) :
+Types : Texte, Nombre (décimal), Entier, Booléen, Date, Objet, et les listes de chacun. Un entier convient partout où un nombre est attendu ; un nombre relié à un champ Entier est tronqué, et le contrôle le signale (« En entier » permet de choisir l’arrondi).
+
+Règles des champs : `*` à côté du nom rend un champ obligatoire, `⚙` (au survol) définit son format — longueur min. / max. et expression régulière pour un texte, bornes pour un nombre ou un entier, bornes pour une date, nombre d’éléments pour une liste. Chaque champ cible est contrôlé (panneau **Contrôles** en haut à droite — son icône donne le résultat global : ✔ conforme, ⚠ avertissements, ⛔ erreurs ; un clic sur un problème centre la vue sur le nœud — compteur dans l’en-tête de la cible, ligne surlignée) :
 
 - ⛔ obligatoire mais non mappé ;
+- ⛔ types incompatibles (ex. texte → date ; le lien est tracé en pointillés rouges) — tout lien est permis, le contrôle le signale ; contrôlé aussi sur les entrées des transformations ;
+- ⚠ types différents mais convertis implicitement (ex. nombre → texte, nombre → entier) ;
 - ⚠ obligatoire mais relié à un champ source optionnel (le champ, ou un de ses parents jusqu’au tableau le plus proche) ;
 - ⚠ format non garanti par le champ source (ses bornes doivent être au moins aussi strictes, son motif identique).
 
@@ -38,7 +43,7 @@ Formes des sockets : rond = valeur unique, losange = liste, losange pointé (`�
 ```
 frontend/src/
   lib/          moteur sans dépendance à Vue : types, champs, transformations, évaluation du graphe
-  components/   nœuds Vue Flow (nodes/), menus, panneau d'aperçu, dialogues
+  components/   nœuds Vue Flow (nodes/), menus, panneau des contrôles, dialogues
   views/        MappingEditor.vue — l'éditeur
   services/     ouverture / export de fichiers
 scripts/setup.js  configuration de Firebase Hosting

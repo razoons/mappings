@@ -11,7 +11,10 @@ const FORMAT_KEYS = {
   number: [
     { key: 'min', label: 'Minimum', kind: 'number' },
     { key: 'max', label: 'Maximum', kind: 'number' },
-    { key: 'integer', label: 'Entier', kind: 'bool' },
+  ],
+  integer: [
+    { key: 'min', label: 'Minimum', kind: 'integer' },
+    { key: 'max', label: 'Maximum', kind: 'integer' },
   ],
   date: [
     { key: 'minDate', label: 'Au plus tôt', kind: 'date' },
@@ -50,7 +53,6 @@ export function formatSummary(f) {
   range(x.minItems, x.maxItems, ' élt');
   range(x.minLength, x.maxLength, ' car.');
   range(x.min, x.max);
-  if (x.integer) parts.push('entier');
   range(x.minDate, x.maxDate);
   if (isSet(x.pattern)) parts.push(`/${x.pattern}/`);
   return parts.join(', ');

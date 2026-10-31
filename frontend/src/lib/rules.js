@@ -1,7 +1,8 @@
 import { findChain, isContainer, pathLabel } from './fields';
+import { getSocket } from './graph';
 import { isSet } from './formats';
 import { TRANSFORMS } from './transforms';
-import { baseOf, isList } from './types';
+import { baseOf, isList, socketTitle, typeMismatch } from './types';
 
 /**
  * Le champ source est-il toujours présent ? Il faut qu'il soit obligatoire, ainsi que ses parents
@@ -80,7 +81,10 @@ function makeSocketInfo(byId, incoming) {
  */
 function formatGaps(src, dst) {
   const want = dst.format ?? {};
-  const have = src.base === base(dst) && src.array === (dst.type === 'array') ? src.format : {};
+  const dstBase = base(dst);
+  // Un entier convient là où un nombre est attendu ; l'inverse perd les décimales.
+  const sameKind = src.base === dstBase || (src.base === 'integer' && dstBase === 'number');
+  const have = sameKind && src.array === (dst.type === 'array') ? src.format : {};
   const gaps = [];
   const shown = (key) => (isSet(have[key]) ? have[key] : 'non bornée');
   const atLeast = (key, label) => {
@@ -99,10 +103,21 @@ function formatGaps(src, dst) {
   if (isSet(want.pattern) && want.pattern !== have.pattern) gaps.push(`motif /${want.pattern}/ non garanti`);
   atLeast('min', 'valeur');
   atMost('max', 'valeur');
-  if (want.integer && !have.integer) gaps.push('entier non garanti');
   atLeast('minDate', 'date');
   atMost('maxDate', 'date');
   return gaps;
+}
+
+/** Écart de type d'un lien : `{ level, message }` ou `null`. */
+export function linkMismatch(byId, e) {
+  const from = getSocket(byId.get(e.source), e.sourceHandle, 'source');
+  const to = getSocket(byId.get(e.target), e.targetHandle, 'target');
+  const kind = from && to && typeMismatch(from.type, to.type);
+  if (!kind) return null;
+  const types = `${socketTitle(baseOf(from.type))} → ${socketTitle(baseOf(to.type))}`;
+  return kind === 'incompatible'
+    ? { level: 'error', message: `Types incompatibles : ${types}` }
+    : { level: 'warning', message: `Type différent : ${types} (conversion implicite)` };
 }
 
 /**
@@ -110,7 +125,9 @@ function formatGaps(src, dst) {
  * Un problème : `{ level: 'error' | 'warning', message }`.
  * - obligatoire et non mappé : erreur ;
  * - obligatoire mais alimenté par un champ source optionnel : avertissement ;
- * - format non garanti par ce qui alimente le champ : avertissement.
+ * - format non garanti par ce qui alimente le champ : avertissement ;
+ * - types différents : avertissement si la valeur est convertie, erreur si les types sont incompatibles
+ *   (contrôlé aussi sur les entrées des transformations).
  * Les garanties traversent les transformations qui les déclarent (`guarantee`, ex. « Extraire » borne
  * la longueur) ; une transformation sans garanties lève les avertissements : c'est elle qui adapte la valeur.
  */
@@ -137,6 +154,8 @@ export function validateTargets(nodes, edges) {
         const chain = [...parents, f];
         const e = linkOf(f);
         if (f.required && !isMapped(f)) add(f, chain, 'error', 'Obligatoire mais non mappé');
+        const mismatch = e && linkMismatch(byId, e);
+        if (mismatch) add(f, chain, mismatch.level, mismatch.message);
         const info = e && infoOf(e.source, e.sourceHandle ?? '');
         if (info) {
           if (f.required && info.required === false) {
@@ -151,6 +170,21 @@ export function validateTargets(nodes, edges) {
       }
     };
     walk(node.data.fields, []);
+    byNode.set(node.id, issues);
+  }
+
+  // Entrées des transformations : seul l'écart de type est contrôlé.
+  for (const node of nodes) {
+    const def = node.type === 'transform' && TRANSFORMS[node.data.kind];
+    if (!def) continue;
+    const issues = new Map();
+    for (const inp of def.inputs) {
+      const e = incoming.get(`${node.id}:${inp.id}`);
+      const mismatch = e && linkMismatch(byId, e);
+      if (!mismatch) continue;
+      issues.set(inp.id, [mismatch]);
+      list.push({ nodeId: node.id, fieldId: inp.id, path: `${def.label} › ${inp.label}`, ...mismatch });
+    }
     byNode.set(node.id, issues);
   }
   return { byNode, list };

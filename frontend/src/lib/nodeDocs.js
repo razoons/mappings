@@ -202,8 +202,13 @@ export const NODE_DOCS = {
     details: ['Une date devient un texte ISO 8601, un objet ou une liste son JSON.'],
   },
   to_number: {
-    summary: 'Convertit une valeur en nombre.',
+    summary: 'Convertit une valeur en nombre (décimal).',
     details: ['La virgule décimale est acceptée (« 3,5 » → 3.5). Vrai → 1, faux → 0, une date → son timestamp en ms.', 'Texte vide → 0 ; texte non numérique → invalide.'],
+  },
+  to_integer: {
+    summary: 'Convertit un nombre en entier : tronqué (partie entière), arrondi, plancher ou plafond.',
+    details: ['Tronquer et Plancher diffèrent pour les négatifs : -2.7 → -2 (tronqué), -3 (plancher).', 'À placer devant un champ cible Entier alimenté par un nombre décimal : la conversion devient explicite et n’est plus signalée.'],
+    example: { in: '2.7, Mode = Arrondi', out: '3' },
   },
   to_bool: {
     summary: 'Convertit une valeur en booléen.',
@@ -244,12 +249,12 @@ export const BASE_NODES = [
     kind: 'target',
     label: 'Cible',
     color: 'target',
-    summary: 'Décrit le document à produire. Chaque champ reçoit une valeur par un lien ; l’aperçu montre le JSON obtenu.',
+    summary: 'Décrit le document à produire. Chaque champ reçoit une valeur par un lien ; la colonne Valeur montre celle obtenue avec l’exemple de la source.',
     details: [
       'Relier une liste à un tableau d’objets le parcourt : ses sous-champs sont évalués pour chaque élément.',
       'Sans lien sur le tableau, la première liste source reliée à un de ses sous-champs dicte le parcours.',
       'Un objet relié à un objet source le recopie ; les sous-champs reliés y remplacent leurs valeurs.',
-      'Contrôles : ⛔ obligatoire non mappé ; ⚠ obligatoire alimenté par une source optionnelle ; ⚠ format non garanti. Détail dans l’onglet Contrôles de l’aperçu.',
+      'Contrôles : ⛔ obligatoire non mappé ; ⛔ types incompatibles ; ⚠ type converti implicitement ; ⚠ obligatoire alimenté par une source optionnelle ; ⚠ format non garanti. Détail dans le panneau Contrôles.',
     ],
   },
   {

@@ -68,9 +68,10 @@ const summary = computed(() => formatSummary(props.field));
 
 function set(k, raw) {
   let v = raw;
-  if (k.kind === 'int' || k.kind === 'number') {
+  if (k.kind === 'int' || k.kind === 'integer' || k.kind === 'number') {
     v = raw === '' || raw == null ? undefined : Number(raw);
     if (Number.isNaN(v)) v = undefined;
+    if (k.kind === 'integer' && v !== undefined) v = Math.trunc(v);
     if (k.kind === 'int' && v !== undefined) v = Math.max(0, Math.trunc(v));
   }
   if (k.kind === 'text' || k.kind === 'date') v = raw || undefined;

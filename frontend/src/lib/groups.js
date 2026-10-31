@@ -12,6 +12,21 @@ const PADDING = 30;
 
 export const isGroup = (n) => n?.type === 'group';
 
+/** Couleurs proposées pour un groupe (`data.color`) ; `null` : couleur par défaut. */
+export const DEFAULT_GROUP_COLOR = '#5b6170';
+export const GROUP_COLORS = [
+  { label: 'Par défaut', value: null },
+  { label: 'Rouge', value: '#a3423c' },
+  { label: 'Orange', value: '#b06a2a' },
+  { label: 'Jaune', value: '#a18a2b' },
+  { label: 'Vert', value: '#3f7d4a' },
+  { label: 'Turquoise', value: '#2f7a76' },
+  { label: 'Bleu', value: '#3a6aa5' },
+  { label: 'Violet', value: '#6d4c9a' },
+  { label: 'Rose', value: '#a14a7a' },
+  { label: 'Brun', value: '#7a5a3e' },
+];
+
 /** Vue Flow exige qu'un parent précède ses enfants. */
 export const groupsFirst = (nodes) => [...nodes.filter(isGroup), ...nodes.filter((n) => !isGroup(n))];
 
@@ -65,6 +80,27 @@ export function groupAround(nodes, sizes, ids) {
   const height = Math.max(...boxes.map((b) => b.y + b.h)) + PADDING - y;
   const group = newGroup({ x, y }, width, height);
   return reparent([group, ...nodes], members.map((n) => n.id), group.id);
+}
+
+const MIN_WIDTH = 220;
+
+/**
+ * Cadre ajusté aux nœuds d'un groupe (marge autour, en-tête au-dessus) : `{ dx, dy, width, height }`, où
+ * `dx`/`dy` est le déplacement du groupe (ses nœuds sont décalés d'autant en sens inverse pour rester en place).
+ * `null` si le cadre est déjà ajusté, si le groupe est vide ou si un de ses nœuds n'est pas encore mesuré.
+ */
+export function fitGroup(group, children, sizes) {
+  if (!children.length) return null;
+  const boxes = children.map((n) => ({ ...n.position, ...(sizes.get(n.id) ?? { w: 0, h: 0 }) }));
+  if (boxes.some((b) => !b.w || !b.h)) return null;
+  const dx = Math.min(...boxes.map((b) => b.x)) - PADDING;
+  const dy = Math.min(...boxes.map((b) => b.y)) - PADDING - GROUP_HEADER;
+  const width = Math.max(MIN_WIDTH, Math.max(...boxes.map((b) => b.x + b.w)) + PADDING - dx);
+  const height = Math.max(...boxes.map((b) => b.y + b.h)) + PADDING - dy;
+  const current = sizes.get(group.id) ?? { w: 0, h: 0 };
+  const close = (a, b) => Math.abs(a - b) < 1;
+  if (close(dx, 0) && close(dy, 0) && close(width, current.w) && close(height, current.h)) return null;
+  return { dx, dy, width, height };
 }
 
 /** Supprime les nœuds `ids` ; les enfants d'un groupe supprimé restent à leur place (sauf s'ils sont eux-mêmes supprimés). */

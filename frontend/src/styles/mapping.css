@@ -18,7 +18,6 @@
   --dashed: #4a4a4a;
   --dashed-hover: #6a6a6a;
   --value: #b8d8b0;
-  --formula: #9cc4ff;
   --danger: #ff6b6b;
   --warning: #ffb84d;
   --warn: #ffc857;
@@ -45,7 +44,6 @@
   --dashed: #b5b5bd;
   --dashed-hover: #8a8a94;
   --value: #2e7d32;
-  --formula: #1f5fbf;
   --danger: #d63c3c;
   --warning: #b86e00;
   --warn: #b7791f;
@@ -433,49 +431,22 @@ kbd {
   flex: 1;
 }
 
-/* ── Panneau d'aperçu ───────────────────────────────────── */
-.output-panel {
+/* ── Panneau des contrôles ─────────────────────────────── */
+.checks-panel {
   max-height: calc(100dvh - var(--v-layout-top) - 40px);
   display: flex;
   flex-direction: column;
 }
-.panel-content {
-  overflow: auto;
-  padding: 8px 10px 10px;
-  font-size: 12px;
-}
-.panel-content h4 {
-  margin: 6px 0;
+.checks-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 10px;
+  padding: 8px 6px 8px 12px;
 }
-.panel-content pre {
-  margin: 0 0 10px;
-  padding: 8px;
-  background: var(--code-bg);
-  border-radius: 4px;
-  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-  font-size: 11px;
+.checks-content {
   overflow: auto;
-}
-.formulas {
-  list-style: none;
-}
-.formulas li {
-  padding: 6px 0;
-  border-bottom: 1px solid var(--divider);
-  line-height: 1.5;
-}
-.formulas .arrow {
-  color: var(--muted);
-  margin: 0 6px;
-}
-.formulas code {
-  display: block;
-  font-size: 11px;
-  color: var(--formula);
-  word-break: break-word;
+  padding: 4px 10px 10px;
+  font-size: 12px;
 }
 
 /* ── Verrouillage ───────────────────────────────────────── */
@@ -579,9 +550,60 @@ kbd {
   flex: none;
   padding: 0 8px 0 4px;
   border-radius: 6px 6px 0 0;
-  background: color-mix(in srgb, #5b6170 85%, transparent);
+  background: color-mix(in srgb, var(--group-color, #5b6170) 85%, transparent);
   color: #fff;
   font-weight: 600;
+}
+/* Groupe coloré : cadre et fond teintés de sa couleur. */
+.group-node.colored {
+  border-color: color-mix(in srgb, var(--group-color) 70%, transparent);
+  background: color-mix(in srgb, var(--group-color) 10%, transparent);
+}
+/* La sélection et la cible d'un dépôt restent visibles sur un groupe coloré. */
+.group-node.colored.selected {
+  border-color: var(--accent);
+}
+.vue-flow__node-group.drop-target .group-node.colored {
+  border-color: var(--primary);
+}
+.color-swatch {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: var(--group-color, #5b6170);
+}
+.color-swatch:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.color-palette {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.color-choice {
+  aspect-ratio: 1;
+  border: 2px solid transparent;
+  border-radius: 50%;
+}
+.color-choice.on {
+  border-color: rgb(var(--v-theme-on-surface));
+}
+.color-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.color-custom input {
+  width: 40px;
+  height: 22px;
+  border: none;
+  background: none;
+  cursor: pointer;
 }
 .group-node.collapsed .group-header {
   border-radius: 6px;
@@ -710,10 +732,12 @@ kbd {
   background: var(--field-hover);
   color: var(--text);
 }
-.field-row.issue-error {
+.field-row.issue-error,
+.in-row.issue-error {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
-.field-row.issue-warning {
+.field-row.issue-warning,
+.in-row.issue-warning {
   background: color-mix(in srgb, var(--warning) 10%, transparent);
 }
 .issue-mark {
@@ -744,20 +768,18 @@ kbd {
   background: var(--danger);
   color: #fff;
 }
-.output-panel .v-tab {
-  min-width: 0;
-  padding: 0 10px;
-  text-transform: none;
-  letter-spacing: normal;
-}
 .checks {
   list-style: none;
 }
 .checks li {
+  cursor: pointer;
   padding: 6px 0 6px 8px;
   border-bottom: 1px solid var(--divider);
   border-left: 3px solid var(--warning);
   line-height: 1.5;
+}
+.checks li:hover {
+  background: var(--hover-overlay);
 }
 .checks li.error {
   border-left-color: var(--danger);
@@ -770,4 +792,10 @@ kbd {
 }
 .node:hover .node-header a.help-link {
   opacity: 1;
+}
+
+/* Copies en cours de placement (« Dupliquer ») : elles suivent la souris sans capter les clics. */
+.vue-flow__node.placing {
+  opacity: 0.75;
+  pointer-events: none !important;
 }

@@ -34,11 +34,12 @@ const nodes = [
       fields: [
         {
           id: 'customer',
+          required: true,
           name: 'customer',
           type: 'object',
           children: [
-            { id: 'c_first', name: 'firstName', type: 'string' },
-            { id: 'c_last', name: 'lastName', type: 'string' },
+            { id: 'c_first', name: 'firstName', type: 'string', format: { maxLength: 25 } },
+            { id: 'c_last', name: 'lastName', type: 'string', required: true, format: { maxLength: 30 } },
             { id: 'c_email', name: 'email', type: 'string', required: true },
           ],
         },
@@ -58,7 +59,7 @@ const nodes = [
               item: 'object',
               children: [
                 { id: 'l_sku', name: 'sku', type: 'string' },
-                { id: 'l_qty', name: 'qty', type: 'number', required: true, format: { integer: true } },
+                { id: 'l_qty', name: 'qty', type: 'integer', required: true },
                 { id: 'l_price', name: 'price', type: 'number' },
               ],
             },
@@ -112,12 +113,12 @@ const nodes = [
               item: 'object',
               children: [
                 { id: 't_code', name: 'code', type: 'string', required: true },
-                { id: 't_qty', name: 'qty', type: 'number', required: true, format: { integer: true, min: 1 } },
+                { id: 't_qty', name: 'qty', type: 'integer', required: true, format: { min: 1 } },
               ],
             },
           ],
         },
-        { id: 't_count', name: 'orderCount', type: 'number' },
+        { id: 't_count', name: 'orderCount', type: 'integer' },
         { id: 't_last', name: 'lastOrderRef', type: 'string' },
         { id: 't_tags', name: 'tags', type: 'string' },
       ],

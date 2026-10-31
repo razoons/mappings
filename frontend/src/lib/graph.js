@@ -1,4 +1,4 @@
-import { allFields, findChain, isContainer, pathLabel, sourceSocketType, targetSocketType } from './fields';
+import { allFields, findChain, sourceSocketType, targetSocketType } from './fields';
 import { bindsOf, isPlainObject, tagList } from './lists';
 import { paramsWithDefaults, TRANSFORMS } from './transforms';
 import { baseOf, coerce, isList, listOf } from './types';
@@ -228,53 +228,6 @@ export function evaluateGraph(nodes, edges) {
     }
   }
   return { outputs, targets };
-}
-
-/** Formule lisible de chaque champ cible mappé. `∀` marque une entrée évaluée pour chaque élément. */
-export function describeTargets(nodes, edges) {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const incoming = new Map(edges.map((e) => [inKey(e.target, e.targetHandle), e]));
-
-  function exprOf(nodeId, handle, depth) {
-    const node = byId.get(nodeId);
-    if (!node || depth > 50) return '?';
-    if (node.type === 'source') {
-      const chain = findChain(node.data.fields, handle);
-      return `${node.data.label}.${chain ? pathLabel(chain) : '?'}`;
-    }
-    if (node.type !== 'transform') return '?';
-    const def = TRANSFORMS[node.data.kind];
-    if (!def) return '?';
-    const args = def.inputs.flatMap((inp) => {
-      const e = incoming.get(inKey(nodeId, inp.id));
-      const prefix = inp.perItem ? '∀ ' : '';
-      if (e) return [prefix + exprOf(e.source, e.sourceHandle ?? '', depth + 1)];
-      if (inp.perItem && !inp.default) return [];
-      if (isList(inp.type)) return ['[]'];
-      const raw = node.data.values[inp.id] ?? inp.default ?? '';
-      return [prefix + (inp.type === 'number' || inp.type === 'boolean' ? String(coerce(raw, inp.type)) : JSON.stringify(raw))];
-    });
-    const params = Object.values(paramsWithDefaults(def, node.data.params)).map((p) => JSON.stringify(p));
-    const out = def.outputs.length > 1 ? `.${def.outputs.find((o) => o.id === handle)?.label}` : '';
-    return `${def.label}${params.length ? `[${params.join(', ')}]` : ''}(${args.join(', ')})${out}`;
-  }
-
-  const lines = [];
-  const walk = (nodeId, label, fields, parents) => {
-    for (const f of fields) {
-      const chain = [...parents, f];
-      const e = incoming.get(inKey(nodeId, f.id));
-      if (e || !isContainer(f))
-        lines.push({
-          path: `${label}.${pathLabel(chain)}`,
-          expr: e ? exprOf(e.source, e.sourceHandle ?? '', 0) : null,
-          iterates: !!e && f.type === 'array' && f.item === 'object',
-        });
-      walk(nodeId, label, f.children ?? [], chain);
-    }
-  };
-  for (const n of nodes) if (n.type === 'target') walk(n.id, n.data.label, n.data.fields, []);
-  return lines;
 }
 
 /** Refuse les cycles : la source ne doit pas être atteignable depuis la cible (`ignoredEdgeId` : lien en cours de déplacement). */

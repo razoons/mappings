@@ -83,12 +83,14 @@ export function flattenRows(fields, depth = 0, parents = []) {
 export const TYPE_OPTIONS = [
   ['string', 'Texte'],
   ['number', 'Nombre'],
+  ['integer', 'Entier'],
   ['boolean', 'Booléen'],
   ['date', 'Date'],
   ['object', 'Objet'],
   ['array:object', 'Liste d’objets'],
   ['array:string', 'Liste de textes'],
   ['array:number', 'Liste de nombres'],
+  ['array:integer', 'Liste d’entiers'],
   ['array:boolean', 'Liste de booléens'],
   ['array:date', 'Liste de dates'],
 ];
@@ -122,12 +124,27 @@ export function fieldFromSocket(name, t) {
   return field;
 }
 
+/** Anciens fichiers : un nombre au format « entier » devient un champ de type Entier. */
+export function migrateFields(fields) {
+  return fields.map((f) => {
+    let next = f;
+    if (f.format?.integer) {
+      const { integer, ...format } = f.format;
+      next = { ...f, format: Object.keys(format).length ? format : undefined };
+      if (integer && f.type === 'number') next.type = 'integer';
+      if (integer && f.type === 'array' && f.item === 'number') next.item = 'integer';
+      if (!next.format) delete next.format;
+    }
+    return next.children ? { ...next, children: migrateFields(next.children) } : next;
+  });
+}
+
 // ── Déduction depuis un exemple JSON ───────────────────────
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
 
 function primitiveOf(v) {
-  if (typeof v === 'number') return 'number';
+  if (typeof v === 'number') return Number.isInteger(v) ? 'integer' : 'number';
   if (typeof v === 'boolean') return 'boolean';
   if (typeof v === 'string' && ISO_DATE.test(v)) return 'date';
   return 'string';
@@ -137,8 +154,10 @@ function inferField(name, v) {
   if (Array.isArray(v)) {
     const objects = v.filter(isPlainObject);
     if (objects.length) return { id: uid('f'), name, type: 'array', item: 'object', children: inferFields(Object.assign({}, ...objects)) };
-    const first = v.find((x) => x != null);
-    return { id: uid('f'), name, type: 'array', item: primitiveOf(first) };
+    const items = v.filter((x) => x != null).map(primitiveOf);
+    // Un seul décimal suffit pour que la liste soit de nombres.
+    const item = items.every((t) => t === 'integer') ? items[0] : items.includes('number') ? 'number' : items[0];
+    return { id: uid('f'), name, type: 'array', item: item ?? 'string' };
   }
   if (isPlainObject(v)) return { id: uid('f'), name, type: 'object', children: inferFields(v) };
   return { id: uid('f'), name, type: primitiveOf(v) };
@@ -154,7 +173,7 @@ export function parseDocument(text) {
   return parsed;
 }
 
-const EXAMPLE_VALUES = { string: 'texte', number: 0, boolean: false, date: '2026-01-01' };
+const EXAMPLE_VALUES = { string: 'texte', number: 0.5, integer: 0, boolean: false, date: '2026-01-01' };
 
 const exampleOf = (f) => {
   if (f.type === 'object') return sampleFromFields(f.children ?? []);
@@ -219,6 +238,9 @@ export function syncFields(old, obj) {
     const textual = (t) => t === 'string' || t === 'date';
     if (textual(next.type) && textual(prev.type)) next.type = prev.type;
     if (next.type === 'array' && prev.type === 'array' && textual(next.item) && textual(prev.item)) next.item = prev.item;
+    // Un exemple entier ne dit pas si le champ est entier ou décimal : on garde le choix fait.
+    if (next.type === 'integer' && prev.type === 'number') next.type = 'number';
+    if (next.type === 'array' && prev.type === 'array' && next.item === 'integer' && prev.item === 'number') next.item = 'number';
     const format = cleanFormat(next, prev.format);
     if (format) next.format = format;
     if (next.children) {

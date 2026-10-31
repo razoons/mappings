@@ -45,10 +45,16 @@
         </label>
       </div>
 
-      <div v-for="i in def.inputs" :key="i.id" class="row in-row">
+      <div
+        v-for="i in def.inputs"
+        :key="i.id"
+        class="row in-row"
+        :class="issueOf(i) && `issue-${issueOf(i).level}`"
+        :title="issueOf(i)?.message"
+      >
         <Handle :id="i.id" type="target" :position="Position.Left" v-bind="socketAttrs(i.type, i.perItem)" />
         <span>
-          {{ i.label }}<span v-if="i.perItem" class="per-item-mark" title="Évalué pour chaque élément de la liste"> ∀</span>
+          <span v-if="issueOf(i)" class="issue-mark">{{ issueOf(i).level === 'error' ? '⛔' : '⚠' }}</span>{{ i.label }}<span v-if="i.perItem" class="per-item-mark" title="Évalué pour chaque élément de la liste"> ∀</span>
         </span>
         <template v-if="hasInlineValue(i)">
           <input
@@ -63,7 +69,8 @@
             v-else
             class="inline-input nodrag"
             :disabled="readOnly"
-            :type="i.type === 'number' ? 'number' : i.type === 'date' ? 'date' : 'text'"
+            :type="isNumeric(i.type) ? 'number' : i.type === 'date' ? 'date' : 'text'"
+            :step="i.type === 'integer' ? 1 : 'any'"
             :placeholder="i.type === 'date' ? '' : '…'"
             :value="valueOf(i)"
             @input="setValue(i.id, $event.target.value)"
@@ -80,7 +87,7 @@ import { Handle, Position, useVueFlow } from '@vue-flow/core';
 import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
 import { paramsWithDefaults, TRANSFORMS } from '../../lib/transforms';
-import { coerce, formatValue, HEADER_COLORS, isList } from '../../lib/types';
+import { coerce, formatValue, HEADER_COLORS, isList, isNumeric } from '../../lib/types';
 import { socketAttrs, useReadOnly, useResults } from './shared';
 
 defineOptions({ inheritAttrs: false });
@@ -92,7 +99,8 @@ const props = defineProps({
 });
 
 const { updateNodeData, edges } = useVueFlow();
-const { outputsOf } = useResults();
+const { outputsOf, issuesOf } = useResults();
+const issueOf = (i) => issuesOf(props.id).get(i.id)?.[0];
 
 const readOnly = useReadOnly(() => props.data.locked);
 const def = computed(() => TRANSFORMS[props.data.kind]);

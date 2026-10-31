@@ -110,7 +110,7 @@ export const TRANSFORMS = {
     inputs: [],
     outputs: [
       { id: 'item', label: 'Élément', type: 'any' },
-      { id: 'index', label: 'Index', type: 'number' },
+      { id: 'index', label: 'Index', type: 'integer' },
     ],
     compute: (_, __, ctx) => ({ item: ctx.current?.item, index: ctx.current?.index ?? 0 }),
   },
@@ -210,7 +210,7 @@ export const TRANSFORMS = {
     list: true,
     inputs: [
       LIST_IN,
-      { id: 'index', label: 'Index', type: 'number', default: '0' },
+      { id: 'index', label: 'Index', type: 'integer', default: '0' },
       { id: 'value', label: 'Valeur', type: 'any', perItem: true },
     ],
     outputs: out('any', 'Élément'),
@@ -245,7 +245,7 @@ export const TRANSFORMS = {
     category: 'Liste',
     list: true,
     inputs: [LIST_IN],
-    outputs: out('number', 'Nombre'),
+    outputs: out('integer', 'Nombre'),
     compute: ({ list }) => ({ result: list.length }),
   },
   list_aggregate: {
@@ -286,8 +286,8 @@ export const TRANSFORMS = {
     list: true,
     inputs: [
       LIST_IN,
-      { id: 'start', label: 'Début', type: 'number', default: '0' },
-      { id: 'count', label: 'Nombre', type: 'number', default: '10' },
+      { id: 'start', label: 'Début', type: 'integer', default: '0' },
+      { id: 'count', label: 'Nombre', type: 'integer', default: '10' },
     ],
     outputs: out('any[]', 'Liste'),
     compute: ({ list, start, count }) => ({ result: pickItems(list, indexes(list).slice(start, start + count)) }),
@@ -377,8 +377,8 @@ export const TRANSFORMS = {
     category: 'Texte',
     inputs: [
       { id: 'text', label: 'Texte', type: 'string' },
-      { id: 'count', label: 'Nb car.', type: 'number', default: '3' },
-      { id: 'start', label: 'Début (milieu)', type: 'number', default: '1' },
+      { id: 'count', label: 'Nb car.', type: 'integer', default: '3' },
+      { id: 'start', label: 'Début (milieu)', type: 'integer', default: '1' },
     ],
     outputs: out('string'),
     params: [{ id: 'mode', label: 'Mode', default: 'Gauche', options: ['Gauche', 'Droite', 'Milieu'] }],
@@ -432,11 +432,11 @@ export const TRANSFORMS = {
     label: 'Longueur',
     category: 'Texte',
     inputs: [{ id: 'text', label: 'Texte', type: 'string' }],
-    outputs: out('number', 'Longueur'),
+    outputs: out('integer', 'Longueur'),
     compute: ({ text }) => ({ result: text.length }),
     guarantee: (input) => {
       const t = textInfo(input('text'));
-      return { required: true, format: { integer: true, min: t.format?.minLength ?? 0, max: t.format?.maxLength } };
+      return { required: true, format: { min: t.format?.minLength ?? 0, max: t.format?.maxLength } };
     },
   },
 
@@ -569,6 +569,17 @@ export const TRANSFORMS = {
     outputs: out('number'),
     compute: ({ value }) => ({ result: value }),
   },
+  to_integer: {
+    label: 'En entier',
+    category: 'Conversion',
+    inputs: [{ id: 'value', label: 'Valeur', type: 'number' }],
+    outputs: out('integer'),
+    params: [{ id: 'mode', label: 'Mode', default: 'Tronquer', options: ['Tronquer', 'Arrondi', 'Plancher', 'Plafond'] }],
+    compute: ({ value }, p) => {
+      const fn = { Tronquer: Math.trunc, Arrondi: Math.round, Plancher: Math.floor, Plafond: Math.ceil }[p.mode] ?? Math.trunc;
+      return { result: fn(value) };
+    },
+  },
   to_bool: {
     label: 'En booléen',
     category: 'Conversion',
@@ -608,7 +619,7 @@ export const TRANSFORMS = {
     label: 'Partie de date',
     category: 'Date',
     inputs: [{ id: 'date', label: 'Date', type: 'date' }],
-    outputs: out('number'),
+    outputs: out('integer'),
     params: [{ id: 'part', label: 'Partie', default: 'Année', options: ['Année', 'Mois', 'Jour', 'Jour de la semaine'] }],
     compute: ({ date }, p) => {
       const parts = {
@@ -627,7 +638,7 @@ export const TRANSFORMS = {
       { id: 'date', label: 'Date', type: 'date' },
       { id: 'ref', label: 'Référence', type: 'date' },
     ],
-    outputs: out('number', 'Années'),
+    outputs: out('integer', 'Années'),
     compute: ({ date, ref }) => {
       const r = isNaN(ref.getTime()) ? new Date() : ref;
       let years = r.getUTCFullYear() - date.getUTCFullYear();

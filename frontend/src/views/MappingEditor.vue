@@ -1,15 +1,5 @@
 <template>
   <v-app-bar density="compact" flat border>
-    <v-text-field
-      v-model="current.name"
-      class="ml-3 flex-grow-0"
-      width="220"
-      density="compact"
-      variant="solo-filled"
-      flat
-      hide-details
-      title="Nom du mapping"
-    />
     <v-btn
       class="ml-3"
       color="primary"
@@ -48,6 +38,7 @@
         :delete-key-code="null"
         :min-zoom="0.2"
         @pane-context-menu="onPaneContextMenu"
+        @node-drag-start="dragging = true"
         @node-drag="onNodeDrag"
         @node-drag-stop="onNodeDragStop"
       >
@@ -63,7 +54,7 @@
           </ControlButton>
         </Controls>
         <Panel position="top-right">
-          <OutputPanel :nodes="nodes" :edges="edges" :results="results" />
+          <ChecksPanel :issues="results.issues.list" :has-targets="nodes.some((n) => n.type === 'target')" @focus="focusNode" />
         </Panel>
       </VueFlow>
     </div>
@@ -102,7 +93,7 @@ import { Background } from '@vue-flow/background';
 import { ControlButton, Controls } from '@vue-flow/controls';
 import AddMenu from '../components/AddMenu.vue';
 import LockIcon from '../components/LockIcon.vue';
-import OutputPanel from '../components/OutputPanel.vue';
+import ChecksPanel from '../components/ChecksPanel.vue';
 import SourceNode from '../components/nodes/SourceNode.vue';
 import TargetNode from '../components/nodes/TargetNode.vue';
 import TransformNode from '../components/nodes/TransformNode.vue';
@@ -110,8 +101,8 @@ import GroupNode from '../components/nodes/GroupNode.vue';
 import TypedEdge from '../components/nodes/TypedEdge.vue';
 import { RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
 import { demoGraph } from '../lib/demo';
-import { fieldFromSocket, newField, setTreeCollapsed } from '../lib/fields';
-import { groupAround, groupAt, groupsFirst, isGroup, newGroup, removeKeepingChildren, reparent } from '../lib/groups';
+import { fieldFromSocket, migrateFields, newField, setTreeCollapsed } from '../lib/fields';
+import { fitGroup, groupAround, groupAt, groupsFirst, isGroup, newGroup, removeKeepingChildren, reparent } from '../lib/groups';
 import { createsCycle, evaluateGraph, getSocket } from '../lib/graph';
 import { validateTargets } from '../lib/rules';
 import { TRANSFORMS } from '../lib/transforms';
@@ -137,9 +128,11 @@ const {
   setNodes,
   setEdges,
   addNodes,
+  removeNodes,
   addEdges,
   removeEdges,
   updateEdge,
+  updateNode,
   updateNodeData,
   updateNodeInternals,
   findNode,
@@ -177,6 +170,8 @@ watch(schemaLocked, (locked) => {
 
 /** Groupe survolé pendant un glisser-déposer de nœuds. */
 const dropGroup = ref(null);
+/** Copies en cours de placement (voir « Dupliquer ») : `{ ids, tops: [{ id, dx, dy }] }`. */
+const placing = ref(null);
 
 // Propriétés d'affichage dérivées des données :
 // - nœud verrouillé : ni déplaçable, ni supprimable (`undefined` laisse jouer le réglage global du schéma) ;
@@ -184,6 +179,7 @@ const dropGroup = ref(null);
 watch(
   () => [
     dropGroup.value,
+    placing.value?.ids.join(','),
     nodes.value.map((n) => `${n.id}:${!!n.data.locked}:${!!n.data.collapsed}:${n.parentNode ?? ''}`).join('|'),
     edges.value.map((e) => e.id).join('|'),
   ],
@@ -194,7 +190,8 @@ watch(
       n.draggable = n.data.locked || masked ? false : undefined;
       n.selectable = masked ? false : undefined;
       if (masked) n.selected = false;
-      n.class = isGroup(n) ? { folded: !!n.data.collapsed, 'drop-target': dropGroup.value === n.id } : { masked };
+      const moving = !!placing.value?.ids.includes(n.id);
+      n.class = isGroup(n) ? { folded: !!n.data.collapsed, 'drop-target': dropGroup.value === n.id, placing: moving } : { masked, placing: moving };
     }
     const maskedNode = (id) => folded.has(findNode(id)?.parentNode);
     for (const e of edges.value) e.updatable = maskedNode(e.source) || maskedNode(e.target) ? false : undefined;
@@ -204,7 +201,8 @@ watch(
 
 // ── Chargement et export ────────────────────────────────────
 
-const current = reactive({ name: 'Sans titre' });
+/** Nom du mapping : nom de fichier proposé à l'export (celui du fichier ouvert, sinon « mapping »). */
+const current = reactive({ name: 'mapping' });
 const snack = reactive({ show: false, text: '', color: undefined });
 const notify = (text, color) => Object.assign(snack, { show: true, text, color });
 
@@ -232,6 +230,7 @@ const measuredSizes = () => new Map(nodes.value.map((n) => [n.id, { w: n.dimensi
 let fitPending = false;
 function load(graph) {
   const copy = JSON.parse(JSON.stringify(graph));
+  for (const n of copy.nodes) if (n.data?.fields) n.data.fields = migrateFields(n.data.fields);
   setNodes(groupsFirst(copy.nodes));
   setEdges(copy.edges.map((e) => ({ ...e, type: 'typed' })));
   fitPending = true;
@@ -242,6 +241,7 @@ onNodesInitialized(() => {
   fitView({ padding: 0.15 });
 });
 
+/** Reprend le mapping enregistré dans le navigateur ; sans sauvegarde, l’éditeur reste vide. */
 function restore() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -250,9 +250,8 @@ function restore() {
       return load(saved.graph);
     }
   } catch {
-    /* sauvegarde corrompue : on repart de la démo */
+    /* sauvegarde corrompue : on repart d’un mapping vide */
   }
-  loadDemo();
 }
 
 // Brouillon local, écrit après chaque modification (avec un léger délai pendant les déplacements).
@@ -293,7 +292,7 @@ async function open() {
 
 function newMapping() {
   if (nodes.value.length && !confirm('Tout effacer ?')) return;
-  current.name = 'Sans titre';
+  current.name = 'mapping';
   load({ nodes: [], edges: [] });
 }
 
@@ -309,6 +308,14 @@ restore();
 const results = computed(() => ({ ...evaluateGraph(nodes.value, edges.value), issues: validateTargets(nodes.value, edges.value) }));
 provide(RESULTS_KEY, results);
 
+/** Centre la vue sur un nœud (clic sur un problème du panneau Contrôles) et le sélectionne. */
+function focusNode(id) {
+  const node = findNode(id);
+  if (!node) return;
+  for (const n of nodes.value) n.selected = n.id === id;
+  fitView({ nodes: [id], padding: 0.4, maxZoom: 1.2, duration: 300 });
+}
+
 // ── Liens ───────────────────────────────────────────────────
 
 /** Lien en cours de tirage ; lâché dans le vide, il est raccordé au nœud choisi dans le menu d'ajout. */
@@ -321,7 +328,8 @@ function isValidConnection(c) {
   if (c.source === c.target) return false;
   const from = getSocket(findNode(c.source), c.sourceHandle, 'source');
   const to = getSocket(findNode(c.target), c.targetHandle, 'target');
-  if (!from || !to || !canConnect(from.type, to.type)) return false;
+  // Tous les types se relient : un écart de type est signalé par les contrôles.
+  if (!from || !to) return false;
   return !createsCycle(edges.value, c.source, c.target, updating?.id);
 }
 
@@ -444,10 +452,14 @@ function onKeydown(e) {
     else open();
     return;
   }
+  if (placing.value && key === 'escape') return endPlacing(false);
   if (isEditable(e.target) || schemaLocked.value) return;
   if (e.shiftKey && key === 'a') {
     e.preventDefault();
     addMenu.value = { ...mouse.value };
+  } else if (ctrl && key === 'd') {
+    e.preventDefault();
+    duplicate(nodes.value.filter((n) => n.selected).map((n) => n.id));
   } else if (ctrl && key === 'g') {
     e.preventDefault();
     groupSelection(nodes.value.filter((n) => n.selected).map((n) => n.id));
@@ -487,11 +499,131 @@ function onNodeDrag({ event, nodes: dragged }) {
 }
 
 function onNodeDragStop({ event, nodes: dragged }) {
+  dragging.value = false;
   const g = pointerGroup(event, dragged);
   dropGroup.value = null;
   const ids = movedIds(dragged, g);
   if (ids.length) rebuild((ns) => reparent(ns, ids, g));
 }
+
+// Un groupe déplié s'ajuste à ses nœuds (position, taille, repli…). Pas pendant un glisser :
+// le cadre suivrait le nœud, qu'on ne pourrait plus sortir du groupe.
+const dragging = ref(false);
+watch(
+  () =>
+    dragging.value ||
+    nodes.value
+      .map((n) => `${n.id}:${n.parentNode ?? ''}:${!!n.data.collapsed}:${Math.round(n.position.x)},${Math.round(n.position.y)}:${n.dimensions.width}x${n.dimensions.height}`)
+      .join('|'),
+  () => {
+    if (dragging.value) return;
+    const sizes = measuredSizes();
+    for (const g of nodes.value) {
+      if (!isGroup(g) || g.data.collapsed) continue;
+      const children = nodes.value.filter((n) => n.parentNode === g.id);
+      const fit = fitGroup(g, children, sizes);
+      if (!fit) continue;
+      for (const n of children) updateNode(n.id, { position: { x: n.position.x - fit.dx, y: n.position.y - fit.dy } });
+      updateNode(g.id, {
+        position: { x: g.position.x + fit.dx, y: g.position.y + fit.dy },
+        style: { ...g.style, width: `${fit.width}px`, height: `${fit.height}px` },
+      });
+    }
+  },
+);
+
+// ── Duplication ─────────────────────────────────────────────
+
+const toFlow = (p) => {
+  const rect = vueFlowRef.value.getBoundingClientRect();
+  return project({ x: p.x - rect.left, y: p.y - rect.top });
+};
+
+/**
+ * Duplique les nœuds `ids` (un groupe avec ses nœuds) et les liens qui les relient entre eux. Les copies
+ * suivent la souris jusqu'au clic gauche qui les dépose (dans le groupe sous le pointeur, s'il y en a un) ;
+ * Échap ou clic droit annule.
+ */
+function duplicate(ids) {
+  if (schemaLocked.value || placing.value || !ids.length) return;
+  const all = plainNodes();
+  const byId = new Map(all.map((n) => [n.id, n]));
+  const chosen = new Set(ids);
+  for (const n of all) if (n.parentNode && chosen.has(n.parentNode)) chosen.add(n.id);
+  const originals = all.filter((n) => chosen.has(n.id));
+  const newId = new Map(originals.map((n) => [n.id, uid(isGroup(n) ? 'g' : hasTree(n) ? n.type : 'n')]));
+  const inCopiedGroup = (n) => n.parentNode && chosen.has(n.parentNode);
+  const abs = (n) => (n.parentNode ? { x: byId.get(n.parentNode).position.x + n.position.x, y: byId.get(n.parentNode).position.y + n.position.y } : n.position);
+  const tops = originals.filter((n) => !inCopiedGroup(n));
+  const left = Math.min(...tops.map((n) => abs(n).x));
+  const top = Math.min(...tops.map((n) => abs(n).y));
+  const at = toFlow(mouse.value);
+
+  const copies = originals.map(({ parentNode, selected: _, ...n }) => {
+    const data = JSON.parse(JSON.stringify(n.data));
+    delete data.locked;
+    if ('label' in data) data.label = `${data.label} (copie)`;
+    const copy = { ...n, id: newId.get(n.id), data, selected: false };
+    if (inCopiedGroup({ parentNode })) return { ...copy, parentNode: newId.get(parentNode), position: { ...n.position } };
+    const p = abs({ ...n, parentNode });
+    return { ...copy, position: { x: at.x + p.x - left, y: at.y + p.y - top } };
+  });
+  const links = edges.value
+    .filter((e) => chosen.has(e.source) && chosen.has(e.target))
+    .map((e) => ({ id: uid('e'), type: 'typed', source: newId.get(e.source), sourceHandle: e.sourceHandle, target: newId.get(e.target), targetHandle: e.targetHandle }));
+
+  for (const n of nodes.value) n.selected = false;
+  addNodes(groupsFirst(copies));
+  addEdges(links);
+  placing.value = {
+    ids: copies.map((c) => c.id),
+    tops: copies.filter((c) => !c.parentNode).map((c) => ({ id: c.id, dx: c.position.x - at.x, dy: c.position.y - at.y, group: isGroup(c) })),
+  };
+  window.addEventListener('pointermove', onPlacingMove);
+  window.addEventListener('pointerdown', onPlacingDown, true);
+}
+
+/** Groupe sous le pointeur où déposer les copies (aucun si elles contiennent un groupe : pas d'imbrication). */
+function placingGroup(p) {
+  if (placing.value.tops.some((t) => t.group)) return null;
+  const others = plainNodes().filter((n) => !placing.value.ids.includes(n.id));
+  return groupAt(others, measuredSizes(), toFlow(p))?.id ?? null;
+}
+
+function onPlacingMove(e) {
+  const at = toFlow({ x: e.clientX, y: e.clientY });
+  for (const t of placing.value.tops) updateNode(t.id, { position: { x: at.x + t.dx, y: at.y + t.dy } });
+  dropGroup.value = placingGroup({ x: e.clientX, y: e.clientY });
+}
+
+function onPlacingDown(e) {
+  // Le clic sert à déposer : Vue Flow ne doit pas le recevoir (désélection, déplacement du fond…).
+  e.preventDefault();
+  e.stopPropagation();
+  window.addEventListener('click', (c) => c.stopPropagation(), { capture: true, once: true });
+  window.addEventListener('contextmenu', (c) => c.preventDefault(), { capture: true, once: true });
+  if (e.button === 0) onPlacingMove(e);
+  endPlacing(e.button === 0);
+}
+
+function endPlacing(keep) {
+  window.removeEventListener('pointermove', onPlacingMove);
+  window.removeEventListener('pointerdown', onPlacingDown, true);
+  const { ids, tops } = placing.value;
+  const g = dropGroup.value;
+  placing.value = null;
+  dropGroup.value = null;
+  if (!keep) {
+    removeEdges(edges.value.filter((e) => ids.includes(e.source) || ids.includes(e.target)));
+    removeNodes(ids);
+    return;
+  }
+  if (g) rebuild((ns) => reparent(ns, tops.map((t) => t.id), g));
+  nextTick(() => {
+    for (const n of nodes.value) n.selected = ids.includes(n.id);
+  });
+}
+onBeforeUnmount(() => placing.value && endPlacing(false));
 
 // ── Repli et menu contextuel des nœuds ──────────────────────
 
@@ -552,6 +684,7 @@ const nodeMenuEntries = computed(() => {
     ...(groups.length
       ? [{ label: 'Dégrouper (garder les nœuds)', disabled: ro, action: () => rebuild((ns) => removeKeepingChildren(ns, groups)) }]
       : []),
+    { label: 'Dupliquer', hint: 'Ctrl D', disabled: ro, action: () => duplicate(ids) },
     { label: allLocked ? 'Déverrouiller' : 'Verrouiller', disabled: ro, action: () => patchNodes(targets, () => ({ locked: !allLocked })) },
     {
       label: unlocked.length && unlocked.length < ids.length ? `Supprimer (${unlocked.length} non verrouillé${unlocked.length > 1 ? 's' : ''})` : 'Supprimer',
