@@ -1,0 +1,23 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: serviceName
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    spec:
+      containers:
+        - image: regionId-docker.pkg.dev/projectId/serviceName/serviceName
+          env:
+            - name: GOOGLE_CLOUD_PROJECT
+              value: "projectId"
+            - name: APP_NAME
+              value: "appName-dev"
+            - name: ALLOWED_ORIGIN
+              value: "https://projectId.web.app"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: JWT_SECRET
+                  key: latest

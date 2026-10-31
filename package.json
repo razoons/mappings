@@ -1,0 +1,20 @@
+{
+  "name": "my-app",
+  "version": "1.0.0",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "dev": "concurrently \"cd backend && node --inspect=9229 server.js\" \"cd frontend && npm install && npm run dev\"",
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "build:backend:dev": "gcloud builds submit --tag regionId-docker.pkg.dev/projectDevId/serviceDevName/serviceDevName --project projectDevId",
+    "build:backend:prod": "gcloud builds submit --tag regionId-docker.pkg.dev/projectProdId/serviceProdName/serviceProdName --project projectProdId",
+    "deploy:backend:dev": "npm run build:backend:dev && gcloud run services replace cloud-run.dev.yaml --project projectDevId --region regionId",
+    "deploy:backend:prod": "npm run build:backend:prod && gcloud run services replace cloud-run.prod.yaml --project projectProdId --region regionId",
+    "deploy:frontend:dev": "npm run build:frontend && firebase deploy --only hosting --project projectDevId",
+    "deploy:frontend:prod": "npm run build:frontend && firebase deploy --only hosting --project projectProdId",
+    "deploy:dev": "npm run deploy:backend:dev && npm run deploy:frontend:dev",
+    "deploy:prod": "npm run deploy:backend:prod && npm run deploy:frontend:prod"
+  }
+}
