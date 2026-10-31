@@ -1,10 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import Home from '../views/Home.vue';
-import Inventory from '../views/Inventory.vue';
+import MappingEditor from '../views/MappingEditor.vue';
 
 const routes = [
-  { path: '/', component: Home },
-  { path: '/inventory', component: Inventory },
+  { path: '/', component: MappingEditor },
+  { path: '/noeuds', component: () => import('../views/NodesHelp.vue') },
 ];
 
 export default createRouter({
