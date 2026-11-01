@@ -175,13 +175,14 @@ export function parseDocument(text) {
 
 const EXAMPLE_VALUES = { string: 'texte', number: 0.5, integer: 0, boolean: false, date: '2026-01-01' };
 
-const exampleOf = (f) => {
+/** Valeur type d'un champ (« texte », 0…), pour un exemple qui n'en précise pas. */
+export const exampleOf = (f) => {
   if (f.type === 'object') return sampleFromFields(f.children ?? []);
   if (f.type === 'array') return [f.item === 'object' ? sampleFromFields(f.children ?? []) : EXAMPLE_VALUES[f.item ?? 'string']];
   return EXAMPLE_VALUES[f.type];
 };
 
-export const sampleFromFields = (fields) => Object.fromEntries(fields.map((f) => [f.name, exampleOf(f)]));
+const sampleFromFields = (fields) => Object.fromEntries(fields.map((f) => [f.name, exampleOf(f)]));
 
 // ── Synchronisation structure ⇄ JSON d’exemple ─────────────
 

@@ -117,7 +117,7 @@ export const NODE_DOCS = {
 
   // ── Texte ───────────────────────────────────────────────
   concat: {
-    summary: 'Met bout à bout A, B et C, séparés par le séparateur.',
+    summary: 'Met bout à bout ses entrées A, B, C…, séparées par le séparateur. Le nombre d’entrées est libre : une entrée vide apparaît toujours en bas pour en ajouter une.',
     details: ['Les entrées vides sont ignorées : pas de séparateur en double.'],
     example: { in: 'A = "Ada", B = "Lovelace", Séparateur = espace', out: '"Ada Lovelace"' },
     guarantee: 'Longueur max. = somme des longueurs max. des entrées + séparateurs (si toutes sont bornées). Obligatoire dès qu’une entrée l’est.',
@@ -238,10 +238,11 @@ export const BASE_NODES = [
     kind: 'source',
     label: 'Source',
     color: 'source',
-    summary: 'Décrit les données d’entrée : un arbre de champs, et un JSON d’exemple qui sert à prévisualiser le résultat.',
+    summary: 'Décrit les données d’entrée : son modèle de données (champs, types, caractère obligatoire et formats).',
     details: [
       'Chaque champ a un socket de sortie. Sous un tableau, un champ produit la liste de ses valeurs (losange), sauf quand ce tableau est en cours de parcours.',
-      'Le bouton { } édite le JSON d’exemple ; enregistrer met la structure à jour (les champs retrouvés par leur nom gardent leurs liens).',
+      'Le bouton { } édite le modèle de données en YAML (type, required, format et example de chaque champ) ; « Importer un exemple JSON » le déduit d’un document. Les champs retrouvés par leur nom gardent leurs liens. Les exemples servent au calcul tant qu’aucun fichier de données n’est chargé ; une liste d’objets peut recevoir la liste complète en exemple.',
+      'Un fichier de données déposé sur le nœud (ou chargé par ⤒) remplace les valeurs du modèle pour le calcul, sans changer le modèle. Il est contrôlé : ⛔ obligatoire absent, type ou format non respecté ; ⚠ champ en trop. Il n’est pas enregistré avec le mapping.',
       'Règles : * rend un champ obligatoire, ⚙ définit son format. Elles servent à contrôler les champs cibles qu’il alimente.',
     ],
   },
@@ -249,8 +250,9 @@ export const BASE_NODES = [
     kind: 'target',
     label: 'Cible',
     color: 'target',
-    summary: 'Décrit le document à produire. Chaque champ reçoit une valeur par un lien ; la colonne Valeur montre celle obtenue avec l’exemple de la source.',
+    summary: 'Décrit le document à produire. Chaque champ reçoit une valeur par un lien ; la colonne Valeur montre celle obtenue avec les données des sources.',
     details: [
+      'Le bouton Résultat montre le JSON produit (avec les fichiers de données chargés, sinon les valeurs des modèles de données), sa conformité au modèle de la cible, et permet de le copier ou de l’exporter.',
       'Relier une liste à un tableau d’objets le parcourt : ses sous-champs sont évalués pour chaque élément.',
       'Sans lien sur le tableau, la première liste source reliée à un de ses sous-champs dicte le parcours.',
       'Un objet relié à un objet source le recopie ; les sous-champs reliés y remplacent leurs valeurs.',

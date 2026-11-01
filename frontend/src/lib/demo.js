@@ -58,8 +58,8 @@ const nodes = [
               type: 'array',
               item: 'object',
               children: [
-                { id: 'l_sku', name: 'sku', type: 'string' },
-                { id: 'l_qty', name: 'qty', type: 'integer', required: true },
+                { id: 'l_sku', name: 'sku', type: 'string', required: true },
+                { id: 'l_qty', name: 'qty', type: 'integer', required: true, format: { min: 1 } },
                 { id: 'l_price', name: 'price', type: 'number' },
               ],
             },

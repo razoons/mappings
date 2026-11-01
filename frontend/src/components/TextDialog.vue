@@ -1,9 +1,9 @@
 <template>
-  <v-dialog :model-value="modelValue" max-width="560" @update:model-value="emit('update:modelValue', $event)">
+  <v-dialog :model-value="modelValue" max-width="680" @update:model-value="emit('update:modelValue', $event)">
     <v-card :title="title">
       <v-card-text>
         <p class="text-body-2 text-medium-emphasis mb-3">{{ readOnly ? 'Nœud verrouillé : consultation seule.' : description }}</p>
-        <v-textarea v-model="text" :readonly="readOnly" class="json-input" variant="outlined" rows="12" spellcheck="false" autofocus hide-details />
+        <v-textarea v-model="text" :readonly="readOnly" class="code-input" variant="outlined" rows="18" spellcheck="false" autofocus hide-details />
         <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-3">{{ error }}</v-alert>
       </v-card-text>
       <v-card-actions>
@@ -24,7 +24,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -47,6 +47,13 @@ watch(
     if (!open) return;
     text.value = props.initial;
     error.value = null;
+    // Curseur et défilement en haut : le début du texte (aide, premiers champs) est visible.
+    nextTick(() => {
+      const ta = document.querySelector('.v-overlay--active .code-input textarea');
+      if (!ta) return;
+      ta.setSelectionRange(0, 0);
+      ta.scrollTop = 0;
+    });
   },
   { immediate: true },
 );

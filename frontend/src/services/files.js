@@ -4,8 +4,9 @@
  * Une annulation de l'utilisateur renvoie `null`.
  */
 const TYPES = [{ description: 'Mapping JSON', accept: { 'application/json': ['.json'] } }];
-// `id` : l'explorateur rouvre le dernier dossier utilisé pour les mappings.
+// `id` : l'explorateur rouvre le dernier dossier utilisé pour les mappings (et, à part, pour les données).
 const PICKER_ID = 'mapping';
+const DATA_TYPES = [{ description: 'Données JSON', accept: { 'application/json': ['.json'] } }];
 
 const hasPicker = 'showOpenFilePicker' in window;
 
@@ -20,12 +21,12 @@ function pickWithInput() {
   });
 }
 
-/** `{ name, text }` du fichier choisi. */
-export async function openFile() {
+/** `{ name, text }` du fichier choisi (`data` : un fichier de données plutôt qu'un mapping). */
+export async function openFile({ data = false } = {}) {
   try {
     let file;
     if (hasPicker) {
-      const [handle] = await window.showOpenFilePicker({ id: PICKER_ID, types: TYPES });
+      const [handle] = await window.showOpenFilePicker(data ? { id: 'data', types: DATA_TYPES } : { id: PICKER_ID, types: TYPES });
       file = await handle.getFile();
     } else {
       file = await pickWithInput();
@@ -38,10 +39,10 @@ export async function openFile() {
 }
 
 /** Écrit `text` dans un fichier dont l'emplacement est choisi dans l'explorateur ; renvoie son nom. */
-export async function exportFile(text, suggestedName) {
+export async function exportFile(text, suggestedName, { data = false } = {}) {
   try {
     if (hasPicker) {
-      const handle = await window.showSaveFilePicker({ id: PICKER_ID, suggestedName, types: TYPES });
+      const handle = await window.showSaveFilePicker(data ? { id: 'data', suggestedName, types: DATA_TYPES } : { id: PICKER_ID, suggestedName, types: TYPES });
       const writable = await handle.createWritable();
       await writable.write(text);
       await writable.close();

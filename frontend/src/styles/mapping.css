@@ -67,7 +67,7 @@ kbd {
   flex: none;
 }
 
-.json-input textarea {
+.code-input textarea {
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   font-size: 12px;
 }
@@ -798,4 +798,90 @@ kbd {
 .vue-flow__node.placing {
   opacity: 0.75;
   pointer-events: none !important;
+}
+
+/* ── Fichier de données d'une source ────────────────────── */
+.data-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 12px;
+  border-bottom: 1px solid var(--divider);
+  font-size: 11px;
+}
+.data-file.ok {
+  background: color-mix(in srgb, #3f9d5a 14%, transparent);
+}
+.data-file.warning {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+}
+.data-file.error {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+.data-file-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.data-file-status {
+  flex: 1;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: help;
+}
+.data-file-drop {
+  margin: 6px 12px;
+  padding: 10px;
+  border: 2px dashed var(--primary);
+  border-radius: 6px;
+  text-align: center;
+  color: var(--text);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.node.file-over {
+  box-shadow: 0 0 0 2px var(--primary);
+}
+.node-header .icon-btn.result-btn {
+  font-family: inherit;
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+}
+.result-json {
+  margin: 0;
+  padding: 10px;
+  max-height: 50vh;
+  overflow: auto;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Exemple modifiable dans la colonne Valeur d'une source */
+.field-value.editable {
+  display: flex;
+  align-items: center;
+  padding-left: 0;
+}
+.node input.value-input {
+  height: 19px;
+  padding: 1px 4px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  color: var(--value);
+  background: transparent;
+  border-color: transparent;
+}
+.node input.value-input:hover,
+.node input.value-input:focus {
+  background: var(--field);
+  border-color: var(--field-border);
+}
+.node input.value-input:focus {
+  border-color: var(--primary);
+}
+.node input.value-input.invalid {
+  border-color: var(--danger);
 }

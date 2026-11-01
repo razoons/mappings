@@ -7,7 +7,8 @@
       <span v-if="counts.errors || counts.warnings" class="issue-count" :class="{ error: counts.errors }" :title="countLabel">
         {{ counts.errors ? '⛔' : '⚠' }} {{ counts.errors + counts.warnings }}
       </span>
-      <button class="icon-btn nodrag" title="Structure en JSON" @click="editing = true">{ }</button>
+      <button class="icon-btn nodrag result-btn" title="Voir le résultat (JSON produit et sa conformité au modèle)" @click="showResult = true">Résultat</button>
+      <button class="icon-btn nodrag" title="Modèle de données (YAML : type, obligatoire, format de chaque champ)" @click="editing = true">{ }</button>
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
@@ -25,28 +26,37 @@
       <FieldTree :node-id="id" :data="data" side="target" :locked="readOnly" :values="previewOf(id)" :connected="connected" :issues="issues" />
     </div>
 
-    <JsonDialog
+    <ResultDialog
+      v-model="showResult"
+      :label="data.label"
+      :fields="data.fields"
+      :value="resultOf(id)"
+      :sources="loadedFiles"
+    />
+
+    <TextDialog
       v-model="editing"
-      :title="`Structure — ${data.label}`"
-      description="La structure actuelle, sous forme d’exemple JSON. Modifiez-la (ou collez le format attendu) puis enregistrez : les champs retrouvés par leur nom gardent leurs liens."
-      :initial="JSON.stringify(sampleFromFields(data.fields), null, 2)"
-      :actions="actions"
+      :title="`Modèle de données — ${data.label}`"
+      description="Modèle de données de la cible : pour chaque champ, son type, s’il est obligatoire (required) et son format. Les champs retrouvés par leur nom gardent leurs liens. Pour partir du format attendu, collez-le en JSON puis « Importer un exemple JSON »."
+      :initial="model.initial()"
+      :actions="model.actions"
       :read-only="readOnly"
     />
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 import { Handle, Position, useVueFlow } from '@vue-flow/core';
-import JsonDialog from '../JsonDialog.vue';
+import TextDialog from '../TextDialog.vue';
+import ResultDialog from '../ResultDialog.vue';
 import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
 import FieldTree from './FieldTree.vue';
-import { allFields, parseDocument, sampleFromFields, syncFields } from '../../lib/fields';
+import { allFields } from '../../lib/fields';
 import { countIssues } from '../../lib/rules';
 import { HEADER_COLORS } from '../../lib/types';
-import { useFieldEditor, useReadOnly, useResults } from './shared';
+import { DATA_FILES_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults } from './shared';
 
 defineOptions({ inheritAttrs: false });
 
@@ -56,10 +66,18 @@ const props = defineProps({
   selected: Boolean,
 });
 
-const { updateNodeData, edges } = useVueFlow();
-const { previewOf, issuesOf } = useResults();
+const { updateNodeData, edges, nodes } = useVueFlow();
+const { previewOf, issuesOf, resultOf } = useResults();
+const files = inject(DATA_FILES_KEY);
+const showResult = ref(false);
+/** Fichiers de données chargés sur les sources (« Boutique : commandes.json »). */
+const loadedFiles = computed(() =>
+  nodes.value.filter((n) => n.type === 'source' && files.get(n.id)?.doc).map((n) => `${n.data.label} : ${files.get(n.id).name}`),
+);
 const ops = useFieldEditor(props.id, () => props.data);
 const editing = ref(false);
+const model = useModelEditor(() => props.data, ops);
+watch(editing, (open) => open && model.reset());
 const readOnly = useReadOnly(() => props.data.locked);
 
 const issues = computed(() => issuesOf(props.id));
@@ -69,15 +87,4 @@ const countLabel = computed(
 );
 
 const connected = computed(() => new Set(edges.value.filter((e) => e.target === props.id).map((e) => e.targetHandle)));
-
-const actions = [
-  {
-    label: 'Enregistrer',
-    primary: true,
-    run: (text) => {
-      ops.sync(syncFields(props.data.fields, parseDocument(text)));
-      return true;
-    },
-  },
-];
 </script>

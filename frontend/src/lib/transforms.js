@@ -9,7 +9,9 @@ import { coerce } from './types';
  * - `list` : le nœud manipule des listes (pas d'application automatique élément par élément) ;
  * - `compute(inputs, params, ctx)` où `ctx.item(inputId, list, index)` évalue une entrée `perItem`,
  *   `ctx.connected(inputId)` dit si elle est reliée et `ctx.current` donne l'élément de l'itération englobante ;
- * - `guarantee(input, params)` (facultatif) : ce que le nœud garantit sur sa sortie, `{ required, format }`,
+ * - `variadic: { type, min }` (facultatif) : entrées en nombre libre A, B, C… ; il y en a toujours une de libre
+ *   après la dernière utilisée (reliée ou saisie), et au moins `min` (voir `inputsOf`) ;
+ * - `guarantee(input, params, inputIds)` (facultatif) : ce que le nœud garantit sur sa sortie, `{ required, format }`,
  *   pour le contrôle des champs cibles. `input(id)` donne `{ connected, info, value }` : `info` décrit ce que
  *   garantit l'amont (`{ required, format }`, ou `null` si inconnu), `value` la valeur saisie d'une entrée libre.
  *   Sans `guarantee`, le contrôle fait confiance au nœud.
@@ -17,13 +19,22 @@ import { coerce } from './types';
 
 const out = (type, label = 'Résultat') => [{ id: 'result', label, type }];
 
+// ── Entrées en nombre libre (A, B, C… puis #27, #28…) ─────
+
+const variadicId = (i) => (i < 26 ? String.fromCharCode(97 + i) : `i${i + 1}`);
+const variadicLabel = (i) => (i < 26 ? String.fromCharCode(65 + i) : `#${i + 1}`);
+/** Rang d'une entrée en nombre libre d'après son id (`-1` si l'id n'en est pas une). */
+const variadicIndex = (id) => (/^[a-z]$/.test(id) ? id.charCodeAt(0) - 97 : /^id+$/.test(id) ? Number(id.slice(1)) - 1 : -1);
+const variadicInputs = (type, n) => Array.from({ length: n }, (_, i) => ({ id: variadicId(i), label: variadicLabel(i), type }));
+
 // ── Garanties (contrôle des cibles) ────────────────────────
 
 /** Garanties d'une entrée texte : celles de l'amont, ou la longueur exacte d'une valeur saisie. */
 function textInfo(i) {
   if (i.connected) return i.info ?? {};
   const n = Array.from(String(i.value)).length;
-  return { required: true, format: { minLength: n, maxLength: n } };
+  // Une saisie vide ne fournit rien : la valeur n'est pas garantie présente.
+  return { required: n > 0, format: { minLength: n, maxLength: n } };
 }
 
 /** Plus petite des bornes connues (`undefined` si aucune). */
@@ -331,20 +342,21 @@ export const TRANSFORMS = {
   concat: {
     label: 'Concaténer',
     category: 'Texte',
-    inputs: [
-      { id: 'a', label: 'A', type: 'string' },
-      { id: 'b', label: 'B', type: 'string' },
-      { id: 'c', label: 'C', type: 'string' },
-    ],
+    variadic: { type: 'string', min: 2 },
+    inputs: variadicInputs('string', 2),
     outputs: out('string'),
     params: [{ id: 'sep', label: 'Séparateur', default: ' ' }],
-    compute: ({ a, b, c }, p) => ({ result: [a, b, c].filter((x) => x !== '').join(p.sep) }),
-    guarantee: (input, p) => {
-      const parts = ['a', 'b', 'c'].map((id) => textInfo(input(id)));
+    // Les entrées arrivent dans l'ordre A, B, C… ; les vides sont ignorées (pas de séparateur en double).
+    compute: (inputs, p) => ({ result: Object.values(inputs).filter((x) => x !== '').join(p.sep) }),
+    guarantee: (input, p, ids) => {
+      const parts = ids.map((id) => textInfo(input(id)));
       const lengths = parts.map((t) => t.format?.maxLength);
       const bounded = lengths.every((n) => typeof n === 'number');
       const required = parts.some((t) => t.required) ? true : parts.every((t) => t.required === false) ? false : undefined;
-      return { required, format: { maxLength: bounded ? lengths.reduce((x, y) => x + y, 0) + 2 * Array.from(p.sep).length : undefined } };
+      // Une entrée toujours vide (saisie vide) est ignorée : pas de séparateur pour elle.
+      const kept = parts.filter((t) => t.format?.maxLength !== 0).length;
+      const seps = Math.max(0, kept - 1) * Array.from(p.sep).length;
+      return { required, format: { maxLength: bounded ? lengths.reduce((x, y) => x + y, 0) + seps : undefined } };
     },
   },
   case: {
@@ -649,6 +661,26 @@ export const TRANSFORMS = {
 };
 
 export const CATEGORIES = ['Entrée', 'Structure', 'Liste', 'Texte', 'Math', 'Logique', 'Conversion', 'Date'];
+
+/**
+ * Entrées d'un nœud. Pour un nœud à entrées en nombre libre : jusqu'à la dernière utilisée (reliée — `connected`
+ * liste les ids des entrées reliées — ou saisie), plus une libre, et au moins `min`.
+ */
+export function inputsOf(def, node, connected = []) {
+  if (!def?.variadic) return def?.inputs ?? [];
+  const filled = Object.entries(node?.data?.values ?? {}).filter(([, v]) => v !== '' && v != null).map(([k]) => k);
+  const last = Math.max(-1, ...[...connected, ...filled].map(variadicIndex));
+  return variadicInputs(def.variadic.type, Math.max(def.variadic.min, last + 2));
+}
+
+/** Socket d'entrée `id` d'un nœud (y compris une entrée en nombre libre au-delà de celles affichées). */
+export function inputSocket(def, id) {
+  if (def?.variadic) {
+    const i = variadicIndex(id);
+    return i < 0 ? undefined : { id, label: variadicLabel(i), type: def.variadic.type };
+  }
+  return def?.inputs.find((s) => s.id === id);
+}
 
 export function paramsWithDefaults(def, params) {
   const result = {};

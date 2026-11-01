@@ -1,6 +1,6 @@
 # Mapping — éditeur nodal
 
-Éditeur visuel de mappings JSON : on relie les champs d'une **source** (structure + JSON d'exemple) à ceux d'une **cible**, en passant si besoin par des nœuds de transformation (texte, math, logique, listes, dates…). Chaque champ cible affiche la valeur obtenue avec l’exemple, et le panneau **Contrôles** vérifie le mapping en direct.
+Éditeur visuel de mappings JSON : on relie les champs d'une **source** (son modèle de données : champs, types, caractère obligatoire et formats) à ceux d'une **cible**, en passant si besoin par des nœuds de transformation (texte, math, logique, listes, dates…). Chaque champ affiche sa valeur (celle du modèle de données, ou d’un fichier de données déposé sur la source), et le panneau **Contrôles** vérifie le mapping en direct.
 
 Application 100 % navigateur (aucun serveur), déployée sur **Firebase Hosting** : Vue 3 + Vite + Vuetify + [Vue Flow](https://vueflow.dev).
 
@@ -13,7 +13,7 @@ Application 100 % navigateur (aucun serveur), déployée sur **Firebase Hosting*
 | Ajouter un nœud | Bouton **Ajouter**, `Shift A` ou clic droit sur le fond |
 | Relier | Glisser d'un socket à l'autre ; lâché dans le vide, le lien propose de créer le nœud à raccorder |
 | Délier | Attraper l'extrémité d'un lien et la lâcher dans le vide |
-| Structure d'une source / cible | Bouton `{ }` de l'en-tête (JSON), ou édition directe des champs (glisser `⋮⋮` pour les déplacer) |
+| Modèle de données d'une source / cible | Bouton `{ }` de l'en-tête : le modèle en YAML (voir ci-dessous), ou édition directe des champs (glisser `⋮⋮` pour les déplacer) |
 | Replier, supprimer | Clic droit sur un nœud (agit sur toute la sélection) ; `Suppr` |
 | Dupliquer | « Dupliquer » au clic droit ou `Ctrl D` : la copie (avec les liens internes à la sélection ; un groupe avec ses nœuds) suit la souris, un clic gauche la dépose — dans un groupe si on clique dessus ; `Échap` ou clic droit annule |
 | Grouper | `Ctrl G` sur la sélection, « Grouper » au clic droit, ou « Groupe » dans le menu d’ajout. Glisser un nœud dans / hors d’un cadre l’y range / l’en sort (c’est le pointeur au lâcher qui compte). Le cadre s’ajuste tout seul à ses nœuds : il grandit ou rétrécit quand on les déplace, les replie ou les modifie. Replié, un groupe se réduit à son en-tête et ses liens y aboutissent. Supprimer un groupe garde ses nœuds. La pastille de l’en-tête choisit sa couleur. |
@@ -22,7 +22,30 @@ Le mapping en cours est conservé dans le navigateur. **Ouvrir** (`Ctrl O`) char
 
 Verrouillage : le cadenas d’en-tête (ou « Verrouiller » au clic droit) fige un nœud — ni déplacement, ni suppression, ni modification ; le cadenas des contrôles en bas à gauche verrouille tout le schéma (ni ajout, ni lien, ni modification). Le repli reste toujours possible.
 
+Données réelles : déposez un fichier JSON sur une source (ou bouton `⤒` de son en-tête). Il remplace les valeurs du modèle de données pour le calcul, sans toucher au modèle décrit dans le nœud, et il est contrôlé contre ce modèle : ⛔ champ obligatoire absent, type ou format non respecté ; ⚠ champ en trop. Un bandeau dans la source résume le résultat, le détail est dans le panneau **Contrôles**. Le fichier reste en mémoire : il n’est ni sauvegardé ni exporté avec le mapping. Le bouton **Résultat** d’une cible montre le JSON produit, sa conformité au modèle de la cible, et permet de le copier ou de l’exporter.
+
 Types : Texte, Nombre (décimal), Entier, Booléen, Date, Objet, et les listes de chacun. Un entier convient partout où un nombre est attendu ; un nombre relié à un champ Entier est tronqué, et le contrôle le signale (« En entier » permet de choisir l’arrondi).
+
+Modèle de données en YAML : un champ par clé, avec son `type` (string, number, integer, boolean, date, object, array), `required: true` s’il est obligatoire, son format et son `example`. Forme courte : `nom: string`.
+
+```yaml
+client:
+  type: object
+  required: true
+  fields:
+    nom: { type: string, required: true, maxLength: 60, example: Ada Lovelace }
+    age: integer
+commandes:
+  type: array
+  items: object          # type des éléments
+  minItems: 1
+  fields:
+    ref: { type: string, required: true, pattern: '^C-\d+$' }   # entre apostrophes : \d reste tel quel
+```
+
+`example` : pour une source, les exemples sont les données du calcul tant qu’aucun fichier n’est chargé (un champ sans exemple reçoit une valeur type) ; une liste d’objets peut recevoir la liste complète dans son `example` (ex. plusieurs commandes). Pour une cible, ils documentent le format attendu. L’exemple d’un champ simple d’une source (hors liste) se modifie aussi directement dans sa colonne **Valeur** (bordure rouge s’il ne respecte pas les règles du champ) ; ce n’est pas possible quand un fichier de données est chargé. Un exemple qui ne respecte pas le type ou le format de son champ est refusé.
+
+« Importer un exemple JSON » déduit le modèle d’un document collé dans la fenêtre (les champs existants gardent leurs règles et leurs liens ; les valeurs du document deviennent les exemples).
 
 Règles des champs : `*` à côté du nom rend un champ obligatoire, `⚙` (au survol) définit son format — longueur min. / max. et expression régulière pour un texte, bornes pour un nombre ou un entier, bornes pour une date, nombre d’éléments pour une liste. Chaque champ cible est contrôlé (panneau **Contrôles** en haut à droite — son icône donne le résultat global : ✔ conforme, ⚠ avertissements, ⛔ erreurs ; un clic sur un problème centre la vue sur le nœud — compteur dans l’en-tête de la cible, ligne surlignée) :
 

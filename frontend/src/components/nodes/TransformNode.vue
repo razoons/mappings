@@ -8,7 +8,7 @@
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
-          v-for="i in def.inputs"
+          v-for="i in inputs"
           :id="i.id"
           :key="`in-${i.id}`"
           type="target"
@@ -46,7 +46,7 @@
       </div>
 
       <div
-        v-for="i in def.inputs"
+        v-for="i in inputs"
         :key="i.id"
         class="row in-row"
         :class="issueOf(i) && `issue-${issueOf(i).level}`"
@@ -82,11 +82,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, nextTick, watch } from 'vue';
 import { Handle, Position, useVueFlow } from '@vue-flow/core';
 import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
-import { paramsWithDefaults, TRANSFORMS } from '../../lib/transforms';
+import { inputsOf, paramsWithDefaults, TRANSFORMS } from '../../lib/transforms';
 import { coerce, formatValue, HEADER_COLORS, isList, isNumeric } from '../../lib/types';
 import { socketAttrs, useReadOnly, useResults } from './shared';
 
@@ -98,7 +98,7 @@ const props = defineProps({
   selected: Boolean,
 });
 
-const { updateNodeData, edges } = useVueFlow();
+const { updateNodeData, updateNodeInternals, edges } = useVueFlow();
 const { outputsOf, issuesOf } = useResults();
 const issueOf = (i) => issuesOf(props.id).get(i.id)?.[0];
 
@@ -107,6 +107,13 @@ const def = computed(() => TRANSFORMS[props.data.kind]);
 const params = computed(() => paramsWithDefaults(def.value, props.data.params));
 const outputs = computed(() => outputsOf(props.id));
 const connected = computed(() => new Set(edges.value.filter((e) => e.target === props.id).map((e) => e.targetHandle)));
+/** Entrées affichées (pour « Concaténer » : celles utilisées, plus une libre en bas). */
+const inputs = computed(() => inputsOf(def.value, props, [...connected.value]));
+// Une entrée apparaît ou disparaît : Vue Flow doit re-mesurer les sockets.
+watch(
+  () => inputs.value.length,
+  () => nextTick(() => updateNodeInternals([props.id])),
+);
 
 /** Valeur saisie directement sur une entrée simple non connectée. */
 const hasInlineValue = (i) => !connected.value.has(i.id) && !isList(i.type) && (i.default !== undefined || !i.perItem);

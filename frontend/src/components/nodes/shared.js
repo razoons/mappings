@@ -1,6 +1,7 @@
 import { computed, inject, nextTick } from 'vue';
 import { useVueFlow } from '@vue-flow/core';
-import { allFields, applyTypeKey, descendantIds, findChain, isContainer, mapField, moveField, newField, removeField, reshapeSample } from '../../lib/fields';
+import { allFields, applyTypeKey, descendantIds, findChain, isContainer, mapField, moveField, newField, parseDocument, removeField, reshapeSample, syncFields } from '../../lib/fields';
+import { fieldsToYaml, yamlToFields } from '../../lib/modelYaml';
 import { cleanFormat } from '../../lib/formats';
 import { isPlainObject } from '../../lib/lists';
 import { baseOf, isList, SOCKET_COLORS, socketTitle } from '../../lib/types';
@@ -13,10 +14,15 @@ export function useResults() {
   return {
     outputsOf: (nodeId) => results.value.outputs.get(nodeId) ?? {},
     previewOf: (nodeId) => results.value.targets.get(nodeId)?.preview ?? {},
+    /** Document produit par une cible. */
+    resultOf: (nodeId) => results.value.targets.get(nodeId)?.value ?? {},
     /** Problèmes de validation d'une cible, par champ. */
     issuesOf: (nodeId) => results.value.issues.byNode.get(nodeId) ?? new Map(),
   };
 }
+
+/** Fichiers de données des sources (`get`, `load`, `clear` par id de nœud), fournis par l'éditeur. */
+export const DATA_FILES_KEY = Symbol('dataFiles');
 
 /** Verrou de tout le schéma (ref booléenne), fourni par l'éditeur. */
 export const SCHEMA_LOCK_KEY = Symbol('schemaLock');
@@ -47,11 +53,11 @@ export function useCollapse(nodeId) {
 export const dragState = { current: null };
 
 /**
- * Opérations sur l'arbre de champs d'un nœud source ou cible. Pour une source (`data.sample` défini),
- * chaque changement de structure réécrit aussi le JSON d'exemple (sauf s'il est invalide).
+ * Opérations sur l'arbre de champs d'un nœud source ou cible. Si `reshape` (source) et `data.sample` défini,
+ * chaque changement de structure réécrit aussi les données d'exemple (sauf si elles sont invalides).
  * `getData` renvoie les données à jour du nœud (Vue Flow remplace l'objet à chaque modification).
  */
-export function useFieldEditor(nodeId, getData) {
+export function useFieldEditor(nodeId, getData, { reshape = true } = {}) {
   const { updateNodeData, edges, removeEdges } = useVueFlow();
 
   const dropEdgesOf = (ids) => {
@@ -64,7 +70,7 @@ export function useFieldEditor(nodeId, getData) {
 
   const setFields = (next) => {
     const { fields, sample } = getData();
-    if (sample === undefined) return updateNodeData(nodeId, { fields: next });
+    if (sample === undefined || !reshape) return updateNodeData(nodeId, { fields: next });
     let doc;
     try {
       doc = JSON.parse(sample || '{}');
@@ -90,7 +96,7 @@ export function useFieldEditor(nodeId, getData) {
       if (!isContainer(next)) dropEdgesOf(descendantIds(field));
       update(id, () => next);
     },
-    /** Règles du champ (`required`, `format`) : sans effet sur le JSON d'exemple. */
+    /** Règles du champ (`required`, `format`) : sans effet sur le modèle de données JSON. */
     setRules: (id, rules) =>
       updateNodeData(nodeId, { fields: mapField(getData().fields, id, (f) => {
         const next = { ...f, ...rules };
@@ -112,5 +118,59 @@ export function useFieldEditor(nodeId, getData) {
       dropEdgesOf(allFields(getData().fields).map((f) => f.id).filter((id) => !kept.has(id)));
       updateNodeData(nodeId, { ...extra, fields: next });
     },
+  };
+}
+
+/**
+ * Édition du modèle de données d'un nœud en YAML (type, `required` et format de chaque champ).
+ * « Importer un exemple JSON » déduit le modèle d'un document collé dans la zone de texte ; pour une source,
+ * ce document devient aussi ses valeurs. Les champs retrouvés par leur nom gardent leurs liens et leurs règles.
+ */
+export function useModelEditor(getData, ops, { source = false } = {}) {
+  /** Exemple JSON importé, pas encore enregistré : `{ fields, doc }`. */
+  let pending = null;
+  const hasSample = () => getData().sample !== undefined;
+  const currentDoc = () => {
+    try {
+      const doc = JSON.parse(getData().sample || '{}');
+      return isPlainObject(doc) ? doc : {};
+    } catch {
+      return {};
+    }
+  };
+
+  return {
+    initial: () => fieldsToYaml(getData().fields, hasSample() ? currentDoc() : undefined),
+    reset: () => (pending = null),
+    actions: [
+      {
+        label: 'Importer un exemple JSON',
+        run: (text, setText) => {
+          let doc;
+          try {
+            doc = parseDocument(text);
+          } catch (e) {
+            throw new Error(`Remplacez le YAML par un document JSON d’exemple, puis cliquez à nouveau (${e.message}).`);
+          }
+          const fields = syncFields(getData().fields, doc);
+          pending = { fields, doc };
+          setText(fieldsToYaml(fields, doc));
+          return false;
+        },
+      },
+      {
+        label: 'Enregistrer',
+        primary: true,
+        run: (text) => {
+          const base = pending ?? { fields: getData().fields };
+          // Source : données de calcul complètes (valeur type sans exemple) ; cible : seuls les exemples donnés.
+          const { fields: next, sample, hasExamples } = yamlToFields(text, base.fields, { defaults: source });
+          const extra = source || hasExamples || hasSample() ? { sample: JSON.stringify(sample, null, 2) } : {};
+          ops.sync(next, extra);
+          pending = null;
+          return true;
+        },
+      },
+    ],
   };
 }

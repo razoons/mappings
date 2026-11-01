@@ -1,7 +1,7 @@
 import { findChain, isContainer, pathLabel } from './fields';
 import { getSocket } from './graph';
 import { isSet } from './formats';
-import { TRANSFORMS } from './transforms';
+import { inputsOf, inputSocket, TRANSFORMS } from './transforms';
 import { baseOf, isList, socketTitle, typeMismatch } from './types';
 
 /**
@@ -22,6 +22,10 @@ const base = (f) => (f.type === 'array' ? f.item ?? 'string' : f.type);
  * `optionalFrom` nomme le champ source optionnel à l'origine d'un `required: false`.
  * `null` : sortie d'une transformation qui ne déclare pas de garanties (on lui fait confiance).
  */
+/** Ids des entrées reliées d'un nœud (`incoming` : clés `nœud:entrée`). */
+const linkedInputsOf = (incoming, nodeId) =>
+  [...incoming.keys()].filter((k) => k.startsWith(`${nodeId}:`)).map((k) => k.slice(nodeId.length + 1));
+
 function makeSocketInfo(byId, incoming) {
   const memo = new Map();
 
@@ -47,14 +51,15 @@ function makeSocketInfo(byId, incoming) {
         const input = (id) => {
           if (!inputs[id]) {
             const e = incoming.get(`${nodeId}:${id}`);
-            const s = def.inputs.find((i) => i.id === id);
+            const s = inputSocket(def, id);
             inputs[id] = e
               ? { connected: true, info: infoOf(e.source, e.sourceHandle ?? '', depth + 1) }
               : { connected: false, info: null, value: node.data.values?.[id] ?? s?.default ?? '' };
           }
           return inputs[id];
         };
-        const g = def.guarantee(input, { ...Object.fromEntries((def.params ?? []).map((p) => [p.id, p.default])), ...node.data.params });
+        const ids = inputsOf(def, node, linkedInputsOf(incoming, nodeId)).map((i) => i.id);
+        const g = def.guarantee(input, { ...Object.fromEntries((def.params ?? []).map((p) => [p.id, p.default])), ...node.data.params }, ids);
         const used = Object.values(inputs);
         // Une liste branchée sur une entrée simple : le nœud est appliqué à chaque élément.
         const array = isList(output.type) || used.some((i) => i.info?.array);
@@ -135,6 +140,7 @@ export function validateTargets(nodes, edges) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const incoming = new Map(edges.map((e) => [`${e.target}:${e.targetHandle}`, e]));
   const infoOf = makeSocketInfo(byId, incoming);
+  const linkedInputs = (nodeId) => linkedInputsOf(incoming, nodeId);
   const byNode = new Map();
   const list = [];
 
@@ -178,7 +184,7 @@ export function validateTargets(nodes, edges) {
     const def = node.type === 'transform' && TRANSFORMS[node.data.kind];
     if (!def) continue;
     const issues = new Map();
-    for (const inp of def.inputs) {
+    for (const inp of inputsOf(def, node, linkedInputs(node.id))) {
       const e = incoming.get(`${node.id}:${inp.id}`);
       const mismatch = e && linkMismatch(byId, e);
       if (!mismatch) continue;

@@ -2,7 +2,7 @@
   <div class="col-labels tree-cols">
     <span>Champ</span>
     <span>Type</span>
-    <span>{{ side === 'source' ? 'Exemple' : 'Valeur' }}</span>
+    <span>Valeur</span>
   </div>
 
   <div
@@ -46,7 +46,28 @@
       <option v-for="[k, label] in TYPE_OPTIONS" :key="k" :value="k">{{ label }}</option>
     </select>
 
-    <span class="field-value" :class="{ empty: isUnmapped(f) }" :title="issueText(f) || formatValue(values[f.id])">
+    <span v-if="exampleEditable(f, chain)" class="field-value editable">
+      <input
+        v-if="f.type === 'boolean'"
+        type="checkbox"
+        class="nodrag"
+        :checked="exampleOf(chain) === true"
+        title="Exemple (données du calcul tant qu’aucun fichier n’est chargé)"
+        @change="setExample(chain, $event.target.checked)"
+      />
+      <input
+        v-else
+        class="value-input nodrag"
+        :class="{ invalid: exampleProblem(f, chain) }"
+        :value="exampleText(chain)"
+        :placeholder="f.type === 'date' ? 'AAAA-MM-JJ' : '—'"
+        :inputmode="f.type === 'number' || f.type === 'integer' ? 'decimal' : undefined"
+        :title="exampleProblem(f, chain) || 'Exemple (données du calcul tant qu’aucun fichier n’est chargé) — Entrée pour valider'"
+        @change="setExample(chain, parseExample(f, $event.target.value))"
+        @keydown.enter="$event.target.blur()"
+      />
+    </span>
+    <span v-else class="field-value" :class="{ empty: isUnmapped(f) }" :title="issueText(f) || formatValue(values[f.id])">
       <span v-if="levelOf(f)" class="issue-mark" :class="levelOf(f)">{{ levelOf(f) === 'error' ? '⛔' : '⚠' }}</span>
       {{ isUnmapped(f) ? 'non mappé' : values[f.id] === undefined ? '—' : formatValue(values[f.id]) }}
     </span>
@@ -83,12 +104,14 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, inject, nextTick, ref, watch } from 'vue';
 import { Handle, Position, useVueFlow } from '@vue-flow/core';
+import { checkDocument, describeProblem } from '../../lib/conformity';
 import { descendantIds, flattenRows, isContainer, sourceSocketType, targetSocketType, TYPE_OPTIONS, typeKey } from '../../lib/fields';
+import { isPlainObject } from '../../lib/lists';
 import { formatValue } from '../../lib/types';
 import FieldRules from './FieldRules.vue';
-import { dragState, socketAttrs, useFieldEditor } from './shared';
+import { DATA_FILES_KEY, dragState, socketAttrs, useFieldEditor } from './shared';
 
 const props = defineProps({
   nodeId: { type: String, required: true },
@@ -104,8 +127,10 @@ const props = defineProps({
   locked: Boolean,
 });
 
-const ops = useFieldEditor(props.nodeId, () => props.data);
-const { updateNodeInternals } = useVueFlow();
+// Les données d'exemple d'une source suivent la structure ; celles d'une cible (exemples donnés) restent telles quelles.
+const ops = useFieldEditor(props.nodeId, () => props.data, { reshape: props.side === 'source' });
+const { updateNodeData, updateNodeInternals } = useVueFlow();
+const files = inject(DATA_FILES_KEY, null);
 const rows = computed(() => flattenRows(props.data.fields));
 const position = computed(() => (props.side === 'source' ? Position.Right : Position.Left));
 const draggedId = ref(null);
@@ -122,6 +147,64 @@ const levelOf = (f) => {
   return list.some((i) => i.level === 'error') ? 'error' : list.length ? 'warning' : null;
 };
 const issueText = (f) => issuesOf(f).map((i) => i.message).join('\n');
+
+// ── Exemple d'une source, modifiable dans la colonne Valeur ─────────────
+// Pour un champ simple hors liste, sans fichier de données chargé (sinon la valeur vient du fichier).
+
+/** Données d'exemple de la source (`null` si elles sont illisibles). */
+const sampleDoc = computed(() => {
+  if (props.side !== 'source') return null;
+  try {
+    const doc = JSON.parse(props.data.sample || '{}');
+    return isPlainObject(doc) ? doc : {};
+  } catch {
+    return null;
+  }
+});
+
+const exampleEditable = (f, chain) =>
+  !!sampleDoc.value &&
+  !props.locked &&
+  !files?.get(props.nodeId) &&
+  !isContainer(f) &&
+  f.type !== 'array' &&
+  chain.slice(0, -1).every((c) => c.type !== 'array');
+
+const exampleOf = (chain) => chain.reduce((v, c) => (isPlainObject(v) ? v[c.name] : undefined), sampleDoc.value);
+const exampleText = (chain) => {
+  const v = exampleOf(chain);
+  return v === undefined || v === null ? '' : String(v);
+};
+
+/** Valeur saisie convertie selon le type du champ (un nombre illisible reste un texte : le contrôle le signale). */
+function parseExample(f, text) {
+  if (text === '') return null;
+  if (f.type === 'number' || f.type === 'integer') {
+    const n = Number(text.trim().replace(',', '.'));
+    return Number.isNaN(n) ? text : n;
+  }
+  return text;
+}
+
+/** Problème de l'exemple au regard du type et du format du champ (message, ou `null`). */
+function exampleProblem(f, chain) {
+  const v = exampleOf(chain);
+  if (v === undefined || v === null) return f.required ? 'Obligatoire : donnez un exemple' : null;
+  const p = checkDocument([f], { [f.name]: v }).find((x) => x.level === 'error');
+  return p ? describeProblem(p) : null;
+}
+
+function setExample(chain, value) {
+  const doc = structuredClone(sampleDoc.value);
+  let node = doc;
+  for (const c of chain.slice(0, -1)) {
+    if (!isPlainObject(node[c.name])) node[c.name] = {};
+    node = node[c.name];
+  }
+  if (value === null) delete node[chain.at(-1).name];
+  else node[chain.at(-1).name] = value;
+  updateNodeData(props.nodeId, { sample: JSON.stringify(doc, null, 2) });
+}
 
 // Les handles visibles changent avec l'arbre : Vue Flow doit les re-mesurer.
 watch(

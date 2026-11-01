@@ -99,9 +99,10 @@ import TargetNode from '../components/nodes/TargetNode.vue';
 import TransformNode from '../components/nodes/TransformNode.vue';
 import GroupNode from '../components/nodes/GroupNode.vue';
 import TypedEdge from '../components/nodes/TypedEdge.vue';
-import { RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
+import { DATA_FILES_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
+import { checkDocument, describeProblem } from '../lib/conformity';
 import { demoGraph } from '../lib/demo';
-import { fieldFromSocket, migrateFields, newField, setTreeCollapsed } from '../lib/fields';
+import { fieldFromSocket, migrateFields, parseDocument, newField, setTreeCollapsed } from '../lib/fields';
 import { fitGroup, groupAround, groupAt, groupsFirst, isGroup, newGroup, removeKeepingChildren, reparent } from '../lib/groups';
 import { createsCycle, evaluateGraph, getSocket } from '../lib/graph';
 import { validateTargets } from '../lib/rules';
@@ -305,7 +306,54 @@ restore();
 
 // ── Évaluation ──────────────────────────────────────────────
 
-const results = computed(() => ({ ...evaluateGraph(nodes.value, edges.value), issues: validateTargets(nodes.value, edges.value) }));
+/**
+ * Fichiers de données déposés sur les sources (nœud → `{ name, doc }` ou `{ name, error }`) : ils remplacent
+ * les valeurs du modèle de données pour le calcul, sans toucher au modèle. Gardés en mémoire seulement (ni sauvegardés ni exportés).
+ */
+const dataFiles = reactive(new Map());
+provide(DATA_FILES_KEY, {
+  get: (id) => dataFiles.get(id),
+  load(id, { name, text }) {
+    try {
+      dataFiles.set(id, { name, doc: markRaw(parseDocument(text)) });
+    } catch (e) {
+      dataFiles.set(id, { name, error: `JSON invalide : ${e.message}` });
+    }
+  },
+  clear: (id) => dataFiles.delete(id),
+});
+
+/** Conformité de chaque fichier de données au modèle de sa source, au format des contrôles. */
+function checkDataFiles() {
+  const byNode = new Map();
+  const list = [];
+  for (const [id, file] of dataFiles) {
+    const node = findNode(id);
+    if (node?.type !== 'source') continue;
+    const issues = new Map();
+    const problems = file.error
+      ? [{ level: 'error', fieldId: null, path: '', message: file.error, count: 1 }]
+      : checkDocument(node.data.fields, file.doc);
+    for (const p of problems) {
+      const issue = { level: p.level, message: `Fichier : ${p.path ? `${p.path} — ` : ''}${describeProblem(p)}` };
+      const key = p.fieldId ?? '';
+      issues.set(key, [...(issues.get(key) ?? []), issue]);
+      list.push({ nodeId: id, fieldId: key, path: `${node.data.label} › ${file.name}${p.path ? ` › ${p.path}` : ''}`, level: p.level, message: describeProblem(p) });
+    }
+    byNode.set(id, issues);
+  }
+  return { byNode, list };
+}
+
+const results = computed(() => {
+  const docs = new Map([...dataFiles].filter(([, f]) => f.doc).map(([id, f]) => [id, f.doc]));
+  const targets = validateTargets(nodes.value, edges.value);
+  const files = checkDataFiles();
+  return {
+    ...evaluateGraph(nodes.value, edges.value, docs),
+    issues: { byNode: new Map([...targets.byNode, ...files.byNode]), list: [...files.list, ...targets.list] },
+  };
+});
 provide(RESULTS_KEY, results);
 
 /** Centre la vue sur un nœud (clic sur un problème du panneau Contrôles) et le sélectionne. */
@@ -469,6 +517,16 @@ function onKeydown(e) {
   }
 }
 onMounted(() => window.addEventListener('keydown', onKeydown));
+// Un fichier lâché hors d'une source ne doit pas faire quitter la page (le navigateur l'ouvrirait).
+const swallowFileDrop = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files') && e.preventDefault();
+onMounted(() => {
+  window.addEventListener('dragover', swallowFileDrop);
+  window.addEventListener('drop', swallowFileDrop);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('dragover', swallowFileDrop);
+  window.removeEventListener('drop', swallowFileDrop);
+});
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
 
 // ── Groupes et suppression ──────────────────────────────────

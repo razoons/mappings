@@ -1,6 +1,6 @@
 import { allFields, findChain, sourceSocketType, targetSocketType } from './fields';
 import { bindsOf, isPlainObject, tagList } from './lists';
-import { paramsWithDefaults, TRANSFORMS } from './transforms';
+import { inputsOf, inputSocket, paramsWithDefaults, TRANSFORMS } from './transforms';
 import { baseOf, coerce, isList, listOf } from './types';
 
 /** Décrit le socket `handleId` d'un nœud (`{ name, type }`), côté sortie (`source`) ou entrée (`target`). */
@@ -14,7 +14,7 @@ export function getSocket(node, handleId, side) {
     return { name: field.name, type: node.type === 'source' ? sourceSocketType(chain) : targetSocketType(field) };
   }
   const def = TRANSFORMS[node.data.kind];
-  const s = (side === 'source' ? def?.outputs : def?.inputs)?.find((s) => s.id === handleId);
+  const s = side === 'source' ? def?.outputs.find((s) => s.id === handleId) : inputSocket(def, handleId);
   return s && { name: s.label, type: s.type };
 }
 
@@ -30,11 +30,16 @@ const ROOT_SCOPE = { id: 0, binds: new Map() };
  * Évalue le graphe. Renvoie :
  * - `outputs` : valeurs des sorties hors itération, par nœud ;
  * - `targets` : pour chaque cible, le document produit (`value`) et la 1re valeur de chaque champ (`preview`).
+ * `dataFiles` (nœud source → document) : données qui remplacent les valeurs du modèle de données d'une source.
  */
-export function evaluateGraph(nodes, edges) {
+export function evaluateGraph(nodes, edges, dataFiles = new Map()) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const incoming = new Map(edges.map((e) => [inKey(e.target, e.targetHandle), e]));
   const samples = new Map();
+  /** Ids des entrées reliées de chaque nœud. */
+  const linkedInputs = new Map();
+  for (const e of edges) linkedInputs.set(e.target, [...(linkedInputs.get(e.target) ?? []), e.targetHandle]);
+  const connectedInputs = (nodeId) => linkedInputs.get(nodeId) ?? [];
   const memo = new Map();
   const visiting = new Set();
   let scopeSeq = 0;
@@ -58,12 +63,13 @@ export function evaluateGraph(nodes, edges) {
   }
 
   function sampleOf(node) {
+    if (dataFiles.has(node.id)) return dataFiles.get(node.id);
     if (!samples.has(node.id)) {
       let parsed = {};
       try {
         parsed = JSON.parse(node.data.sample || '{}');
       } catch {
-        /* exemple invalide : signalé dans le nœud */
+        /* modèle de données invalide : signalé dans le nœud */
       }
       samples.set(node.id, parsed);
     }
@@ -115,7 +121,8 @@ export function evaluateGraph(nodes, edges) {
     visiting.add(memoKey);
 
     const inline = (s) => node.data.values[s.id] ?? s.default ?? '';
-    const direct = def.inputs.filter((i) => !i.perItem);
+    const inputs = inputsOf(def, node, connectedInputs(node.id));
+    const direct = inputs.filter((i) => !i.perItem);
     const raw = {};
     for (const inp of direct) {
       const up = upstream(node.id, inp.id, scope);
@@ -126,7 +133,7 @@ export function evaluateGraph(nodes, edges) {
       connected: (id) => incoming.has(inKey(node.id, id)),
       current: scope.current,
       item: (id, list, index) => {
-        const inp = def.inputs.find((s) => s.id === id);
+        const inp = inputs.find((s) => s.id === id);
         const up = upstream(node.id, id, extend(scope, bindsOf(list)?.[index], list[index], index));
         return coerce(up.connected ? up.value : inline(inp), inp.type);
       },
