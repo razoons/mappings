@@ -1,5 +1,5 @@
 import { findChain, isContainer, pathLabel } from './fields';
-import { getSocket } from './graph';
+import { getSocket, outputType } from './graph';
 import { isSet } from './formats';
 import { inputsOf, inputSocket, TRANSFORMS } from './transforms';
 import { baseOf, isList, socketTitle, typeMismatch } from './types';
@@ -114,8 +114,9 @@ function formatGaps(src, dst) {
 }
 
 /** Écart de type d'un lien : `{ level, message }` ou `null`. */
-export function linkMismatch(byId, e) {
-  const from = getSocket(byId.get(e.source), e.sourceHandle, 'source');
+export function linkMismatch(byId, e, incoming) {
+  const fromType = outputType((id) => byId.get(id), (id, h) => incoming.get(`${id}:${h}`), e.source, e.sourceHandle);
+  const from = fromType && { type: fromType };
   const to = getSocket(byId.get(e.target), e.targetHandle, 'target');
   const kind = from && to && typeMismatch(from.type, to.type);
   if (!kind) return null;
@@ -160,7 +161,7 @@ export function validateTargets(nodes, edges) {
         const chain = [...parents, f];
         const e = linkOf(f);
         if (f.required && !isMapped(f)) add(f, chain, 'error', 'Obligatoire mais non mappé');
-        const mismatch = e && linkMismatch(byId, e);
+        const mismatch = e && linkMismatch(byId, e, incoming);
         if (mismatch) add(f, chain, mismatch.level, mismatch.message);
         const info = e && infoOf(e.source, e.sourceHandle ?? '');
         if (info) {
@@ -186,7 +187,7 @@ export function validateTargets(nodes, edges) {
     const issues = new Map();
     for (const inp of inputsOf(def, node, linkedInputs(node.id))) {
       const e = incoming.get(`${node.id}:${inp.id}`);
-      const mismatch = e && linkMismatch(byId, e);
+      const mismatch = e && linkMismatch(byId, e, incoming);
       if (!mismatch) continue;
       issues.set(inp.id, [mismatch]);
       list.push({ nodeId: node.id, fieldId: inp.id, path: `${def.label} › ${inp.label}`, ...mismatch });

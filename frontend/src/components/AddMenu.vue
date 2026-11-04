@@ -42,7 +42,7 @@ import { HEADER_COLORS } from '../lib/types';
 
 /** Menu d'ajout de nœud (Shift+A) ; `pick` émet `source`, `target`, `group` ou une clé de TRANSFORMS. */
 const props = defineProps({
-  /** Position écran `{ x, y }` ; nul = fermé. */
+  /** Position écran `{ x, y }` ; nul = fermé. `only` : liste des nœuds proposés (sinon tous). */
   at: { type: Object, default: null },
 });
 const emit = defineEmits(['pick', 'close']);
@@ -66,7 +66,8 @@ const search = ref(null);
 
 const items = computed(() => {
   const q = normalize(query.value.trim());
-  return q ? ITEMS.filter((i) => normalize(`${i.label} ${i.category}`).includes(q)) : ITEMS;
+  const allowed = props.at?.only ? ITEMS.filter((i) => props.at.only.includes(i.kind)) : ITEMS;
+  return q ? allowed.filter((i) => normalize(`${i.label} ${i.category}`).includes(q)) : allowed;
 });
 
 watch(query, () => (active.value = 0));

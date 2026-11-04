@@ -60,9 +60,9 @@
         class="value-input nodrag"
         :class="{ invalid: exampleProblem(f, chain) }"
         :value="exampleText(chain)"
-        :placeholder="f.type === 'date' ? 'AAAA-MM-JJ' : '—'"
+        :placeholder="examplePlaceholder(f)"
         :inputmode="f.type === 'number' || f.type === 'integer' ? 'decimal' : undefined"
-        :title="exampleProblem(f, chain) || 'Exemple (données du calcul tant qu’aucun fichier n’est chargé) — Entrée pour valider'"
+        :title="exampleProblem(f, chain) || exampleHint(f)"
         @change="setExample(chain, parseExample(f, $event.target.value))"
         @keydown.enter="$event.target.blur()"
       />
@@ -149,7 +149,7 @@ const levelOf = (f) => {
 const issueText = (f) => issuesOf(f).map((i) => i.message).join('\n');
 
 // ── Exemple d'une source, modifiable dans la colonne Valeur ─────────────
-// Pour un champ simple hors liste, sans fichier de données chargé (sinon la valeur vient du fichier).
+// Pour un champ simple ou une liste de valeurs simples (éléments séparés par des virgules), hors liste d'objets, sans fichier de données chargé (sinon la valeur vient du fichier).
 
 /** Données d'exemple de la source (`null` si elles sont illisibles). */
 const sampleDoc = computed(() => {
@@ -167,21 +167,74 @@ const exampleEditable = (f, chain) =>
   !props.locked &&
   !files?.get(props.nodeId) &&
   !isContainer(f) &&
-  f.type !== 'array' &&
   chain.slice(0, -1).every((c) => c.type !== 'array');
 
 const exampleOf = (chain) => chain.reduce((v, c) => (isPlainObject(v) ? v[c.name] : undefined), sampleDoc.value);
 const exampleText = (chain) => {
   const v = exampleOf(chain);
-  return v === undefined || v === null ? '' : String(v);
+  if (v === undefined || v === null) return '';
+  if (!Array.isArray(v)) return String(v);
+  // Liste de textes : chaque élément entre guillemets (il peut contenir des virgules, ou être vide).
+  const quoted = (chain.at(-1).item ?? 'string') === 'string';
+  return v.map((x) => (quoted ? `"${String(x ?? '').replace(/[\\"]/g, '\\$&')}"` : String(x ?? ''))).join(', ');
 };
+const examplePlaceholder = (f) => {
+  if (f.type === 'array') return (f.item ?? 'string') === 'string' ? '"a", "b, c", ""' : '1, 2, 3';
+  return f.type === 'date' ? 'AAAA-MM-JJ' : '—';
+};
+const exampleHint = (f) =>
+  `Exemple (données du calcul tant qu’aucun fichier n’est chargé)${
+    f.type !== 'array' ? '' : (f.item ?? 'string') === 'string' ? ' — textes entre guillemets, séparés par des virgules ("" : texte vide)' : ' — éléments séparés par des virgules'
+  } — Entrée pour valider`;
+
+/**
+ * Éléments d'une liste saisie : séparés par des virgules ; un élément entre guillemets est pris tel quel
+ * (virgules comprises, `\"` pour un guillemet, `""` pour un texte vide). Un élément vide sans guillemets est ignoré.
+ */
+function splitList(text) {
+  const items = [];
+  let i = 0;
+  while (i <= text.length) {
+    while (text[i] === ' ' || text[i] === '\t') i++;
+    if (text[i] === '"') {
+      let value = '';
+      for (i++; i < text.length && text[i] !== '"'; i++) {
+        if (text[i] === '\\' && i + 1 < text.length) i++;
+        value += text[i];
+      }
+      items.push(value);
+      while (i < text.length && text[i] !== ',') i++; // après le guillemet fermant : jusqu'à la virgule
+    } else {
+      const comma = text.indexOf(',', i);
+      const end = comma < 0 ? text.length : comma;
+      const value = text.slice(i, end).trim();
+      if (value !== '') items.push(value);
+      i = end;
+    }
+    i++;
+  }
+  return items;
+}
 
 /** Valeur saisie convertie selon le type du champ (un nombre illisible reste un texte : le contrôle le signale). */
 function parseExample(f, text) {
   if (text === '') return null;
-  if (f.type === 'number' || f.type === 'integer') {
+  if (f.type === 'array') {
+    return splitList(text).map((t) => parseScalar(f.item ?? 'string', t));
+  }
+  return parseScalar(f.type, text);
+}
+
+/** Une valeur simple saisie, convertie selon son type. */
+function parseScalar(type, text) {
+  if (type === 'number' || type === 'integer') {
     const n = Number(text.trim().replace(',', '.'));
     return Number.isNaN(n) ? text : n;
+  }
+  if (type === 'boolean') {
+    const t = text.trim().toLowerCase();
+    if (['true', 'vrai', 'oui', '1'].includes(t)) return true;
+    if (['false', 'faux', 'non', '0'].includes(t)) return false;
   }
   return text;
 }

@@ -5,7 +5,8 @@ import { coerce } from './types';
  * Définition d'un nœud de transformation :
  * - `inputs` / `outputs` : sockets `{ id, label, type, default?, perItem? }`. Une entrée `perItem`
  *   est réévaluée pour chaque élément de la liste du nœud (comme un « field » Blender) ;
- * - `params` : réglages `{ id, label, default, options? }` ;
+ * - `params` : réglages `{ id, label, default, options?, optionLabel? }` (`optionLabel(option, params)` : texte affiché
+ *   pour une option, selon les autres réglages) ;
  * - `list` : le nœud manipule des listes (pas d'application automatique élément par élément) ;
  * - `compute(inputs, params, ctx)` où `ctx.item(inputId, list, index)` évalue une entrée `perItem`,
  *   `ctx.connected(inputId)` dit si elle est reliée et `ctx.current` donne l'élément de l'itération englobante ;
@@ -19,12 +20,46 @@ import { coerce } from './types';
 
 const out = (type, label = 'Résultat') => [{ id: 'result', label, type }];
 
+// ── Noms des jours (dimanche en premier, comme getUTCDay) et des mois ──
+const NAMES = {
+  'lundi, mardi…': {
+    days: ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
+    months: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+  },
+  'lun, mar…': {
+    days: ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'],
+    months: ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'],
+  },
+  'monday, tuesday…': {
+    days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+    months: ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'],
+  },
+  'mon, tue…': {
+    days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
+    months: ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'],
+  },
+};
+const NAME_STYLES = Object.keys(NAMES);
+/** Libellé d'un style de noms : des mois si la partie choisie est le mois (« janvier, février… »), sinon des jours. */
+const nameStyleLabel = (style, p) => {
+  const months = p.part === 'Mois' && NAMES[style]?.months;
+  return months ? `${months[0]}, ${months[1]}…` : style;
+};
+
+/*
+ * `passes` : une sortie « Tout » qui ne fait que transmettre des entrées prend le type réel de ce qui y entre
+ * (voir outputType dans graph.js), pour que les contrôles de type voient à travers le nœud.
+ * `inputs` : les entrées transmises (`'variadic'` : toutes les entrées en nombre libre) ;
+ * `as` : `'same'` (défaut) le type commun, `'item'` l'élément d'une liste, `'list'` une liste de ce type ;
+ * `unless` : une entrée qui, reliée, fournit seule la sortie (ex. la Valeur de « Élément n »).
+ */
+
 // ── Entrées en nombre libre (A, B, C… puis #27, #28…) ─────
 
-const variadicId = (i) => (i < 26 ? String.fromCharCode(97 + i) : `i${i + 1}`);
+export const variadicId = (i) => (i < 26 ? String.fromCharCode(97 + i) : `i${i + 1}`);
 const variadicLabel = (i) => (i < 26 ? String.fromCharCode(65 + i) : `#${i + 1}`);
 /** Rang d'une entrée en nombre libre d'après son id (`-1` si l'id n'en est pas une). */
-const variadicIndex = (id) => (/^[a-z]$/.test(id) ? id.charCodeAt(0) - 97 : /^id+$/.test(id) ? Number(id.slice(1)) - 1 : -1);
+const variadicIndex = (id) => (/^[a-z]$/.test(id) ? id.charCodeAt(0) - 97 : /^i\d+$/.test(id) ? Number(id.slice(1)) - 1 : -1);
 const variadicInputs = (type, n) => Array.from({ length: n }, (_, i) => ({ id: variadicId(i), label: variadicLabel(i), type }));
 
 // ── Garanties (contrôle des cibles) ────────────────────────
@@ -171,13 +206,17 @@ export const TRANSFORMS = {
     label: 'Créer une liste',
     category: 'Structure',
     list: true,
-    inputs: [
-      { id: 'a', label: 'A', type: 'any' },
-      { id: 'b', label: 'B', type: 'any' },
-      { id: 'c', label: 'C', type: 'any' },
-    ],
+    // Autant d'entrées que nécessaire : il y en a toujours une libre en bas.
+    variadic: { type: 'any', min: 2 },
+    inputs: variadicInputs('any', 2),
     outputs: out('any[]', 'Liste'),
-    compute: (inputs, _, ctx) => ({ result: ['a', 'b', 'c'].filter(ctx.connected).flatMap((id) => inputs[id]) }),
+    passes: { result: { inputs: 'variadic', as: 'list' } },
+    // Dans l'ordre A, B, C… : les entrées reliées et les valeurs saisies ; une entrée vide est ignorée.
+    compute: (inputs, _, ctx) => ({
+      result: Object.entries(inputs)
+        .filter(([id, v]) => ctx.connected(id) || (v !== '' && v != null))
+        .flatMap(([, v]) => v),
+    }),
   },
 
   // ── Liste ───────────────────────────────────────────────
@@ -187,6 +226,7 @@ export const TRANSFORMS = {
     list: true,
     inputs: [LIST_IN, { id: 'cond', label: 'Garder si', type: 'boolean', perItem: true, default: 'true' }],
     outputs: out('any[]', 'Liste'),
+    passes: { result: { inputs: ['list'] } },
     compute: ({ list }, _, ctx) => ({ result: pickItems(list, indexes(list).filter((i) => ctx.item('cond', list, i))) }),
   },
   list_sort: {
@@ -195,6 +235,7 @@ export const TRANSFORMS = {
     list: true,
     inputs: [LIST_IN, { id: 'key', label: 'Clé', type: 'any', perItem: true }],
     outputs: out('any[]', 'Liste'),
+    passes: { result: { inputs: ['list'] } },
     params: [{ id: 'order', label: 'Ordre', default: 'Croissant', options: ['Croissant', 'Décroissant'] }],
     compute: ({ list }, p, ctx) => {
       const keys = indexes(list).map((i) => (ctx.connected('key') ? ctx.item('key', list, i) : list[i]));
@@ -208,6 +249,7 @@ export const TRANSFORMS = {
     list: true,
     inputs: [LIST_IN, { id: 'value', label: 'Valeur', type: 'any', perItem: true }],
     outputs: out('any[]', 'Liste'),
+    passes: { result: { inputs: ['value'], as: 'list' } },
     compute: ({ list }, _, ctx) => ({
       result: tagList(
         indexes(list).map((i) => ctx.item('value', list, i)),
@@ -225,6 +267,7 @@ export const TRANSFORMS = {
       { id: 'value', label: 'Valeur', type: 'any', perItem: true },
     ],
     outputs: out('any', 'Élément'),
+    passes: { result: { inputs: ['list'], as: 'item', unless: 'value' } },
     params: [{ id: 'from', label: 'Depuis', default: 'Début', options: ['Début', 'Fin'] }],
     compute: ({ list, index }, p, ctx) => {
       const i = p.from === 'Fin' ? list.length - 1 - index : index;
@@ -245,6 +288,7 @@ export const TRANSFORMS = {
       { id: 'result', label: 'Élément', type: 'any' },
       { id: 'found', label: 'Trouvé', type: 'boolean' },
     ],
+    passes: { result: { inputs: ['list'], as: 'item', unless: 'value' } },
     compute: ({ list }, _, ctx) => {
       const i = indexes(list).find((i) => ctx.item('cond', list, i));
       if (i === undefined) return { result: null, found: false };
@@ -301,6 +345,7 @@ export const TRANSFORMS = {
       { id: 'count', label: 'Nombre', type: 'integer', default: '10' },
     ],
     outputs: out('any[]', 'Liste'),
+    passes: { result: { inputs: ['list'] } },
     compute: ({ list, start, count }) => ({ result: pickItems(list, indexes(list).slice(start, start + count)) }),
   },
   list_reverse: {
@@ -309,6 +354,7 @@ export const TRANSFORMS = {
     list: true,
     inputs: [LIST_IN],
     outputs: out('any[]', 'Liste'),
+    passes: { result: { inputs: ['list'] } },
     compute: ({ list }) => ({ result: pickItems(list, indexes(list).reverse()) }),
   },
   list_unique: {
@@ -317,6 +363,7 @@ export const TRANSFORMS = {
     list: true,
     inputs: [LIST_IN, { id: 'key', label: 'Clé', type: 'any', perItem: true }],
     outputs: out('any[]', 'Liste'),
+    passes: { result: { inputs: ['list'] } },
     compute: ({ list }, _, ctx) => {
       const seen = new Set();
       const keep = indexes(list).filter((i) => {
@@ -536,7 +583,7 @@ export const TRANSFORMS = {
     compute: ({ a, b }, p) => ({ result: p.op === 'ET' ? a && b : p.op === 'OU' ? a || b : a !== b }),
   },
   not: {
-    label: 'Non',
+    label: 'Contraire',
     category: 'Logique',
     inputs: [{ id: 'a', label: 'Booléen', type: 'boolean' }],
     outputs: out('boolean'),
@@ -551,6 +598,7 @@ export const TRANSFORMS = {
       { id: 'no', label: 'Si faux', type: 'any' },
     ],
     outputs: out('any'),
+    passes: { result: { inputs: ['yes', 'no'] } },
     compute: ({ cond, yes, no }) => ({ result: cond ? yes : no }),
   },
   coalesce: {
@@ -561,6 +609,7 @@ export const TRANSFORMS = {
       { id: 'fallback', label: 'Défaut', type: 'any' },
     ],
     outputs: out('any'),
+    passes: { result: { inputs: ['value', 'fallback'] } },
     compute: ({ value, fallback }) => ({
       result: value == null || value === '' || (value instanceof Date && isNaN(value.getTime())) ? fallback : value,
     }),
@@ -631,16 +680,27 @@ export const TRANSFORMS = {
     label: 'Partie de date',
     category: 'Date',
     inputs: [{ id: 'date', label: 'Date', type: 'date' }],
-    outputs: out('integer'),
-    params: [{ id: 'part', label: 'Partie', default: 'Année', options: ['Année', 'Mois', 'Jour', 'Jour de la semaine'] }],
+    outputs: [
+      { id: 'result', label: 'Nombre', type: 'integer' },
+      { id: 'name', label: 'Nom', type: 'string' },
+    ],
+    params: [
+      { id: 'part', label: 'Partie', default: 'Année', options: ['Année', 'Mois', 'Jour', 'Jour de la semaine'] },
+      { id: 'names', label: 'Nom', default: NAME_STYLES[0], options: NAME_STYLES, optionLabel: nameStyleLabel },
+    ],
     compute: ({ date }, p) => {
+      if (!(date instanceof Date) || Number.isNaN(date.getTime())) return { result: null, name: null };
       const parts = {
         Année: date.getUTCFullYear(),
         Mois: date.getUTCMonth() + 1,
         Jour: date.getUTCDate(),
         'Jour de la semaine': date.getUTCDay(),
       };
-      return { result: parts[p.part] };
+      const n = parts[p.part];
+      // Nom du jour de la semaine ou du mois ; pour l'année et le jour du mois, le nombre en texte.
+      const names = NAMES[p.names] ?? NAMES[NAME_STYLES[0]];
+      const name = p.part === 'Jour de la semaine' ? names.days[n] : p.part === 'Mois' ? names.months[n - 1] : String(n);
+      return { result: n, name };
     },
   },
   age: {

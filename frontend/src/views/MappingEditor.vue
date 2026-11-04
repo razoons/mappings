@@ -1,26 +1,40 @@
 <template>
   <v-app-bar density="compact" flat border>
-    <v-btn
-      class="ml-3"
-      color="primary"
-      variant="flat"
-      prepend-icon="mdi-plus"
-      :disabled="schemaLocked"
-      @click="openAddMenuBelow"
-    >
-      Ajouter <kbd>Shift A</kbd>
-    </v-btn>
+    <v-text-field
+      v-model="current.name"
+      class="ml-3 flex-grow-0"
+      width="220"
+      density="compact"
+      variant="solo-filled"
+      flat
+      hide-details
+      placeholder="Sans titre"
+      title="Nom du mapping (nom proposé à l’export et dans les liens de partage)"
+    />
     <v-divider vertical inset class="mx-2" />
     <v-btn prepend-icon="mdi-file-outline" :disabled="schemaLocked" @click="newMapping">Nouveau</v-btn>
     <v-btn prepend-icon="mdi-folder-open-outline" title="Ouvrir un fichier (Ctrl O)" :disabled="schemaLocked" @click="open">
       Ouvrir
     </v-btn>
-    <v-btn prepend-icon="mdi-export" title="Exporter dans un fichier (Ctrl S)" @click="exportMapping">Exporter</v-btn>
+    <v-menu>
+      <template #activator="{ props: menu }">
+        <v-btn v-bind="menu" prepend-icon="mdi-export" append-icon="mdi-menu-down">Exporter</v-btn>
+      </template>
+      <v-list density="compact">
+        <v-list-item prepend-icon="mdi-code-json" title="Mapping (.json)" subtitle="Pour le rouvrir ou le partager" @click="exportMapping">
+          <template #append><kbd>Ctrl S</kbd></template>
+        </v-list-item>
+        <v-list-item prepend-icon="mdi-image-outline" title="Image du schéma (.png)" subtitle="Tout le schéma, sur le fond du thème" @click="exportImage" />
+      </v-list>
+    </v-menu>
+    <v-btn prepend-icon="mdi-share-variant" title="Copier un lien qui ouvre ce schéma" @click="shareMapping">Partager</v-btn>
     <v-btn prepend-icon="mdi-school-outline" :disabled="schemaLocked" @click="loadDemo">Démo</v-btn>
     <v-divider vertical inset class="mx-2" />
     <v-btn icon="mdi-arrow-collapse-vertical" title="Tout replier" @click="collapseAll(true)" />
     <v-btn icon="mdi-arrow-expand-vertical" title="Tout déplier" @click="collapseAll(false)" />
+    <v-btn icon="mdi-graph-outline" title="Réorganiser le schéma (colonnes dans le sens des liens)" :disabled="schemaLocked" @click="arrangeSchema" />
     <v-spacer />
+    <v-btn prepend-icon="mdi-map-legend" title="Légende : types, sockets, liens, couleurs" @click="legendOpen = true">Légende</v-btn>
     <v-btn prepend-icon="mdi-help-circle-outline" href="/noeuds" target="_blank" title="Documentation des nœuds (nouvel onglet)">Nœuds</v-btn>
     <v-btn :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'" title="Changer de thème" @click="toggleTheme" />
   </v-app-bar>
@@ -53,7 +67,22 @@
             <LockIcon :locked="schemaLocked" />
           </ControlButton>
         </Controls>
-        <Panel position="top-right">
+        <Panel position="top-right" class="side-panel">
+          <!-- Bouton flottant d'ajout, au-dessus du panneau des contrôles. -->
+          <v-btn
+            class="add-fab side-block text-none"
+            color="primary"
+            block
+            height="48"
+            rounded="lg"
+            elevation="4"
+            prepend-icon="mdi-plus"
+            :disabled="schemaLocked"
+            title="Ajouter un nœud (Shift A, ou clic droit sur le fond)"
+            @click="openAddMenuBelow"
+          >
+            Ajouter <kbd>Shift A</kbd>
+          </v-btn>
           <ChecksPanel :issues="results.issues.list" :has-targets="nodes.some((n) => n.type === 'target')" @focus="focusNode" />
         </Panel>
       </VueFlow>
@@ -81,7 +110,23 @@
       </v-list>
     </v-menu>
 
-    <v-snackbar v-model="snack.show" :color="snack.color" timeout="3000">{{ snack.text }}</v-snackbar>
+    <v-dialog v-model="legendOpen" max-width="980" scrollable>
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          Légende
+          <v-spacer />
+          <v-btn icon="mdi-close" variant="text" size="small" title="Fermer" @click="legendOpen = false" />
+        </v-card-title>
+        <v-card-text><LegendGrid link-base="/noeuds" /></v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <v-snackbar v-model="snack.show" :color="snack.color" :timeout="snack.action ? 5000 : snack.color === 'error' ? 3500 : 1800">
+      {{ snack.text }}
+      <template v-if="snack.action" #actions>
+        <v-btn variant="text" @click="snack.action.run(), (snack.show = false)">{{ snack.action.label }}</v-btn>
+      </template>
+    </v-snackbar>
   </v-main>
 </template>
 
@@ -92,6 +137,7 @@ import { Panel, VueFlow, useVueFlow } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { ControlButton, Controls } from '@vue-flow/controls';
 import AddMenu from '../components/AddMenu.vue';
+import LegendGrid from '../components/LegendGrid.vue';
 import LockIcon from '../components/LockIcon.vue';
 import ChecksPanel from '../components/ChecksPanel.vue';
 import SourceNode from '../components/nodes/SourceNode.vue';
@@ -99,16 +145,19 @@ import TargetNode from '../components/nodes/TargetNode.vue';
 import TransformNode from '../components/nodes/TransformNode.vue';
 import GroupNode from '../components/nodes/GroupNode.vue';
 import TypedEdge from '../components/nodes/TypedEdge.vue';
-import { DATA_FILES_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
+import { DATA_FILES_KEY, EDGE_INSERT_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
 import { checkDocument, describeProblem } from '../lib/conformity';
 import { demoGraph } from '../lib/demo';
 import { fieldFromSocket, migrateFields, parseDocument, newField, setTreeCollapsed } from '../lib/fields';
+import { autoLayout } from '../lib/layout';
 import { fitGroup, groupAround, groupAt, groupsFirst, isGroup, newGroup, removeKeepingChildren, reparent } from '../lib/groups';
 import { createsCycle, evaluateGraph, getSocket } from '../lib/graph';
 import { validateTargets } from '../lib/rules';
-import { TRANSFORMS } from '../lib/transforms';
-import { canConnect, isList, uid } from '../lib/types';
+import { inputsOf, TRANSFORMS } from '../lib/transforms';
+import { canConnect, isList, typeMismatch, uid } from '../lib/types';
 import { exportFile, openFile } from '../services/files';
+import { schemaImage } from '../services/image';
+import { clearSharedGraph, shareLink, sharedGraph } from '../services/share';
 
 const FLOW_ID = 'mapping';
 const STORAGE_KEY = 'mapping-current';
@@ -202,10 +251,12 @@ watch(
 
 // ── Chargement et export ────────────────────────────────────
 
-/** Nom du mapping : nom de fichier proposé à l'export (celui du fichier ouvert, sinon « mapping »). */
-const current = reactive({ name: 'mapping' });
-const snack = reactive({ show: false, text: '', color: undefined });
-const notify = (text, color) => Object.assign(snack, { show: true, text, color });
+/** Nom du mapping (champ de la barre d'outils) : nom de fichier proposé à l'export, repris par les liens de partage. */
+const current = reactive({ name: 'Sans titre' });
+const legendOpen = ref(false);
+const snack = reactive({ show: false, text: '', color: undefined, action: null });
+/** Message en bas de l'écran ; `action` : bouton `{ label, run }` (ex. annuler). */
+const notify = (text, color, action = null) => Object.assign(snack, { show: true, text, color, action });
 
 /** Copie simple des nœuds (le groupe d'un nœud dans `parentNode`, la taille d'un groupe dans `style`). */
 const plainNodes = () =>
@@ -266,6 +317,44 @@ watch(
   { deep: true },
 );
 
+// ── Historique (Ctrl+Z / Ctrl+Y) ────────────────────────────
+// Un instantané (JSON du mapping) par modification, pris une fois l'action terminée (après un court délai, jamais
+// au milieu d'un déplacement) ; l'interface (sélection, zoom) n'en fait pas partie.
+const HISTORY_SIZE = 20;
+const history = { past: [], future: [], present: null, settling: false };
+let historyTimer;
+
+function record() {
+  clearTimeout(historyTimer);
+  if (placing.value || nodes.value.some((n) => n.dragging)) return (historyTimer = setTimeout(record, 400));
+  const s = JSON.stringify({ name: current.name, ...serialize() });
+  // Juste après un retour en arrière, les ajustements automatiques (taille des groupes…) ne sont pas une action.
+  if (history.settling || history.present === null) return Object.assign(history, { present: s, settling: false });
+  if (s === history.present) return;
+  history.past.push(history.present);
+  if (history.past.length > HISTORY_SIZE) history.past.shift();
+  history.present = s;
+  history.future = [];
+}
+watch([nodes, edges, current], () => {
+  clearTimeout(historyTimer);
+  historyTimer = setTimeout(record, 400);
+}, { deep: true });
+
+function travel(from, to) {
+  record(); // une modification encore en attente compte comme la dernière action
+  if (!from.length) return;
+  to.push(history.present);
+  const s = from.pop();
+  const { name, nodes: ns, edges: es } = JSON.parse(s);
+  Object.assign(history, { present: s, settling: true });
+  current.name = name;
+  setNodes(groupsFirst(ns));
+  setEdges(es.map((e) => ({ ...e, type: 'typed' })));
+}
+const undo = () => travel(history.past, history.future);
+const redo = () => travel(history.future, history.past);
+
 /** Exporte le mapping dans un fichier JSON dont l'emplacement est choisi dans l'explorateur. */
 async function exportMapping() {
   try {
@@ -275,6 +364,48 @@ async function exportMapping() {
   } catch (e) {
     notify(`Export impossible : ${e.message}`, 'error');
   }
+}
+
+/** Image PNG de tout le schéma, enregistrée à l'emplacement choisi. */
+async function exportImage() {
+  try {
+    const blob = await schemaImage(nodes.value, vueFlowRef.value);
+    const name = await exportFile(blob, `${current.name || 'schema'}.png`, { image: true });
+    if (name) notify(`Image exportée : ${name}`, 'success');
+  } catch (e) {
+    notify(`Export de l’image impossible : ${e.message}`, 'error');
+  }
+}
+
+/** Copie un lien qui contient tout le schéma (les fichiers de données chargés n'en font pas partie). */
+async function shareMapping() {
+  try {
+    const link = await shareLink({ version: 1, name: current.name, ...serialize() });
+    await navigator.clipboard.writeText(link);
+    const size = link.length.toLocaleString('fr-FR');
+    notify(`Lien copié`, 'success');
+  } catch (e) {
+    notify(`Partage impossible : ${e.message}`, 'error');
+  }
+}
+
+/** Ouvre le schéma contenu dans le lien de partage, s'il y en a un ; le mapping en cours n'est remplacé qu'avec accord. */
+async function openShared() {
+  let graph;
+  try {
+    graph = await sharedGraph();
+  } catch {
+    clearSharedGraph();
+    return notify('Lien de partage illisible (incomplet ou abîmé) : le mapping en cours est conservé.', 'error');
+  }
+  if (!graph) return;
+  clearSharedGraph();
+  if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return notify('Le lien ne contient pas un mapping.', 'error');
+  const name = graph.name || 'Sans titre';
+  if (nodes.value.length && !confirm(`Ouvrir le schéma partagé « ${name} » ? Il remplace le mapping en cours (exportez-le d'abord si besoin).`)) return;
+  current.name = name;
+  load(graph);
+  notify(`Schéma partagé « ${name} » ouvert.`, 'success');
 }
 
 async function open() {
@@ -293,7 +424,7 @@ async function open() {
 
 function newMapping() {
   if (nodes.value.length && !confirm('Tout effacer ?')) return;
-  current.name = 'mapping';
+  current.name = 'Sans titre';
   load({ nodes: [], edges: [] });
 }
 
@@ -303,6 +434,7 @@ function loadDemo() {
 }
 
 restore();
+openShared();
 
 // ── Évaluation ──────────────────────────────────────────────
 
@@ -429,9 +561,10 @@ onEdgeUpdateEnd(({ edge }) => {
 const addMenu = ref(null);
 const mouse = ref({ x: 300, y: 200 });
 
+/** Menu d'ajout sous le bouton flottant, aligné sur son bord droit (le menu fait environ 320 px de large). */
 function openAddMenuBelow(e) {
   const r = e.currentTarget.getBoundingClientRect();
-  addMenu.value = { x: r.left, y: r.bottom + 4 };
+  addMenu.value = { x: Math.max(8, r.right - 320), y: r.bottom + 6 };
 }
 
 function onPaneContextMenu(e) {
@@ -441,9 +574,10 @@ function onPaneContextMenu(e) {
 }
 
 function pick(kind) {
-  const { x, y, pending: link } = addMenu.value;
+  const { x, y, pending: link, insert } = addMenu.value;
   addMenu.value = null;
-  addNode(kind, { x, y }, link);
+  if (insert) addOnEdge(kind, { x, y }, insert);
+  else addNode(kind, { x, y }, link);
 }
 
 function addNode(kind, screen, link) {
@@ -501,8 +635,19 @@ function onKeydown(e) {
     return;
   }
   if (placing.value && key === 'escape') return endPlacing(false);
-  if (isEditable(e.target) || schemaLocked.value) return;
-  if (e.shiftKey && key === 'a') {
+  if (isEditable(e.target)) return;
+  if (schemaLocked.value) {
+    if (ctrl && (key === 'z' || key === 'y')) {
+      e.preventDefault();
+      notify('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour annuler ou rétablir.', 'warning');
+    }
+    return;
+  }
+  if (ctrl && (key === 'z' || key === 'y')) {
+    e.preventDefault();
+    if (key === 'y' || e.shiftKey) redo();
+    else undo();
+  } else if (e.shiftKey && key === 'a') {
     e.preventDefault();
     addMenu.value = { ...mouse.value };
   } else if (ctrl && key === 'd') {
@@ -554,6 +699,7 @@ const movedIds = (dragged, groupId) => dragged.filter((n) => !isGroup(n) && (n.p
 function onNodeDrag({ event, nodes: dragged }) {
   const g = pointerGroup(event, dragged);
   dropGroup.value = movedIds(dragged, g).length ? g : null;
+  showInsertion(insertionAt(event, dragged));
 }
 
 function onNodeDragStop({ event, nodes: dragged }) {
@@ -562,6 +708,102 @@ function onNodeDragStop({ event, nodes: dragged }) {
   dropGroup.value = null;
   const ids = movedIds(dragged, g);
   if (ids.length) rebuild((ns) => reparent(ns, ids, g));
+  const insertion = insertionAt(event, dragged);
+  showInsertion(null);
+  if (insertion) insertOnEdge(insertion);
+}
+
+// ── Insertion sur un lien ───────────────────────────────────
+// Comme dans Blender : un nœud de transformation encore libre (sans aucun lien), lâché sur un lien, s'y intercale.
+
+const INSERT_DISTANCE = 14; // px à l'écran entre le pointeur et le lien
+
+/** Lien sous le pointeur où le nœud glissé peut s'intercaler : `{ edge, input, output, node }` ou `null`. */
+function insertionAt(event, dragged) {
+  if (dragged.length !== 1) return null;
+  const node = findNode(dragged[0].id);
+  const def = node?.type === 'transform' && TRANSFORMS[node.data.kind];
+  if (!def || edges.value.some((e) => e.source === node.id || e.target === node.id)) return null;
+  const p = 'changedTouches' in event ? event.changedTouches[0] : event;
+  let best = null;
+  for (const edge of edges.value) {
+    const d = edgeDistance(edge.id, p.clientX, p.clientY);
+    if (d > INSERT_DISTANCE || (best && d >= best.d)) continue;
+    const sockets = insertSockets(def, node, edge);
+    if (sockets) best = { d, edge, ...sockets, node: node.id };
+  }
+  return best;
+}
+
+/** Entrée et sortie par lesquelles un nœud (type `def`) s'intercale sur `edge` : `{ input, output }` ou `null`. */
+function insertSockets(def, node, edge) {
+  const from = getSocket(findNode(edge.source), edge.sourceHandle, 'source')?.type;
+  const to = getSocket(findNode(edge.target), edge.targetHandle, 'target')?.type;
+  const input = bestSocket(inputsOf(def, node), (s) => typeMismatch(from, s.type));
+  const output = bestSocket(def.outputs, (s) => typeMismatch(s.type, to));
+  return input && output ? { input: input.id, output: output.id } : null;
+}
+
+/** Socket de même type de préférence, sinon convertible ; jamais incompatible. */
+const bestSocket = (sockets, mismatch) => sockets.find((s) => mismatch(s) === null) ?? sockets.find((s) => mismatch(s) === 'conversion');
+
+// Bouton « + » d'un lien : le menu d'ajout ne propose que les nœuds qui peuvent s'y intercaler.
+provide(EDGE_INSERT_KEY, (edgeId, screen) => {
+  const edge = edges.value.find((e) => e.id === edgeId);
+  if (!edge || schemaLocked.value) return;
+  const only = Object.entries(TRANSFORMS)
+    .filter(([kind, def]) => insertSockets(def, { data: { kind, values: {} } }, edge))
+    .map(([kind]) => kind);
+  nodeMenu.value = null;
+  addMenu.value = { ...screen, insert: edgeId, only };
+});
+
+/** Crée un nœud `kind` centré sur `screen` et l'intercale sur le lien `edgeId`. */
+function addOnEdge(kind, screen, edgeId) {
+  const edge = edges.value.find((e) => e.id === edgeId);
+  const def = TRANSFORMS[kind];
+  if (!edge || !def) return;
+  const id = uid('n');
+  const p = toFlow(screen);
+  const node = { id, type: 'transform', position: { x: p.x - 100, y: p.y - 40 }, data: { kind, params: {}, values: {} } };
+  const sockets = insertSockets(def, node, edge);
+  if (!sockets) return;
+  for (const n of nodes.value) n.selected = false;
+  addNodes([{ ...node, selected: true }]);
+  insertOnEdge({ edge, ...sockets, node: id });
+}
+
+/** Distance à l'écran entre un point et le tracé d'un lien (échantillonné). */
+function edgeDistance(id, x, y) {
+  const path = vueFlowRef.value?.querySelector(`.vue-flow__edge[data-id="${CSS.escape(id)}"] path.vue-flow__edge-path`);
+  const m = path?.getScreenCTM();
+  if (!m) return Infinity;
+  const box = path.getBoundingClientRect();
+  const far = INSERT_DISTANCE;
+  if (x < box.left - far || x > box.right + far || y < box.top - far || y > box.bottom + far) return Infinity;
+  const len = path.getTotalLength();
+  let d = Infinity;
+  for (let i = 0; i <= 60; i++) {
+    const q = path.getPointAtLength((len * i) / 60).matrixTransform(m);
+    d = Math.min(d, Math.hypot(q.x - x, q.y - y));
+  }
+  return d;
+}
+
+/** Met en évidence le lien qui recevra le nœud. */
+function showInsertion(insertion) {
+  for (const e of edges.value) {
+    const on = e.id === insertion?.edge.id;
+    if (!!e.class !== on) e.class = on ? 'insert-target' : undefined;
+  }
+}
+
+function insertOnEdge({ edge, input, output, node }) {
+  removeEdges([edge.id]);
+  addEdges([
+    { id: uid('e'), type: 'typed', source: edge.source, sourceHandle: edge.sourceHandle, target: node, targetHandle: input },
+    { id: uid('e'), type: 'typed', source: node, sourceHandle: output, target: edge.target, targetHandle: edge.targetHandle },
+  ]);
 }
 
 // Un groupe déplié s'ajuste à ses nœuds (position, taille, repli…). Pas pendant un glisser :
@@ -589,6 +831,34 @@ watch(
     }
   },
 );
+
+// ── Réorganisation ──────────────────────────────────────────
+
+/** Hauteur de chaque socket dans son nœud, mesurée par Vue Flow (milieu du socket). */
+const socketHeights = () =>
+  new Map(
+    nodes.value.map((n) => {
+      const side = (list) => new Map((list ?? []).map((h) => [h.id, h.y + h.height / 2]));
+      return [n.id, { source: side(n.handleBounds?.source), target: side(n.handleBounds?.target) }];
+    }),
+  );
+
+/** Range les nœuds en colonnes dans le sens des liens (les nœuds verrouillés restent en place) ; annulable. */
+function arrangeSchema() {
+  if (schemaLocked.value || !nodes.value.length) return;
+  const before = new Map(nodes.value.map((n) => [n.id, { ...n.position }]));
+  const positions = autoLayout(plainNodes(), edges.value, measuredSizes(), socketHeights());
+  rebuild((ns) => ns.map((n) => (positions.has(n.id) ? { ...n, position: positions.get(n.id) } : n)));
+  nextTick(() => fitView({ padding: 0.15, duration: 300 }));
+  const locked = nodes.value.filter((n) => n.data.locked).length;
+  notify(`Schéma réorganisé${locked ? ` (${locked} nœud${locked > 1 ? 's' : ''} verrouillé${locked > 1 ? 's' : ''} laissé${locked > 1 ? 's' : ''} en place)` : ''}.`, 'success', {
+    label: 'Annuler',
+    run: () => {
+      rebuild((ns) => ns.map((n) => (before.has(n.id) ? { ...n, position: before.get(n.id) } : n)));
+      nextTick(() => fitView({ padding: 0.15, duration: 300 }));
+    },
+  });
+}
 
 // ── Duplication ─────────────────────────────────────────────
 

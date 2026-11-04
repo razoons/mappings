@@ -1,17 +1,21 @@
 <template>
-  <v-btn v-if="!open" size="small" :title="status.label" @click="open = true">
+  <!-- Replié : même gabarit que le bouton « Ajouter » placé au-dessus. -->
+  <v-btn v-if="!open" class="side-block checks-collapsed text-none" block height="48" rounded="lg" elevation="4" :title="status.label" @click="open = true">
     <v-icon :icon="status.icon" :color="status.color" start />
-    Contrôles
+    <span class="font-weight-bold">Contrôles</span>
     <span v-if="issues.length" class="tab-count ml-2" :class="{ error: errors }">{{ issues.length }}</span>
+    <v-spacer />
+    <v-icon icon="mdi-chevron-down" end />
   </v-btn>
-  <v-card v-else class="checks-panel" width="360">
-    <div class="checks-header">
+  <v-card v-else class="checks-panel side-block" rounded="lg" elevation="4">
+    <!-- Tout l'en-tête replie le panneau, comme le bouton replié le déplie. -->
+    <div class="checks-header clickable" role="button" tabindex="0" title="Replier" @click="open = false" @keydown.enter="open = false">
       <v-icon :icon="status.icon" :color="status.color" />
       <div class="flex-grow-1">
         <div class="font-weight-bold">Contrôles</div>
         <div class="text-caption text-medium-emphasis">{{ status.label }}</div>
       </div>
-      <v-btn icon="mdi-chevron-right" variant="text" size="small" title="Masquer" @click="open = false" />
+      <v-icon icon="mdi-chevron-up" class="mr-1" />
     </div>
     <v-divider />
     <div v-if="issues.length" class="checks-content">
@@ -37,7 +41,7 @@ const props = defineProps({
 });
 const emit = defineEmits(['focus']);
 
-const open = ref(true);
+const open = ref(false);
 const errors = computed(() => props.issues.filter((i) => i.level === 'error').length);
 const warnings = computed(() => props.issues.length - errors.value);
 

@@ -27,6 +27,9 @@ export const DATA_FILES_KEY = Symbol('dataFiles');
 /** Verrou de tout le schéma (ref booléenne), fourni par l'éditeur. */
 export const SCHEMA_LOCK_KEY = Symbol('schemaLock');
 
+/** Bouton « + » au milieu d'un lien : `(edgeId, { x, y })` ouvre le menu des nœuds à y intercaler (position écran). */
+export const EDGE_INSERT_KEY = Symbol('edgeInsert');
+
 /** Un nœud est en lecture seule s'il est verrouillé lui-même ou si tout le schéma l'est. */
 export function useReadOnly(getLocked) {
   const schemaLocked = inject(SCHEMA_LOCK_KEY);

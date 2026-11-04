@@ -7,6 +7,7 @@ const TYPES = [{ description: 'Mapping JSON', accept: { 'application/json': ['.j
 // `id` : l'explorateur rouvre le dernier dossier utilisé pour les mappings (et, à part, pour les données).
 const PICKER_ID = 'mapping';
 const DATA_TYPES = [{ description: 'Données JSON', accept: { 'application/json': ['.json'] } }];
+const IMAGE_TYPES = [{ description: 'Image PNG', accept: { 'image/png': ['.png'] } }];
 
 const hasPicker = 'showOpenFilePicker' in window;
 
@@ -38,17 +39,25 @@ export async function openFile({ data = false } = {}) {
   }
 }
 
-/** Écrit `text` dans un fichier dont l'emplacement est choisi dans l'explorateur ; renvoie son nom. */
-export async function exportFile(text, suggestedName, { data = false } = {}) {
+/**
+ * Écrit `content` (texte, ou `Blob` pour une image) dans un fichier dont l'emplacement est choisi dans
+ * l'explorateur ; renvoie son nom. `data` : fichier de données JSON ; `image` : image PNG (sinon un mapping).
+ */
+export async function exportFile(content, suggestedName, { data = false, image = false } = {}) {
   try {
     if (hasPicker) {
-      const handle = await window.showSaveFilePicker(data ? { id: 'data', suggestedName, types: DATA_TYPES } : { id: PICKER_ID, suggestedName, types: TYPES });
+      const picker = image
+        ? { id: 'image', suggestedName, types: IMAGE_TYPES }
+        : data
+          ? { id: 'data', suggestedName, types: DATA_TYPES }
+          : { id: PICKER_ID, suggestedName, types: TYPES };
+      const handle = await window.showSaveFilePicker(picker);
       const writable = await handle.createWritable();
-      await writable.write(text);
+      await writable.write(content);
       await writable.close();
       return handle.name;
     }
-    const blob = new Blob([text], { type: 'application/json' });
+    const blob = content instanceof Blob ? content : new Blob([content], { type: 'application/json' });
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: suggestedName });
     a.click();
     URL.revokeObjectURL(a.href);

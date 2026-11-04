@@ -1,4 +1,4 @@
-# Mapping — éditeur nodal
+# ScheMap — éditeur nodal
 
 Éditeur visuel de mappings JSON : on relie les champs d'une **source** (son modèle de données : champs, types, caractère obligatoire et formats) à ceux d'une **cible**, en passant si besoin par des nœuds de transformation (texte, math, logique, listes, dates…). Chaque champ affiche sa valeur (celle du modèle de données, ou d’un fichier de données déposé sur la source), et le panneau **Contrôles** vérifie le mapping en direct.
 
@@ -15,8 +15,16 @@ Application 100 % navigateur (aucun serveur), déployée sur **Firebase Hosting*
 | Délier | Attraper l'extrémité d'un lien et la lâcher dans le vide |
 | Modèle de données d'une source / cible | Bouton `{ }` de l'en-tête : le modèle en YAML (voir ci-dessous), ou édition directe des champs (glisser `⋮⋮` pour les déplacer) |
 | Replier, supprimer | Clic droit sur un nœud (agit sur toute la sélection) ; `Suppr` |
+| Réorganiser | Bouton de la barre d’outils : les nœuds sont rangés en colonnes dans le sens des liens (sources → transformations → cibles), en limitant les croisements ; un groupe garde ses nœuds ensemble, un nœud verrouillé ne bouge pas ; « Annuler » dans le message remet les positions d’avant |
+| Survol d’un lien | Un bouton « + » apparaît au milieu : il ouvre le menu d’ajout, limité aux nœuds qui peuvent s’intercaler sur ce lien. Une pastille marque chaque extrémité : la saisir pour changer le point d’accroche (y compris à l’intérieur d’un groupe, dont seul l’en-tête capte la souris). |
+| Insérer sur un lien | Glisser un nœud de transformation encore libre (sans lien) sur un lien : le lien s’éclaire en orange, lâcher intercale le nœud (entrée et sortie choisies selon les types). |
 | Dupliquer | « Dupliquer » au clic droit ou `Ctrl D` : la copie (avec les liens internes à la sélection ; un groupe avec ses nœuds) suit la souris, un clic gauche la dépose — dans un groupe si on clique dessus ; `Échap` ou clic droit annule |
+| Annuler / rétablir | `Ctrl Z` annule la dernière action (jusqu’à 20 en arrière), `Ctrl Y` ou `Ctrl Shift Z` la rétablit. Dans un champ de saisie, ces raccourcis agissent sur le texte. |
 | Grouper | `Ctrl G` sur la sélection, « Grouper » au clic droit, ou « Groupe » dans le menu d’ajout. Glisser un nœud dans / hors d’un cadre l’y range / l’en sort (c’est le pointeur au lâcher qui compte). Le cadre s’ajuste tout seul à ses nœuds : il grandit ou rétrécit quand on les déplace, les replie ou les modifie. Replié, un groupe se réduit à son en-tête et ses liens y aboutissent. Supprimer un groupe garde ses nœuds. La pastille de l’en-tête choisit sa couleur. |
+
+**Exporter › Image du schéma** enregistre une image PNG de tout le schéma (pas seulement la partie visible), sur le fond du thème courant.
+
+**Partager** copie un lien qui contient tout le schéma (compressé dans l’adresse, après `#` : rien n’est envoyé au serveur ni stocké). L’ouvrir charge le schéma, après confirmation s’il remplace un mapping en cours. Les fichiers de données chargés sur les sources n’en font pas partie. Compter environ 2 à 4 000 caractères pour un schéma courant.
 
 Le mapping en cours est conservé dans le navigateur. **Ouvrir** (`Ctrl O`) charge un fichier `.json` choisi dans l’explorateur ; **Exporter** (`Ctrl S`) demande à chaque fois où l’enregistrer (sous Chrome / Edge ; les autres navigateurs le téléchargent).
 

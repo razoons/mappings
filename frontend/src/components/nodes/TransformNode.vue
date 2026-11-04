@@ -37,7 +37,7 @@
 
       <div v-for="p in def.params ?? []" :key="p.id" class="row">
         <select v-if="p.options" class="nodrag" :disabled="readOnly" :title="p.label" :value="params[p.id]" @change="setParam(p.id, $event.target.value)">
-          <option v-for="o in p.options" :key="o">{{ o }}</option>
+          <option v-for="o in p.options" :key="o" :value="o">{{ p.optionLabel ? p.optionLabel(o, params) : o }}</option>
         </select>
         <label v-else class="param-input">
           <span>{{ p.label }}</span>

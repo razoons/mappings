@@ -1,7 +1,7 @@
 import { allFields, findChain, sourceSocketType, targetSocketType } from './fields';
 import { bindsOf, isPlainObject, tagList } from './lists';
-import { inputsOf, inputSocket, paramsWithDefaults, TRANSFORMS } from './transforms';
-import { baseOf, coerce, isList, listOf } from './types';
+import { inputsOf, inputSocket, paramsWithDefaults, TRANSFORMS, variadicId } from './transforms';
+import { baseOf, coerce, isList, isNumeric, listOf } from './types';
 
 /** Décrit le socket `handleId` d'un nœud (`{ name, type }`), côté sortie (`source`) ou entrée (`target`). */
 export function getSocket(node, handleId, side) {
@@ -16,6 +16,61 @@ export function getSocket(node, handleId, side) {
   const def = TRANSFORMS[node.data.kind];
   const s = side === 'source' ? def?.outputs.find((s) => s.id === handleId) : inputSocket(def, handleId);
   return s && { name: s.label, type: s.type };
+}
+
+/**
+ * Type réel de la sortie `handle` d'un nœud : le type déclaré, sauf pour une sortie « Tout » qui transmet ses
+ * entrées (`passes`) : elle prend le type de ce qui y entre (liens en amont, ou valeur saisie).
+ * `getNode(id)` donne un nœud, `incomingOf(nodeId, inputId)` le lien qui arrive sur une entrée.
+ */
+export function outputType(getNode, incomingOf, nodeId, handle, depth = 0) {
+  const node = getNode(nodeId);
+  const declared = getSocket(node, handle, 'source')?.type;
+  const def = node?.type === 'transform' ? TRANSFORMS[node.data.kind] : null;
+  const pass = def?.passes?.[handle];
+  if (!pass || depth > 50) return declared;
+  const override = pass.unless && incomingOf(nodeId, pass.unless);
+  if (override) return outputType(getNode, incomingOf, override.source, override.sourceHandle, depth + 1);
+
+  const ids =
+    pass.inputs === 'variadic'
+      ? inputsOf(def, node, Array.from({ length: 60 }, (_, i) => variadicId(i)).filter((id) => incomingOf(nodeId, id))).map((i) => i.id)
+      : pass.inputs;
+  const types = ids
+    .map((id) => {
+      const e = incomingOf(nodeId, id);
+      if (e) return outputType(getNode, incomingOf, e.source, e.sourceHandle, depth + 1);
+      const declaredIn = inputSocket(def, id)?.type;
+      if (declaredIn && declaredIn !== 'any' && declaredIn !== 'any[]') return declaredIn;
+      return literalType(node.data.values?.[id] ?? inputSocket(def, id)?.default);
+    })
+    .filter(Boolean);
+  if (!types.length) return declared;
+  if (pass.as === 'list') return listOf(commonType(types.map(baseOf)));
+  if (pass.as === 'item') return baseOf(commonType(types));
+  return commonType(types);
+}
+
+/** Type d'une valeur saisie dans une entrée « Tout » (`null` si vide : elle ne compte pas). */
+function literalType(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const s = String(v).trim();
+  if (/^-?\d+$/.test(s)) return 'integer';
+  if (s !== '' && !Number.isNaN(Number(s))) return 'number';
+  if (/^(true|false)$/i.test(s)) return 'boolean';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return 'date';
+  return 'string';
+}
+
+/** Type commun : identique partout, « Nombre » pour un mélange d'entiers et de nombres, « Texte » si l'un est un texte, sinon « Tout ». */
+function commonType(types) {
+  if (types.every((t) => t === types[0])) return types[0];
+  const list = types.every(isList);
+  if (!list && types.some(isList)) return 'any';
+  // Mélange : des nombres restent un nombre ; avec un texte, la sortie peut être un texte (le cas le plus strict).
+  const bases = types.map(baseOf);
+  const base = bases.every(isNumeric) ? 'number' : bases.includes('any') ? 'any' : bases.includes('string') ? 'string' : 'any';
+  return list ? listOf(base) : base;
 }
 
 const inKey = (nodeId, handle) => `${nodeId}:${handle}`;

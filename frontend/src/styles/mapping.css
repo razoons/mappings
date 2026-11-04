@@ -432,8 +432,29 @@ kbd {
 }
 
 /* ── Panneau des contrôles ─────────────────────────────── */
+/* Colonne de droite : bouton d'ajout puis panneau des contrôles, de même largeur et de même allure. */
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 280px;
+}
+.side-block {
+  width: 100%;
+  font-size: 14px;
+  letter-spacing: normal;
+}
+.add-fab {
+  font-weight: 600;
+}
+.add-fab kbd {
+  margin-left: 8px;
+}
+.checks-collapsed .v-btn__content {
+  width: 100%;
+}
 .checks-panel {
-  max-height: calc(100dvh - var(--v-layout-top) - 40px);
+  max-height: calc(100dvh - var(--v-layout-top) - 100px);
   display: flex;
   flex-direction: column;
 }
@@ -442,6 +463,13 @@ kbd {
   align-items: center;
   gap: 10px;
   padding: 8px 6px 8px 12px;
+}
+.checks-header.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+.checks-header.clickable:hover {
+  background: var(--hover-overlay);
 }
 .checks-content {
   overflow: auto;
@@ -458,7 +486,7 @@ kbd {
 }
 .node-header .icon-btn.lock.on {
   color: #fff;
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--accent); /* verrouillé : orange, comme le verrou du schéma */
 }
 .node-header .icon-btn.lock:disabled {
   cursor: not-allowed;
@@ -512,6 +540,14 @@ kbd {
 /* ── Groupes ────────────────────────────────────────────── */
 .vue-flow__node-group {
   border-radius: 8px;
+}
+/* Le cadre d'un groupe est posé au-dessus des liens : seul son en-tête capte la souris, pour qu'on puisse
+   saisir les liens et leurs extrémités (changer le point d'accroche) à l'intérieur du groupe. */
+.vue-flow__node.vue-flow__node-group {
+  pointer-events: none !important;
+}
+.vue-flow__node-group .group-header {
+  pointer-events: all;
 }
 .group-node {
   width: 100%;
@@ -633,7 +669,7 @@ kbd {
 }
 .group-header .icon-btn.lock.on {
   color: #fff;
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--accent); /* verrouillé : orange, comme le verrou du schéma */
 }
 .group-count {
   font-size: 11px;
@@ -884,4 +920,47 @@ kbd {
 }
 .node input.value-input.invalid {
   border-color: var(--danger);
+}
+
+/* Lien sur lequel le nœud glissé va s'intercaler (lâcher pour l'insérer). */
+.vue-flow__edge.insert-target path.vue-flow__edge-path {
+  stroke: var(--accent) !important;
+  stroke-width: 4 !important;
+  stroke-dasharray: none !important;
+}
+
+/* Bouton « + » au milieu d'un lien survolé : intercale un nouveau nœud. */
+.edge-insert {
+  position: absolute;
+  pointer-events: all;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--edge-highlight);
+  color: var(--bg);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.edge-insert:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Extrémités d'un lien survolé : une pastille montre qu'on peut les saisir pour changer le point d'accroche. */
+.edge-end {
+  fill: var(--bg);
+  stroke: var(--edge-highlight);
+  stroke-width: 2;
+  pointer-events: none;
+}
+.vue-flow__edge:has(.vue-flow__edgeupdater-source:hover) .edge-end-source,
+.vue-flow__edge:has(.vue-flow__edgeupdater-target:hover) .edge-end-target {
+  fill: var(--accent);
+}
+.vue-flow__edgeupdater {
+  cursor: grab;
 }
