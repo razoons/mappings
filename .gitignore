@@ -13,3 +13,8 @@ firebase-debug.*.log*
 
 # Fichiers générés par Claude
 .claude
+
+
+#certificats
+_.schemap.fr_private_key.key
+schemap.fr_ssl_certificate.cer
