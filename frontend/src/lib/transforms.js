@@ -166,9 +166,12 @@ export const TRANSFORMS = {
     inputs: [{ id: 'obj', label: 'Objet', type: 'object' }],
     outputs: out('any', 'Valeur'),
     params: [{ id: 'path', label: 'Chemin', default: 'id' }],
+    // « lignes[0].sku » : un index entre crochets désigne un élément de tableau (« lignes.0.sku » reste accepté).
     compute: ({ obj }, p) => ({
       result: p.path
+        .replace(/\[(\d+)\]/g, '.$1')
         .split('.')
+        .filter(Boolean)
         .reduce((v, k) => (isPlainObject(v) ? v[k] : Array.isArray(v) ? v[Number(k)] : undefined), obj),
     }),
   },

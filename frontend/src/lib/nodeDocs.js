@@ -30,7 +30,7 @@ export const NODE_DOCS = {
   },
   get_field: {
     summary: 'Lit une valeur dans un objet à partir d’un chemin pointé.',
-    details: ['Les segments numériques désignent un index de tableau : « lignes.0.sku ».', 'Un chemin introuvable donne une valeur vide.'],
+    details: ['Un index entre crochets désigne un élément de tableau : « lignes[0].sku ».', 'Un chemin introuvable donne une valeur vide.'],
   },
   set_field: {
     summary: 'Ajoute ou remplace une clé dans un objet, ou dans chaque objet d’une liste.',

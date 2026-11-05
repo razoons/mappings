@@ -1,8 +1,7 @@
 <template>
   <v-app-bar density="compact" flat border>
     <v-btn class="ml-2" prepend-icon="mdi-arrow-left" to="/">Éditeur</v-btn>
-    <img class="logo ml-4" src="/favicon.svg" alt="ScheMap" />
-    <v-app-bar-title class="ml-2">Nœuds</v-app-bar-title>
+    <v-app-bar-title class="ml-4">Nœuds</v-app-bar-title>
     <v-text-field
       v-model="search"
       class="mr-3"
@@ -36,6 +35,13 @@
       </nav>
 
       <div id="principes" class="help-content">
+        <h1 class="page-title">
+          <img class="logo" src="/icon.svg" alt="" />
+          <span>
+            ScheMap
+            <small>Schématiser et contrôler vos mappings de données</small>
+          </span>
+        </h1>
         <h2 class="chapter">Principes</h2>
         <p class="intro">
           ScheMap sert à schématiser, de manière exhaustive, le passage d’un modèle à un autre : le mapping entre
@@ -199,9 +205,27 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* Titre de la page : le logo et le nom du site. */
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 16px 0 8px;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.page-title small {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--muted);
+}
 .logo {
-  width: 28px;
-  height: 28px;
+  flex: none;
+  width: auto;
+  height: 96px;
 }
 .help {
   display: grid;

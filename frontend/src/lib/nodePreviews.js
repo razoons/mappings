@@ -16,7 +16,7 @@ export const NODE_PREVIEWS = {
 
   // ── Structure ───────────────────────────────────────────
   current: { current: { item: { sku: 'B-12', qty: 3 }, index: 2 } },
-  get_field: { inputs: { obj: { client: { nom: 'Ada', ville: 'Lyon' } } }, params: { path: 'client.nom' } },
+  get_field: { inputs: { obj: { client: 'Ada', lignes: [{ sku: 'A-1' }, { sku: 'B-12' }] } }, params: { path: 'lignes[1].sku' } },
   set_field: { inputs: { obj: { id: 1, nom: 'Ada' } }, each: { value: ['"FR"', () => 'FR'] }, params: { path: 'pays' } },
   remove_field: { inputs: { obj: { id: 1, nom: 'Ada', interne: 'x' } }, params: { keys: 'interne' } },
   list_create: { inputs: { a: 'x', b: ['y', 'z'] } },
