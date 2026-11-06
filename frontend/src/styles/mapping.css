@@ -85,6 +85,14 @@ kbd {
 .vue-flow__edge:hover .vue-flow__edge-path {
   stroke: var(--edge-highlight) !important;
 }
+/* Pas de zone bleue après une sélection au Shift-glisser : les nœuds sont déjà
+   entourés d'orange. Elle ne capte plus la souris non plus, sinon elle bloquerait
+   invisiblement le fond et les nœuds ; glisser un nœud sélectionné déplace le groupe. */
+.vue-flow__nodesselection .vue-flow__nodesselection-rect {
+  background: none;
+  border: none;
+  pointer-events: none;
+}
 .vue-flow__connection-path {
   stroke: var(--edge-highlight);
   stroke-width: 2;
