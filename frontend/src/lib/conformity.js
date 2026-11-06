@@ -1,4 +1,5 @@
 import { isSet } from './formats';
+import { t } from './i18n';
 import { isPlainObject } from './lists';
 
 /**
@@ -23,27 +24,27 @@ export function checkDocument(fields, doc) {
 
   function checkObject(fields, obj, path, ownerId) {
     const known = new Set(fields.map((f) => f.name));
-    for (const key of Object.keys(obj)) if (!known.has(key)) add('warning', ownerId, join(path, key), 'Champ en trop (absent du modèle)');
+    for (const key of Object.keys(obj)) if (!known.has(key)) add('warning', ownerId, join(path, key), t('Champ en trop (absent du modèle)', 'Extra field (not in the model)'));
     for (const f of fields) checkField(f, obj[f.name], join(path, f.name));
   }
 
   function checkField(f, v, path) {
     if (missing(v)) {
-      if (f.required) add('error', f.id, path, 'Obligatoire mais absent');
+      if (f.required) add('error', f.id, path, t('Obligatoire mais absent', 'Required but missing'));
       return;
     }
     if (f.type === 'object') {
-      if (!isPlainObject(v)) return add('error', f.id, path, 'Objet attendu', v);
+      if (!isPlainObject(v)) return add('error', f.id, path, t('Objet attendu', 'Object expected'), v);
       return checkObject(f.children ?? [], v, path, f.id);
     }
     if (f.type === 'array') {
-      if (!Array.isArray(v)) return add('error', f.id, path, 'Liste attendue', v);
+      if (!Array.isArray(v)) return add('error', f.id, path, t('Liste attendue', 'List expected'), v);
       const x = f.format ?? {};
-      if (isSet(x.minItems) && v.length < x.minItems) add('error', f.id, path, `Au moins ${x.minItems} élément(s) attendu(s)`, v.length);
-      if (isSet(x.maxItems) && v.length > x.maxItems) add('error', f.id, path, `Au plus ${x.maxItems} élément(s) attendu(s)`, v.length);
+      if (isSet(x.minItems) && v.length < x.minItems) add('error', f.id, path, t(`Au moins ${x.minItems} élément(s) attendu(s)`, `At least ${x.minItems} item(s) expected`), v.length);
+      if (isSet(x.maxItems) && v.length > x.maxItems) add('error', f.id, path, t(`Au plus ${x.maxItems} élément(s) attendu(s)`, `At most ${x.maxItems} item(s) expected`), v.length);
       for (const item of v) {
         if (f.item === 'object') {
-          if (!isPlainObject(item)) add('error', f.id, `${path}[]`, 'Objet attendu', item);
+          if (!isPlainObject(item)) add('error', f.id, `${path}[]`, t('Objet attendu', 'Object expected'), item);
           else checkObject(f.children ?? [], item, `${path}[]`, f.id);
         } else if (!missing(item)) {
           checkValue(f, f.item ?? 'string', item, `${path}[]`);
@@ -60,49 +61,49 @@ export function checkDocument(fields, doc) {
     const err = (message) => add('error', f.id, path, message, v);
     switch (type) {
       case 'string': {
-        if (typeof v !== 'string') return err('Texte attendu');
+        if (typeof v !== 'string') return err(t('Texte attendu', 'Text expected'));
         const n = Array.from(v).length;
-        if (isSet(x.minLength) && n < x.minLength) err(`Moins de ${x.minLength} caractères`);
-        if (isSet(x.maxLength) && n > x.maxLength) err(`Plus de ${x.maxLength} caractères`);
+        if (isSet(x.minLength) && n < x.minLength) err(t(`Moins de ${x.minLength} caractères`, `Fewer than ${x.minLength} characters`));
+        if (isSet(x.maxLength) && n > x.maxLength) err(t(`Plus de ${x.maxLength} caractères`, `More than ${x.maxLength} characters`));
         if (isSet(x.pattern)) {
           let re;
           try {
             re = new RegExp(x.pattern);
           } catch {
-            return err(`Expression régulière du modèle invalide : /${x.pattern}/`);
+            return err(t(`Expression régulière du modèle invalide : /${x.pattern}/`, `Invalid regular expression in the model: /${x.pattern}/`));
           }
-          if (!re.test(v)) err(`Ne respecte pas /${x.pattern}/`);
+          if (!re.test(v)) err(t(`Ne respecte pas /${x.pattern}/`, `Does not match /${x.pattern}/`));
         }
         return;
       }
       case 'number':
       case 'integer':
-        if (typeof v !== 'number' || Number.isNaN(v)) return err(type === 'integer' ? 'Entier attendu' : 'Nombre attendu');
-        if (type === 'integer' && !Number.isInteger(v)) return err('Entier attendu');
-        if (isSet(x.min) && v < x.min) err(`Inférieur à ${x.min}`);
-        if (isSet(x.max) && v > x.max) err(`Supérieur à ${x.max}`);
+        if (typeof v !== 'number' || Number.isNaN(v)) return err(type === 'integer' ? t('Entier attendu', 'Integer expected') : t('Nombre attendu', 'Number expected'));
+        if (type === 'integer' && !Number.isInteger(v)) return err(t('Entier attendu', 'Integer expected'));
+        if (isSet(x.min) && v < x.min) err(t(`Inférieur à ${x.min}`, `Less than ${x.min}`));
+        if (isSet(x.max) && v > x.max) err(t(`Supérieur à ${x.max}`, `Greater than ${x.max}`));
         return;
       case 'boolean':
-        if (typeof v !== 'boolean') err('Booléen attendu (true / false)');
+        if (typeof v !== 'boolean') err(t('Booléen attendu (true / false)', 'Boolean expected (true / false)'));
         return;
       case 'date': {
         const d = v instanceof Date ? v : typeof v === 'string' || typeof v === 'number' ? new Date(v) : null;
-        if (!d || Number.isNaN(d.getTime())) return err('Date attendue (ex. 2026-01-31)');
-        if (isSet(x.minDate) && d < new Date(x.minDate)) err(`Antérieure au ${x.minDate}`);
-        if (isSet(x.maxDate) && d > new Date(x.maxDate)) err(`Postérieure au ${x.maxDate}`);
+        if (!d || Number.isNaN(d.getTime())) return err(t('Date attendue (ex. 2026-01-31)', 'Date expected (e.g. 2026-01-31)'));
+        if (isSet(x.minDate) && d < new Date(x.minDate)) err(t(`Antérieure au ${x.minDate}`, `Before ${x.minDate}`));
+        if (isSet(x.maxDate) && d > new Date(x.maxDate)) err(t(`Postérieure au ${x.maxDate}`, `After ${x.maxDate}`));
         return;
       }
     }
   }
 
   if (isPlainObject(doc)) checkObject(fields, doc, '', null);
-  else add('error', null, '', 'Le document doit être un objet JSON');
+  else add('error', null, '', t('Le document doit être un objet JSON', 'The document must be a JSON object'));
   return [...found.values()];
 }
 
 /** Texte d'un problème de conformité : message, nombre d'occurrences et exemple de valeur fautive. */
 export function describeProblem(p) {
-  const times = p.count > 1 ? ` (${p.count} fois)` : '';
-  const example = p.example === undefined ? '' : ` — ex. : ${JSON.stringify(p.example)?.slice(0, 60)}`;
+  const times = p.count > 1 ? t(` (${p.count} fois)`, ` (${p.count} times)`) : '';
+  const example = p.example === undefined ? '' : ` — ${t('ex. :', 'e.g.')} ${JSON.stringify(p.example)?.slice(0, 60)}`;
   return `${p.message}${times}${example}`;
 }

@@ -1,14 +1,14 @@
 <template>
   <div class="legend-grid">
     <div class="legend-card">
-      <h3>Types de données</h3>
-      <p class="legend-note">La couleur d’un socket et du lien qui en part indique le type de la valeur.</p>
+      <h3>{{ t('Types de données', 'Data types') }}</h3>
+      <p class="legend-note">{{ t('La couleur d’un socket et du lien qui en part indique le type de la valeur.', 'The color of a socket, and of the link leaving it, shows the type of the value.') }}</p>
       <table class="legend-table">
         <tbody>
-          <tr v-for="t in TYPE_DOCS" :key="t.type">
-            <td class="sample"><span class="lg-socket" :style="{ background: SOCKET_COLORS[t.type] }" /></td>
-            <td class="name">{{ socketTitle(t.type) }}</td>
-            <td class="note">{{ t.text }}</td>
+          <tr v-for="d in TYPE_DOCS" :key="d.type">
+            <td class="sample"><span class="lg-socket" :style="{ background: SOCKET_COLORS[d.type] }" /></td>
+            <td class="name">{{ socketTitle(d.type) }}</td>
+            <td class="note">{{ t(...d.text) }}</td>
           </tr>
         </tbody>
       </table>
@@ -16,39 +16,39 @@
 
     <div class="legend-card">
       <h3>Sockets</h3>
-      <p class="legend-note">À gauche d’un nœud les entrées, à droite les sorties.</p>
+      <p class="legend-note">{{ t('À gauche d’un nœud les entrées, à droite les sorties.', 'Inputs on the left of a node, outputs on the right.') }}</p>
       <table class="legend-table">
         <tbody>
           <tr>
             <td class="sample"><span class="lg-socket" :style="{ background: SOCKET_COLORS.string }" /></td>
-            <td class="name">Rond</td>
-            <td class="note">Une valeur unique.</td>
+            <td class="name">{{ t('Rond', 'Circle') }}</td>
+            <td class="note">{{ t('Une valeur unique.', 'A single value.') }}</td>
           </tr>
           <tr>
             <td class="sample"><span class="lg-socket list" :style="{ background: SOCKET_COLORS.string }" /></td>
-            <td class="name">Losange</td>
-            <td class="note">Une liste (ex. « Liste de textes »).</td>
+            <td class="name">{{ t('Losange', 'Diamond') }}</td>
+            <td class="note">{{ t('Une liste (ex. « Liste de textes »).', 'A list (e.g. “List of texts”).') }}</td>
           </tr>
           <tr>
             <td class="sample"><span class="lg-socket list per-item" :style="{ background: SOCKET_COLORS.boolean }" /></td>
-            <td class="name">Losange pointé <span class="per-item">∀</span></td>
-            <td class="note">Entrée évaluée pour chaque élément de la liste du nœud (ex. la condition de Filtrer).</td>
+            <td class="name">{{ t('Losange pointé', 'Dotted diamond') }} <span class="per-item">∀</span></td>
+            <td class="note">{{ t('Entrée évaluée pour chaque élément de la liste du nœud (ex. la condition de Filtrer).', 'Input evaluated for each item of the node’s list (e.g. the condition of Filter).') }}</td>
           </tr>
           <tr>
             <td class="sample"><span class="lg-input">abc</span></td>
-            <td class="name">Champ de saisie</td>
-            <td class="note">Une entrée non reliée prend la valeur saisie à côté de son socket.</td>
+            <td class="name">{{ t('Champ de saisie', 'Input box') }}</td>
+            <td class="note">{{ t('Une entrée non reliée prend la valeur saisie à côté de son socket.', 'An unlinked input takes the value typed next to its socket.') }}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <div class="legend-card">
-      <h3>Liens</h3>
-      <p class="legend-note">Un lien prend la couleur du type de la sortie dont il part.</p>
+      <h3>{{ t('Liens', 'Links') }}</h3>
+      <p class="legend-note">{{ t('Un lien prend la couleur du type de la sortie dont il part.', 'A link takes the color of the type of the output it leaves from.') }}</p>
       <table class="legend-table">
         <tbody>
-          <tr v-for="l in LINK_DOCS" :key="l.name">
+          <tr v-for="l in LINK_DOCS" :key="l.name[0]">
             <td class="sample">
               <svg width="56" height="14" aria-hidden="true">
                 <line x1="3" y1="7" x2="53" y2="7" :stroke="l.color" :stroke-width="l.width ?? 2" :stroke-dasharray="l.dash" />
@@ -62,16 +62,16 @@
                 </template>
               </svg>
             </td>
-            <td class="name">{{ l.name }}</td>
-            <td class="note">{{ l.text }}</td>
+            <td class="name">{{ t(...l.name) }}</td>
+            <td class="note">{{ t(...l.text) }}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <div class="legend-card">
-      <h3>Couleurs des nœuds</h3>
-      <p class="legend-note">L’en-tête d’un nœud a la couleur de sa catégorie.</p>
+      <h3>{{ t('Couleurs des nœuds', 'Node colors') }}</h3>
+      <p class="legend-note">{{ t('L’en-tête d’un nœud a la couleur de sa catégorie.', 'A node’s header has the color of its category.') }}</p>
       <div class="legend-chips">
         <a
           v-for="c in NODE_COLORS"
@@ -82,17 +82,17 @@
           :style="{ background: c.color }"
         >{{ c.label }}</a>
       </div>
-      <p class="legend-note mt-3">Un groupe peut prendre une autre couleur (pastille de son en-tête).</p>
+      <p class="legend-note mt-3">{{ t('Un groupe peut prendre une autre couleur (pastille de son en-tête).', 'A group can take another color (swatch in its header).') }}</p>
     </div>
 
     <div class="legend-card wide">
-      <h3>Champs, contrôles et verrous</h3>
+      <h3>{{ t('Champs, contrôles et verrous', 'Fields, checks and locks') }}</h3>
       <table class="legend-table">
         <tbody>
-          <tr v-for="m in MARK_DOCS" :key="m.name">
-            <td class="sample"><span class="lg-mark" :class="m.cls">{{ m.mark }}</span></td>
-            <td class="name">{{ m.name }}</td>
-            <td class="note">{{ m.text }}</td>
+          <tr v-for="m in MARK_DOCS" :key="m.cls">
+            <td class="sample"><span class="lg-mark" :class="m.cls">{{ t(...m.mark) }}</span></td>
+            <td class="name">{{ t(...m.name) }}</td>
+            <td class="note">{{ t(...m.text) }}</td>
           </tr>
         </tbody>
       </table>
@@ -101,7 +101,9 @@
 </template>
 
 <script setup>
-import { CATEGORIES } from '../lib/transforms';
+import { computed } from 'vue';
+import { t } from '../lib/i18n';
+import { CATEGORIES, categoryLabel } from '../lib/transforms';
 import { HEADER_COLORS, SOCKET_COLORS, socketTitle } from '../lib/types';
 
 /** Légende de l'éditeur : types, sockets, liens, couleurs et repères. Utilisée par la page Nœuds et l'éditeur. */
@@ -111,44 +113,101 @@ defineProps({
 });
 
 /** Légende : types de données. */
+// Textes en paires [français, anglais].
 const TYPE_DOCS = [
-  { type: 'string', text: 'Chaîne de caractères.' },
-  { type: 'number', text: 'Nombre décimal (accepte aussi un entier).' },
-  { type: 'integer', text: 'Nombre entier (comptes, index, longueurs…).' },
-  { type: 'boolean', text: 'Vrai ou faux.' },
-  { type: 'date', text: 'Date ou date-heure (ISO, ex. 2026-09-14).' },
-  { type: 'object', text: 'Objet : un ensemble de champs.' },
-  { type: 'any', text: 'Tout type : la valeur passe telle quelle.' },
+  { type: 'string', text: ['Chaîne de caractères.', 'String of characters.'] },
+  { type: 'number', text: ['Nombre décimal (accepte aussi un entier).', 'Decimal number (also accepts an integer).'] },
+  { type: 'integer', text: ['Nombre entier (comptes, index, longueurs…).', 'Whole number (counts, indexes, lengths…).'] },
+  { type: 'boolean', text: ['Vrai ou faux.', 'True or false.'] },
+  { type: 'date', text: ['Date ou date-heure (ISO, ex. 2026-09-14).', 'Date or date-time (ISO, e.g. 2026-09-14).'] },
+  { type: 'object', text: ['Objet : un ensemble de champs.', 'Object: a set of fields.'] },
+  { type: 'any', text: ['Tout type : la valeur passe telle quelle.', 'Any type: the value passes as is.'] },
 ];
 
 /** Légende : apparence des liens. */
 const LINK_DOCS = [
-  { name: 'Trait plein', color: SOCKET_COLORS.string, text: 'Une valeur unique.' },
-  { name: 'Tirets', color: SOCKET_COLORS.string, dash: '7 4', text: 'Une liste.' },
-  { name: 'Pointillés rouges', color: 'var(--danger)', dash: '2 4', text: 'Types incompatibles : erreur dans les contrôles.' },
-  { name: 'Blanc', color: 'var(--edge-highlight)', text: 'Lien survolé ou sélectionné (Suppr le supprime).' },
-  { name: 'Bouton +', color: 'var(--edge-highlight)', plus: true, text: 'Au milieu d’un lien survolé : ajoute un nœud intercalé sur ce lien.' },
-  { name: 'Pastilles', color: 'var(--edge-highlight)', ends: true, text: 'Aux extrémités d’un lien survolé : les saisir pour changer le point d’accroche.' },
-  { name: 'Orange épais', color: 'var(--accent)', width: 4, text: 'Le nœud glissé s’intercalera sur ce lien si on le lâche.' },
+  { name: ['Trait plein', 'Solid line'], color: SOCKET_COLORS.string, text: ['Une valeur unique.', 'A single value.'] },
+  { name: ['Tirets', 'Dashes'], color: SOCKET_COLORS.string, dash: '7 4', text: ['Une liste.', 'A list.'] },
+  {
+    name: ['Pointillés rouges', 'Red dots'],
+    color: 'var(--danger)',
+    dash: '2 4',
+    text: ['Types incompatibles : erreur dans les contrôles.', 'Incompatible types: error in the checks.'],
+  },
+  { name: ['Blanc', 'White'], color: 'var(--edge-highlight)', text: ['Lien survolé ou sélectionné (Suppr le supprime).', 'Hovered or selected link (Del deletes it).'] },
+  {
+    name: ['Bouton +', '+ button'],
+    color: 'var(--edge-highlight)',
+    plus: true,
+    text: ['Au milieu d’un lien survolé : ajoute un nœud intercalé sur ce lien.', 'In the middle of a hovered link: adds a node inserted on this link.'],
+  },
+  {
+    name: ['Pastilles', 'Handles'],
+    color: 'var(--edge-highlight)',
+    ends: true,
+    text: ['Aux extrémités d’un lien survolé : les saisir pour changer le point d’accroche.', 'At the ends of a hovered link: grab them to change the attach point.'],
+  },
+  {
+    name: ['Orange épais', 'Thick orange'],
+    color: 'var(--accent)',
+    width: 4,
+    text: ['Le nœud glissé s’intercalera sur ce lien si on le lâche.', 'The dragged node will be inserted on this link if dropped.'],
+  },
 ];
 
 /** Légende : couleurs des en-têtes de nœuds. */
-const NODE_COLORS = [
-  { label: 'Source', color: HEADER_COLORS.source, href: '#source' },
-  { label: 'Cible', color: HEADER_COLORS.target, href: '#target' },
-  { label: 'Groupe', color: HEADER_COLORS.group, href: '#group' },
-  ...CATEGORIES.map((c) => ({ label: c, color: HEADER_COLORS[c], href: `#cat-${c}` })),
-];
+const NODE_COLORS = computed(() => [
+  { label: t('Source', 'Source'), color: HEADER_COLORS.source, href: '#source' },
+  { label: t('Cible', 'Target'), color: HEADER_COLORS.target, href: '#target' },
+  { label: t('Groupe', 'Group'), color: HEADER_COLORS.group, href: '#group' },
+  ...CATEGORIES.map((c) => ({ label: categoryLabel(c), color: HEADER_COLORS[c], href: `#cat-${c}` })),
+]);
 
 /** Légende : repères sur les champs et les nœuds. */
 const MARK_DOCS = [
-  { mark: '*', cls: 'required', name: 'Obligatoire', text: 'Le champ doit être présent. Cliquer l’étoile bascule obligatoire / optionnel.' },
-  { mark: '≤ 25 car.', cls: 'rule', name: 'Format', text: 'Règle de format du champ (longueur, bornes, motif, dates, taille de liste) ; cliquer pour la modifier.' },
-  { mark: '⛔', cls: 'error', name: 'Erreur', text: 'Champ obligatoire non alimenté, types incompatibles, fichier de données non conforme…' },
-  { mark: '⚠', cls: 'warning', name: 'Avertissement', text: 'Conversion de type, source optionnelle vers un champ obligatoire, format non garanti, champ en trop…' },
-  { mark: '2', cls: 'count', name: 'Pastille de nœud', text: 'Nombre de problèmes relevés sur ce nœud ; le détail est dans le panneau Contrôles.' },
-  { mark: '🔓', cls: 'lock', name: 'Cadenas ouvert', text: 'Nœud ou groupe modifiable.' },
-  { mark: '🔒', cls: 'lock on', name: 'Cadenas orange', text: 'Nœud, groupe ou schéma verrouillé : ni déplacement ni modification.' },
+  {
+    mark: ['*', '*'],
+    cls: 'required',
+    name: ['Obligatoire', 'Required'],
+    text: ['Le champ doit être présent. Cliquer l’étoile bascule obligatoire / optionnel.', 'The field must be present. Clicking the star toggles required / optional.'],
+  },
+  {
+    mark: ['≤ 25 car.', '≤ 25 chars'],
+    cls: 'rule',
+    name: ['Format', 'Format'],
+    text: [
+      'Règle de format du champ (longueur, bornes, motif, dates, taille de liste) ; cliquer pour la modifier.',
+      'Format rule of the field (length, bounds, pattern, dates, list size); click to edit it.',
+    ],
+  },
+  {
+    mark: ['⛔', '⛔'],
+    cls: 'error',
+    name: ['Erreur', 'Error'],
+    text: ['Champ obligatoire non alimenté, types incompatibles, fichier de données non conforme…', 'Required field not fed, incompatible types, data file not matching…'],
+  },
+  {
+    mark: ['⚠', '⚠'],
+    cls: 'warning',
+    name: ['Avertissement', 'Warning'],
+    text: [
+      'Conversion de type, source optionnelle vers un champ obligatoire, format non garanti, champ en trop…',
+      'Type conversion, optional source into a required field, format not guaranteed, extra field…',
+    ],
+  },
+  {
+    mark: ['2', '2'],
+    cls: 'count',
+    name: ['Pastille de nœud', 'Node badge'],
+    text: ['Nombre de problèmes relevés sur ce nœud ; le détail est dans le panneau Contrôles.', 'Number of problems found on this node; details are in the Checks panel.'],
+  },
+  { mark: ['🔓', '🔓'], cls: 'lock', name: ['Cadenas ouvert', 'Open padlock'], text: ['Nœud ou groupe modifiable.', 'Editable node or group.'] },
+  {
+    mark: ['🔒', '🔒'],
+    cls: 'lock on',
+    name: ['Cadenas orange', 'Orange padlock'],
+    text: ['Nœud, groupe ou schéma verrouillé : ni déplacement ni modification.', 'Locked node, group or schema: no moving, no editing.'],
+  },
 ];
 </script>
 

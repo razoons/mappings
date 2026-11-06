@@ -8,11 +8,11 @@
   >
     <div class="node-header" :style="{ background: HEADER_COLORS.source }">
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
-      <span class="node-kind">Source</span>
+      <span class="node-kind">{{ t('Source', 'Source') }}</span>
       <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
-      <span v-if="sampleError" class="warn" :title="`Modèle de données JSON invalide : ${sampleError}`">⚠</span>
-      <button class="icon-btn nodrag" title="Charger un fichier de données (ou le déposer sur le nœud)" @click="pickFile">⤒</button>
-      <button class="icon-btn nodrag" title="Modèle de données (YAML : type, obligatoire, format de chaque champ)" @click="editing = true">{ }</button>
+      <span v-if="sampleError" class="warn" :title="`${t('Modèle de données JSON invalide', 'Invalid JSON data model')} : ${sampleError}`">⚠</span>
+      <button class="icon-btn nodrag" :title="t('Charger un fichier de données (ou le déposer sur le nœud)', 'Load a data file (or drop it on the node)')" @click="pickFile">⤒</button>
+      <button class="icon-btn nodrag" :title="t('Modèle de données (YAML : type, obligatoire, format de chaque champ)', 'Data model (YAML: type, required, format of each field)')" @click="editing = true">{ }</button>
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
@@ -30,17 +30,22 @@
       <span class="data-file-icon">{{ fileStatus.icon }}</span>
       <span class="data-file-name" :title="file.name">{{ file.name }}</span>
       <span class="data-file-status" :title="fileStatus.detail">{{ fileStatus.label }}</span>
-      <button class="icon-btn nodrag" title="Retirer le fichier (revenir aux valeurs du modèle de données)" @click="files.clear(id)">×</button>
+      <button class="icon-btn nodrag" :title="t('Retirer le fichier (revenir aux valeurs du modèle de données)', 'Remove the file (back to the data model values)')" @click="files.clear(id)">×</button>
     </div>
-    <div v-if="fileOver" class="data-file-drop">Déposer pour utiliser ce fichier comme données</div>
+    <div v-if="fileOver" class="data-file-drop">{{ t('Déposer pour utiliser ce fichier comme données', 'Drop to use this file as data') }}</div>
     <div v-if="!data.collapsed" class="node-body">
       <FieldTree :node-id="id" :data="data" side="source" :locked="readOnly" :values="outputsOf(id)" :issues="issues" />
     </div>
 
     <TextDialog
       v-model="editing"
-      :title="`Modèle de données — ${data.label}`"
-      description="Modèle de données de la source : pour chaque champ, son type, s’il est obligatoire (required) et son format. Les champs retrouvés par leur nom gardent leurs liens. Pour partir d’un document réel, collez-le en JSON puis « Importer un exemple JSON »."
+      :title="`${t('Modèle de données', 'Data model')} — ${data.label}`"
+      :description="
+        t(
+          'Modèle de données de la source : pour chaque champ, son type, s’il est obligatoire (required) et son format. Les champs retrouvés par leur nom gardent leurs liens. Pour partir d’un document réel, collez-le en JSON puis « Importer un exemple JSON ».',
+          'Data model of the source: for each field, its type, whether it is required and its format. Fields found by name keep their links. To start from a real document, paste it as JSON then “Import a JSON example”.',
+        )
+      "
       :initial="model.initial()"
       :actions="model.actions"
       :read-only="readOnly"
@@ -56,6 +61,7 @@ import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
 import FieldTree from './FieldTree.vue';
 import { allFields } from '../../lib/fields';
+import { count, t } from '../../lib/i18n';
 import { HEADER_COLORS } from '../../lib/types';
 import { openFile } from '../../services/files';
 import { DATA_FILES_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults } from './shared';
@@ -88,9 +94,9 @@ const fileStatus = computed(() => {
   const errors = all.filter((i) => i.level === 'error').length;
   const warnings = all.length - errors;
   const detail = all.map((i) => i.message).join('\n');
-  if (errors) return { level: 'error', icon: '⛔', label: `${errors} erreur${errors > 1 ? 's' : ''}${warnings ? `, ${warnings} ⚠` : ''}`, detail };
-  if (warnings) return { level: 'warning', icon: '⚠', label: `${warnings} avertissement${warnings > 1 ? 's' : ''}`, detail };
-  return { level: 'ok', icon: '✔', label: 'conforme au modèle', detail: 'Le fichier respecte le modèle.' };
+  if (errors) return { level: 'error', icon: '⛔', label: `${count(errors, 'erreur', 'error')}${warnings ? `, ${warnings} ⚠` : ''}`, detail };
+  if (warnings) return { level: 'warning', icon: '⚠', label: count(warnings, 'avertissement', 'warning'), detail };
+  return { level: 'ok', icon: '✔', label: t('conforme au modèle', 'matches the model'), detail: t('Le fichier respecte le modèle.', 'The file matches the model.') };
 });
 
 const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');

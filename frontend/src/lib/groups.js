@@ -1,3 +1,4 @@
+import { bilingual } from './i18n';
 import { uid } from './types';
 
 /**
@@ -15,17 +16,18 @@ export const isGroup = (n) => n?.type === 'group';
 /** Couleurs proposées pour un groupe (`data.color`) ; `null` : couleur par défaut. */
 export const DEFAULT_GROUP_COLOR = '#5b6170';
 export const GROUP_COLORS = [
-  { label: 'Par défaut', value: null },
-  { label: 'Rouge', value: '#a3423c' },
-  { label: 'Orange', value: '#b06a2a' },
-  { label: 'Jaune', value: '#a18a2b' },
-  { label: 'Vert', value: '#3f7d4a' },
-  { label: 'Turquoise', value: '#2f7a76' },
-  { label: 'Bleu', value: '#3a6aa5' },
-  { label: 'Violet', value: '#6d4c9a' },
-  { label: 'Rose', value: '#a14a7a' },
-  { label: 'Brun', value: '#7a5a3e' },
+  { label: 'Par défaut', en: 'Default', value: null },
+  { label: 'Rouge', en: 'Red', value: '#a3423c' },
+  { label: 'Orange', en: 'Orange', value: '#b06a2a' },
+  { label: 'Jaune', en: 'Yellow', value: '#a18a2b' },
+  { label: 'Vert', en: 'Green', value: '#3f7d4a' },
+  { label: 'Turquoise', en: 'Teal', value: '#2f7a76' },
+  { label: 'Bleu', en: 'Blue', value: '#3a6aa5' },
+  { label: 'Violet', en: 'Purple', value: '#6d4c9a' },
+  { label: 'Rose', en: 'Pink', value: '#a14a7a' },
+  { label: 'Brun', en: 'Brown', value: '#7a5a3e' },
 ];
+for (const c of GROUP_COLORS) bilingual(c, 'label', c.en);
 
 /** Vue Flow exige qu'un parent précède ses enfants. */
 export const groupsFirst = (nodes) => [...nodes.filter(isGroup), ...nodes.filter((n) => !isGroup(n))];

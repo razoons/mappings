@@ -9,7 +9,7 @@
     <button
       class="edge-insert nodrag nopan"
       :style="{ transform: `translate(-50%, -50%) translate(${path[1]}px, ${path[2]}px)` }"
-      title="Ajouter un nœud sur ce lien"
+      :title="t('Ajouter un nœud sur ce lien', 'Add a node on this link')"
       @mouseenter="enter"
       @mouseleave="leave"
       @click.stop="insert"
@@ -25,6 +25,7 @@ import { BaseEdge, EdgeLabelRenderer, getBezierPath, useVueFlow } from '@vue-flo
 import { getSocket, outputType } from '../../lib/graph';
 import { GROUP_HEADER } from '../../lib/groups';
 import { EDGE_INSERT_KEY, SCHEMA_LOCK_KEY } from './shared';
+import { t } from '../../lib/i18n';
 import { baseOf, isList, SOCKET_COLORS, typeMismatch } from '../../lib/types';
 
 defineOptions({ inheritAttrs: false });

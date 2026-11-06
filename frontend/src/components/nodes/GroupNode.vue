@@ -5,7 +5,7 @@
       <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
       <v-menu location="bottom" :disabled="readOnly">
         <template #activator="{ props: menu }">
-          <button v-bind="menu" class="color-swatch nodrag" :disabled="readOnly" title="Couleur du groupe" />
+          <button v-bind="menu" class="color-swatch nodrag" :disabled="readOnly" :title="t('Couleur du groupe', 'Group color')" />
         </template>
         <v-card class="pa-2" width="196">
           <div class="color-palette">
@@ -20,15 +20,15 @@
             />
           </div>
           <label class="color-custom">
-            Autre couleur
+            {{ t('Autre couleur', 'Other color') }}
             <input type="color" :value="data.color ?? DEFAULT_GROUP_COLOR" @input="updateNodeData(id, { color: $event.target.value })" />
           </label>
         </v-card>
       </v-menu>
-      <span class="group-count">{{ count }} nœud{{ count > 1 ? 's' : '' }}</span>
+      <span class="group-count">{{ countOf(count, 'nœud', 'node') }}</span>
       <LockButton :node-id="id" :locked="data.locked" />
     </div>
-    <div v-if="!data.collapsed && count === 0" class="group-empty">Glissez des nœuds ici</div>
+    <div v-if="!data.collapsed && count === 0" class="group-empty">{{ t('Glissez des nœuds ici', 'Drag nodes here') }}</div>
   </div>
 </template>
 
@@ -38,6 +38,7 @@ import { useVueFlow } from '@vue-flow/core';
 import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
 import { DEFAULT_GROUP_COLOR, GROUP_COLORS } from '../../lib/groups';
+import { count as countOf, t } from '../../lib/i18n';
 import { useReadOnly } from './shared';
 
 /**

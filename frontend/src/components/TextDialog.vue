@@ -2,12 +2,12 @@
   <v-dialog :model-value="modelValue" max-width="680" @update:model-value="emit('update:modelValue', $event)">
     <v-card :title="title">
       <v-card-text>
-        <p class="text-body-2 text-medium-emphasis mb-3">{{ readOnly ? 'Nœud verrouillé : consultation seule.' : description }}</p>
+        <p class="text-body-2 text-medium-emphasis mb-3">{{ readOnly ? t('Nœud verrouillé : consultation seule.', 'Locked node: read only.') : description }}</p>
         <v-textarea v-model="text" :readonly="readOnly" class="code-input" variant="outlined" rows="18" spellcheck="false" autofocus hide-details />
         <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-3">{{ error }}</v-alert>
       </v-card-text>
       <v-card-actions>
-        <v-btn @click="emit('update:modelValue', false)">{{ readOnly ? 'Fermer' : 'Annuler' }}</v-btn>
+        <v-btn @click="emit('update:modelValue', false)">{{ readOnly ? t('Fermer', 'Close') : t('Annuler', 'Cancel') }}</v-btn>
         <v-spacer />
         <v-btn
           v-for="a in readOnly ? [] : actions"
@@ -25,6 +25,7 @@
 
 <script setup>
 import { nextTick, ref, watch } from 'vue';
+import { t } from '../lib/i18n';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -61,7 +62,7 @@ watch(
 function run(action) {
   try {
     error.value = null;
-    if (action.run(text.value, (t) => (text.value = t))) emit('update:modelValue', false);
+    if (action.run(text.value, (next) => (text.value = next))) emit('update:modelValue', false);
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   }

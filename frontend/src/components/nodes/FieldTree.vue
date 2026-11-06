@@ -1,8 +1,8 @@
 <template>
   <div class="col-labels tree-cols">
-    <span>Champ</span>
-    <span>Type</span>
-    <span>Valeur</span>
+    <span>{{ t('Champ', 'Field') }}</span>
+    <span>{{ t('Type', 'Type') }}</span>
+    <span>{{ t('Valeur', 'Value') }}</span>
   </div>
 
   <div
@@ -20,14 +20,14 @@
         v-else
         class="grip nodrag"
         draggable="true"
-        title="Glisser pour déplacer le champ"
+        :title="t('Glisser pour déplacer le champ', 'Drag to move the field')"
         @dragstart="startDrag($event, f)"
         @dragend="endDrag"
       >⋮⋮</span>
       <button
         v-if="isContainer(f)"
         class="toggle nodrag"
-        :title="f.collapsed ? 'Déplier' : 'Replier'"
+        :title="f.collapsed ? t('Déplier', 'Expand') : t('Replier', 'Collapse')"
         @click="ops.toggle(f.id)"
       >{{ f.collapsed ? '▸' : '▾' }}</button>
       <span v-else class="toggle" />
@@ -36,7 +36,7 @@
         class="required-btn nodrag"
         :class="{ on: f.required }"
         :disabled="locked"
-        :title="f.required ? 'Obligatoire (cliquer pour le rendre optionnel)' : 'Optionnel (cliquer pour le rendre obligatoire)'"
+        :title="f.required ? t('Obligatoire (cliquer pour le rendre optionnel)', 'Required (click to make it optional)') : t('Optionnel (cliquer pour le rendre obligatoire)', 'Optional (click to make it required)')"
         @click="ops.setRules(f.id, { required: !f.required })"
       >*</button>
       <FieldRules :field="f" :locked="locked" @update="ops.setRules(f.id, $event)" />
@@ -52,7 +52,7 @@
         type="checkbox"
         class="nodrag"
         :checked="exampleOf(chain) === true"
-        title="Exemple (données du calcul tant qu’aucun fichier n’est chargé)"
+        :title="t('Exemple (données du calcul tant qu’aucun fichier n’est chargé)', 'Example (data used until a file is loaded)')"
         @change="setExample(chain, $event.target.checked)"
       />
       <input
@@ -69,12 +69,12 @@
     </span>
     <span v-else class="field-value" :class="{ empty: isUnmapped(f) }" :title="issueText(f) || formatValue(values[f.id])">
       <span v-if="levelOf(f)" class="issue-mark" :class="levelOf(f)">{{ levelOf(f) === 'error' ? '⛔' : '⚠' }}</span>
-      {{ isUnmapped(f) ? 'non mappé' : values[f.id] === undefined ? '—' : formatValue(values[f.id]) }}
+      {{ isUnmapped(f) ? t('non mappé', 'not mapped') : values[f.id] === undefined ? '—' : formatValue(values[f.id]) }}
     </span>
 
     <span v-if="!locked" class="row-actions">
-      <button v-if="isContainer(f)" class="icon-btn nodrag" title="Ajouter un sous-champ" @click="ops.addChild(f.id)">+</button>
-      <button class="icon-btn danger nodrag" title="Supprimer" @click="ops.remove(f.id)">×</button>
+      <button v-if="isContainer(f)" class="icon-btn nodrag" :title="t('Ajouter un sous-champ', 'Add a sub-field')" @click="ops.addChild(f.id)">+</button>
+      <button class="icon-btn danger nodrag" :title="t('Supprimer', 'Delete')" @click="ops.remove(f.id)">×</button>
     </span>
 
     <Handle :id="f.id" :type="side" :position="position" v-bind="socketAttrs(socketType(chain))" />
@@ -99,7 +99,7 @@
     @dragleave="drop?.id === null && (drop = null)"
     @drop="dropOn"
   >
-    {{ draggedId ? 'Déposer ici pour placer à la racine' : '+ Ajouter un champ' }}
+    {{ draggedId ? t('Déposer ici pour placer à la racine', 'Drop here to place at the root') : t('+ Ajouter un champ', '+ Add a field') }}
   </button>
 </template>
 
@@ -107,6 +107,7 @@
 import { computed, inject, nextTick, ref, watch } from 'vue';
 import { Handle, Position, useVueFlow } from '@vue-flow/core';
 import { checkDocument, describeProblem } from '../../lib/conformity';
+import { t } from '../../lib/i18n';
 import { descendantIds, flattenRows, isContainer, sourceSocketType, targetSocketType, TYPE_OPTIONS, typeKey } from '../../lib/fields';
 import { isPlainObject } from '../../lib/lists';
 import { formatValue } from '../../lib/types';
@@ -180,12 +181,16 @@ const exampleText = (chain) => {
 };
 const examplePlaceholder = (f) => {
   if (f.type === 'array') return (f.item ?? 'string') === 'string' ? '"a", "b, c", ""' : '1, 2, 3';
-  return f.type === 'date' ? 'AAAA-MM-JJ' : '—';
+  return f.type === 'date' ? t('AAAA-MM-JJ', 'YYYY-MM-DD') : '—';
 };
 const exampleHint = (f) =>
-  `Exemple (données du calcul tant qu’aucun fichier n’est chargé)${
-    f.type !== 'array' ? '' : (f.item ?? 'string') === 'string' ? ' — textes entre guillemets, séparés par des virgules ("" : texte vide)' : ' — éléments séparés par des virgules'
-  } — Entrée pour valider`;
+  `${t('Exemple (données du calcul tant qu’aucun fichier n’est chargé)', 'Example (data used until a file is loaded)')}${
+    f.type !== 'array'
+      ? ''
+      : (f.item ?? 'string') === 'string'
+        ? t(' — textes entre guillemets, séparés par des virgules ("" : texte vide)', ' — texts in quotes, separated by commas ("": empty text)')
+        : t(' — éléments séparés par des virgules', ' — items separated by commas')
+  } — ${t('Entrée pour valider', 'Enter to confirm')}`;
 
 /**
  * Éléments d'une liste saisie : séparés par des virgules ; un élément entre guillemets est pris tel quel
@@ -220,7 +225,7 @@ function splitList(text) {
 function parseExample(f, text) {
   if (text === '') return null;
   if (f.type === 'array') {
-    return splitList(text).map((t) => parseScalar(f.item ?? 'string', t));
+    return splitList(text).map((item) => parseScalar(f.item ?? 'string', item));
   }
   return parseScalar(f.type, text);
 }
@@ -232,9 +237,9 @@ function parseScalar(type, text) {
     return Number.isNaN(n) ? text : n;
   }
   if (type === 'boolean') {
-    const t = text.trim().toLowerCase();
-    if (['true', 'vrai', 'oui', '1'].includes(t)) return true;
-    if (['false', 'faux', 'non', '0'].includes(t)) return false;
+    const word = text.trim().toLowerCase();
+    if (['true', 'vrai', 'oui', '1'].includes(word)) return true;
+    if (['false', 'faux', 'non', '0'].includes(word)) return false;
   }
   return text;
 }
@@ -242,7 +247,7 @@ function parseScalar(type, text) {
 /** Problème de l'exemple au regard du type et du format du champ (message, ou `null`). */
 function exampleProblem(f, chain) {
   const v = exampleOf(chain);
-  if (v === undefined || v === null) return f.required ? 'Obligatoire : donnez un exemple' : null;
+  if (v === undefined || v === null) return f.required ? t('Obligatoire : donnez un exemple', 'Required: give an example') : null;
   const p = checkDocument([f], { [f.name]: v }).find((x) => x.level === 'error');
   return p ? describeProblem(p) : null;
 }

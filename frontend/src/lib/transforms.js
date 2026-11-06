@@ -1,4 +1,5 @@
 import { bindsOf, isPlainObject, pickItems, tagList } from './lists';
+import { bilingual, t } from './i18n';
 import { coerce } from './types';
 
 /**
@@ -20,31 +21,14 @@ import { coerce } from './types';
 
 const out = (type, label = 'Résultat') => [{ id: 'result', label, type }];
 
-// ── Noms des jours (dimanche en premier, comme getUTCDay) et des mois ──
-const NAMES = {
-  'lundi, mardi…': {
-    days: ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
-    months: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
-  },
-  'lun, mar…': {
-    days: ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'],
-    months: ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'],
-  },
-  'monday, tuesday…': {
-    days: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
-    months: ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'],
-  },
-  'mon, tue…': {
-    days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
-    months: ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'],
-  },
-};
-const NAME_STYLES = Object.keys(NAMES);
-/** Libellé d'un style de noms : des mois si la partie choisie est le mois (« janvier, février… »), sinon des jours. */
-const nameStyleLabel = (style, p) => {
-  const months = p.part === 'Mois' && NAMES[style]?.months;
-  return months ? `${months[0]}, ${months[1]}…` : style;
-};
+// ── Noms des jours (du lundi au dimanche) et des mois, saisis par l'utilisateur, séparés par des virgules ──
+const DAY_NAMES = ['lundi, mardi, mercredi, jeudi, vendredi, samedi, dimanche', 'monday, tuesday, wednesday, thursday, friday, saturday, sunday'];
+const MONTH_NAMES = [
+  'janvier, février, mars, avril, mai, juin, juillet, août, septembre, octobre, novembre, décembre',
+  'january, february, march, april, may, june, july, august, september, october, november, december',
+];
+/** n-ième nom d'une liste saisie (« a, b, c »), ou `null` s'il manque. */
+const nthName = (list, n) => String(list ?? '').split(',').map((s) => s.trim())[n] || null;
 
 /*
  * `passes` : une sortie « Tout » qui ne fait que transmettre des entrées prend le type réel de ce qui y entre
@@ -689,7 +673,9 @@ export const TRANSFORMS = {
     ],
     params: [
       { id: 'part', label: 'Partie', default: 'Année', options: ['Année', 'Mois', 'Jour', 'Jour de la semaine'] },
-      { id: 'names', label: 'Nom', default: NAME_STYLES[0], options: NAME_STYLES, optionLabel: nameStyleLabel },
+      // Valeur par défaut dans la langue de l'interface, figée à la création du nœud (`initial`).
+      { id: 'days', label: 'Jours', default: DAY_NAMES[0], initial: () => t(...DAY_NAMES), when: (p) => p.part === 'Jour de la semaine' },
+      { id: 'months', label: 'Mois', default: MONTH_NAMES[0], initial: () => t(...MONTH_NAMES), when: (p) => p.part === 'Mois' },
     ],
     compute: ({ date }, p) => {
       if (!(date instanceof Date) || Number.isNaN(date.getTime())) return { result: null, name: null };
@@ -700,9 +686,9 @@ export const TRANSFORMS = {
         'Jour de la semaine': date.getUTCDay(),
       };
       const n = parts[p.part];
-      // Nom du jour de la semaine ou du mois ; pour l'année et le jour du mois, le nombre en texte.
-      const names = NAMES[p.names] ?? NAMES[NAME_STYLES[0]];
-      const name = p.part === 'Jour de la semaine' ? names.days[n] : p.part === 'Mois' ? names.months[n - 1] : String(n);
+      // Nom du jour de la semaine (la liste commence au lundi, getUTCDay au dimanche) ou du mois ;
+      // pour l'année et le jour du mois, le nombre en texte.
+      const name = p.part === 'Jour de la semaine' ? nthName(p.days, (n + 6) % 7) : p.part === 'Mois' ? nthName(p.months, n - 1) : String(n);
       return { result: n, name };
     },
   },
@@ -725,6 +711,128 @@ export const TRANSFORMS = {
 
 export const CATEGORIES = ['Entrée', 'Structure', 'Liste', 'Texte', 'Math', 'Logique', 'Conversion', 'Date'];
 
+// ── Traduction anglaise ─────────────────────────────────────
+// Les catégories et les options des réglages sont des valeurs enregistrées (en français) : seul leur affichage change.
+
+const CATEGORY_EN = {
+  Entrée: 'Input',
+  Structure: 'Structure',
+  Liste: 'List',
+  Texte: 'Text',
+  Math: 'Math',
+  Logique: 'Logic',
+  Conversion: 'Conversion',
+  Date: 'Date',
+};
+/** Nom affiché d'une catégorie. */
+export const categoryLabel = (c) => t(c, CATEGORY_EN[c] ?? c);
+
+const OPTION_EN = {
+  vrai: 'true',
+  faux: 'false',
+  Croissant: 'Ascending',
+  Décroissant: 'Descending',
+  Début: 'Start',
+  Fin: 'End',
+  Somme: 'Sum',
+  Moyenne: 'Average',
+  'Au moins un': 'At least one',
+  Tous: 'All',
+  Aucun: 'None',
+  MAJUSCULES: 'UPPERCASE',
+  minuscules: 'lowercase',
+  Capitaliser: 'Capitalize',
+  Gauche: 'Left',
+  Droite: 'Right',
+  Milieu: 'Middle',
+  Soustraction: 'Subtraction',
+  Puissance: 'Power',
+  Arrondi: 'Round',
+  Plancher: 'Floor',
+  Plafond: 'Ceiling',
+  Tronquer: 'Truncate',
+  contient: 'contains',
+  'commence par': 'starts with',
+  ET: 'AND',
+  OU: 'OR',
+  'OU exclusif': 'XOR',
+  'JJ/MM/AAAA': 'DD/MM/YYYY',
+  'MM/JJ/AAAA': 'MM/DD/YYYY',
+  'AAAA-MM-JJ': 'YYYY-MM-DD',
+  Année: 'Year',
+  Mois: 'Month',
+  Jour: 'Day',
+  'Jour de la semaine': 'Day of the week',
+};
+
+/** `label` : nom du nœud ; `sockets` : entrées et sorties par id ; `params` : réglages par id. */
+const EN = {
+  const_string: { label: 'Text', sockets: { result: 'Text' }, params: { value: 'Value' } },
+  const_number: { label: 'Number', sockets: { result: 'Number' }, params: { value: 'Value' } },
+  const_bool: { label: 'Boolean', sockets: { result: 'Boolean' }, params: { value: 'Value' } },
+  now: { label: 'Now', sockets: { result: 'Date' } },
+  current: { label: 'Current item', sockets: { item: 'Item', index: 'Index' } },
+  get_field: { label: 'Read a field', sockets: { obj: 'Object', result: 'Value' }, params: { path: 'Path' } },
+  set_field: { label: 'Set a field', sockets: { obj: 'Object(s)', value: 'Value', result: 'Object(s)' }, params: { path: 'Key' } },
+  remove_field: { label: 'Remove fields', sockets: { obj: 'Object(s)', result: 'Object(s)' }, params: { keys: 'Keys (a, b.c)' } },
+  list_create: { label: 'Create a list', sockets: { result: 'List' } },
+  list_filter: { label: 'Filter', sockets: { list: 'List', cond: 'Keep if', result: 'List' } },
+  list_sort: { label: 'Sort', sockets: { key: 'Key', result: 'List' }, params: { order: 'Order' } },
+  list_map: { label: 'Map each', sockets: { value: 'Value', result: 'List' } },
+  list_at: { label: 'Item n', sockets: { index: 'Index', value: 'Value', result: 'Item' }, params: { from: 'From' } },
+  list_find: { label: 'Find', sockets: { cond: 'Condition', value: 'Value', result: 'Item', found: 'Found' } },
+  list_count: { label: 'Count', sockets: { result: 'Number' } },
+  list_aggregate: { label: 'Aggregate', sockets: { value: 'Value', result: 'Result' }, params: { op: 'Operation' } },
+  list_test: { label: 'Test items', sockets: { cond: 'Condition', result: 'Result' }, params: { op: 'Mode' } },
+  list_slice: { label: 'Slice', sockets: { start: 'Start', count: 'Count', result: 'List' } },
+  list_reverse: { label: 'Reverse', sockets: { result: 'List' } },
+  list_unique: { label: 'Remove duplicates', sockets: { key: 'Key', result: 'List' } },
+  list_join: { label: 'Join as text', sockets: { list: 'List', result: 'Result' }, params: { sep: 'Separator' } },
+  concat: { label: 'Concatenate', sockets: { result: 'Result' }, params: { sep: 'Separator' } },
+  case: { label: 'Case', sockets: { text: 'Text', result: 'Result' }, params: { mode: 'Mode' } },
+  trim: { label: 'Trim spaces', sockets: { text: 'Text', result: 'Result' } },
+  substring: {
+    label: 'Extract (left / right)',
+    sockets: { text: 'Text', count: 'Chars', start: 'Start (middle)', result: 'Result' },
+    params: { mode: 'Mode' },
+  },
+  replace: { label: 'Replace', sockets: { text: 'Text', result: 'Result' }, params: { search: 'Find', replace: 'With' } },
+  split: { label: 'Split', sockets: { text: 'Text', result: 'Piece' }, params: { sep: 'Separator', index: 'Index' } },
+  split_list: { label: 'Split into list', sockets: { text: 'Text', result: 'List' }, params: { sep: 'Separator' } },
+  length: { label: 'Length', sockets: { text: 'Text', result: 'Length' } },
+  math: { label: 'Math', sockets: { result: 'Result' }, params: { op: 'Operation' } },
+  round: { label: 'Round', sockets: { value: 'Value', result: 'Result' }, params: { mode: 'Mode', decimals: 'Decimals' } },
+  compare: { label: 'Compare', sockets: { result: 'Result' }, params: { op: 'Operator' } },
+  logic: { label: 'Boolean operation', sockets: { result: 'Result' }, params: { op: 'Operation' } },
+  not: { label: 'Not', sockets: { a: 'Boolean', result: 'Result' } },
+  switch: { label: 'Condition (if/else)', sockets: { cond: 'Condition', yes: 'If true', no: 'If false', result: 'Result' } },
+  coalesce: { label: 'Default value', sockets: { value: 'Value', fallback: 'Default', result: 'Result' } },
+  to_string: { label: 'To text', sockets: { value: 'Value', result: 'Result' } },
+  to_number: { label: 'To number', sockets: { value: 'Value', result: 'Result' } },
+  to_integer: { label: 'To integer', sockets: { value: 'Value', result: 'Result' }, params: { mode: 'Mode' } },
+  to_bool: { label: 'To boolean', sockets: { value: 'Value', result: 'Result' } },
+  date_format: { label: 'Format date', sockets: { date: 'Date', result: 'Result' }, params: { format: 'Format' } },
+  date_part: { label: 'Date part', sockets: { date: 'Date', result: 'Number', name: 'Name' }, params: { part: 'Part', days: 'Days', months: 'Months' } },
+  age: { label: 'Age (years)', sockets: { date: 'Date', ref: 'Reference', result: 'Years' } },
+};
+
+bilingual(LIST_IN, 'label', 'List');
+for (const [kind, def] of Object.entries(TRANSFORMS)) {
+  const en = EN[kind] ?? {};
+  bilingual(def, 'label', en.label);
+  for (const s of [...def.inputs, ...def.outputs]) bilingual(s, 'label', en.sockets?.[s.id]);
+  for (const p of def.params ?? []) {
+    bilingual(p, 'label', en.params?.[p.id]);
+    if (!p.options) continue;
+    // Libellé d'une option : celui du réglage (s'il en a un), traduit s'il est connu.
+    const shown = p.optionLabel ?? ((o) => o);
+    p.optionLabel = (o, params) => {
+      const fr = shown(o, params);
+      return t(fr, OPTION_EN[fr] ?? fr);
+    };
+  }
+}
+
 /**
  * Entrées d'un nœud. Pour un nœud à entrées en nombre libre : jusqu'à la dernière utilisée (reliée — `connected`
  * liste les ids des entrées reliées — ou saisie), plus une libre, et au moins `min`.
@@ -744,6 +852,9 @@ export function inputSocket(def, id) {
   }
   return def?.inputs.find((s) => s.id === id);
 }
+
+/** Réglages d'un nouveau nœud : ceux dont la valeur de départ dépend de la langue de l'interface (`initial`). */
+export const initialParams = (def) => Object.fromEntries((def?.params ?? []).filter((p) => p.initial).map((p) => [p.id, p.initial()]));
 
 export function paramsWithDefaults(def, params) {
   const result = {};

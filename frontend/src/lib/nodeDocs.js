@@ -202,8 +202,8 @@ export const NODE_DOCS = {
     summary: 'Extrait l’année, le mois, le jour du mois ou le jour de la semaine : en nombre et en nom.',
     details: [
       'Nombre : mois de 1 à 12 ; jour de la semaine 0 = dimanche, 1 = lundi … 6 = samedi.',
-      'Nom (texte) : le jour de la semaine ou le mois en toutes lettres, selon le réglage Nom : « lundi, mardi… », « lun, mar… », « monday, tuesday… » ou « mon, tue… » (mois : « janvier », « janv », « january », « jan »). Pour l’année et le jour du mois, c’est le nombre en texte.',
-      'En minuscules : le nœud Casse les met en majuscule si besoin.',
+      'Nom (texte) : le jour de la semaine ou le mois, pris dans la liste saisie dans le nœud, séparée par des virgules : les 7 jours du lundi au dimanche (réglage Jours), ou les 12 mois de janvier à décembre (réglage Mois). Au choix : « lun, mar, mer… », « Monday, Tuesday… », « L, M, M, J, V, S, D »… Pour l’année et le jour du mois, c’est le nombre en texte.',
+      'Un nom absent de la liste donne un texte vide.',
       'Calculé en UTC.',
     ],
   },
@@ -222,7 +222,7 @@ export const BASE_NODES = [
     summary: 'Décrit les données d’entrée : son modèle de données (champs, types, caractère obligatoire et formats).',
     details: [
       'Chaque champ a un socket de sortie. Sous un tableau, un champ produit la liste de ses valeurs (losange), sauf quand ce tableau est en cours de parcours.',
-      'Le bouton { } édite le modèle de données en YAML (type, required, format et example de chaque champ) ; « Importer un exemple JSON » le déduit d’un document. Les champs retrouvés par leur nom gardent leurs liens. Les exemples servent au calcul tant qu’aucun fichier de données n’est chargé ; une liste d’objets peut recevoir la liste complète en exemple.',
+      'Le bouton { } édite le modèle de données en YAML (type, obligatoire, format et exemple de chaque champ, mots-clés français ou anglais) ; « Importer un exemple JSON » le déduit d’un document. Les champs retrouvés par leur nom gardent leurs liens. Les exemples servent au calcul tant qu’aucun fichier de données n’est chargé ; une liste d’objets peut recevoir la liste complète en exemple.',
       'Un fichier de données déposé sur le nœud (ou chargé par ⤒) remplace les valeurs du modèle pour le calcul, sans changer le modèle. Il est contrôlé : ⛔ obligatoire absent, type ou format non respecté ; ⚠ champ en trop. Il n’est pas enregistré avec le mapping.',
       'Règles : * rend un champ obligatoire, ⚙ définit son format. Elles servent à contrôler les champs cibles qu’il alimente.',
     ],

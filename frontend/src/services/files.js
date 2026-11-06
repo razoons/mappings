@@ -6,7 +6,7 @@
 const TYPES = [{ description: 'Mapping JSON', accept: { 'application/json': ['.json'] } }];
 // `id` : l'explorateur rouvre le dernier dossier utilisé pour les mappings (et, à part, pour les données).
 const PICKER_ID = 'mapping';
-const DATA_TYPES = [{ description: 'Données JSON', accept: { 'application/json': ['.json'] } }];
+const DATA_TYPES = [{ description: 'JSON', accept: { 'application/json': ['.json'] } }];
 const IMAGE_TYPES = [{ description: 'Image PNG', accept: { 'image/png': ['.png'] } }];
 
 const hasPicker = 'showOpenFilePicker' in window;

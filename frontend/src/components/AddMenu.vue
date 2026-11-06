@@ -9,7 +9,7 @@
       <v-text-field
         ref="search"
         v-model="query"
-        placeholder="Rechercher un nœud…"
+        :placeholder="t('Rechercher un nœud…', 'Search a node…')"
         density="compact"
         variant="solo-filled"
         flat
@@ -29,7 +29,7 @@
             </v-list-item-title>
           </v-list-item>
         </template>
-        <v-list-item v-if="!items.length" class="text-medium-emphasis">Aucun résultat</v-list-item>
+        <v-list-item v-if="!items.length" class="text-medium-emphasis">{{ t('Aucun résultat', 'No results') }}</v-list-item>
       </v-list>
     </v-card>
   </v-menu>
@@ -37,7 +37,8 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
-import { CATEGORIES, TRANSFORMS } from '../lib/transforms';
+import { t } from '../lib/i18n';
+import { CATEGORIES, categoryLabel, TRANSFORMS } from '../lib/transforms';
 import { HEADER_COLORS } from '../lib/types';
 
 /** Menu d'ajout de nœud (Shift+A) ; `pick` émet `source`, `target`, `group` ou une clé de TRANSFORMS. */
@@ -47,16 +48,17 @@ const props = defineProps({
 });
 const emit = defineEmits(['pick', 'close']);
 
-const ITEMS = [
-  { kind: 'source', label: 'Source de données', category: 'Données', color: HEADER_COLORS.source },
-  { kind: 'target', label: 'Cible de données', category: 'Données', color: HEADER_COLORS.target },
-  { kind: 'group', label: 'Groupe', category: 'Organisation', color: HEADER_COLORS.group },
+// Recalculé quand la langue change (libellés et catégories traduits).
+const ITEMS = computed(() => [
+  { kind: 'source', label: t('Source de données', 'Data source'), category: t('Données', 'Data'), color: HEADER_COLORS.source },
+  { kind: 'target', label: t('Cible de données', 'Data target'), category: t('Données', 'Data'), color: HEADER_COLORS.target },
+  { kind: 'group', label: t('Groupe', 'Group'), category: t('Organisation', 'Layout'), color: HEADER_COLORS.group },
   ...CATEGORIES.flatMap((category) =>
     Object.entries(TRANSFORMS)
       .filter(([, def]) => def.category === category)
-      .map(([kind, def]) => ({ kind, label: def.label, category, color: HEADER_COLORS[category] })),
+      .map(([kind, def]) => ({ kind, label: def.label, category: categoryLabel(category), color: HEADER_COLORS[category] })),
   ),
-];
+]);
 
 const normalize = (s) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
@@ -66,7 +68,7 @@ const search = ref(null);
 
 const items = computed(() => {
   const q = normalize(query.value.trim());
-  const allowed = props.at?.only ? ITEMS.filter((i) => props.at.only.includes(i.kind)) : ITEMS;
+  const allowed = props.at?.only ? ITEMS.value.filter((i) => props.at.only.includes(i.kind)) : ITEMS.value;
   return q ? allowed.filter((i) => normalize(`${i.label} ${i.category}`).includes(q)) : allowed;
 });
 

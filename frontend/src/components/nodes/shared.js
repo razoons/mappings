@@ -3,6 +3,7 @@ import { useVueFlow } from '@vue-flow/core';
 import { allFields, applyTypeKey, descendantIds, findChain, isContainer, mapField, moveField, newField, parseDocument, removeField, reshapeSample, syncFields } from '../../lib/fields';
 import { fieldsToYaml, yamlToFields } from '../../lib/modelYaml';
 import { cleanFormat } from '../../lib/formats';
+import { t } from '../../lib/i18n';
 import { isPlainObject } from '../../lib/lists';
 import { baseOf, isList, SOCKET_COLORS, socketTitle } from '../../lib/types';
 
@@ -40,7 +41,7 @@ export function useReadOnly(getLocked) {
 export const socketAttrs = (type, perItem = false) => ({
   class: ['socket', { list: isList(type), 'per-item': perItem }],
   style: { background: SOCKET_COLORS[baseOf(type)] },
-  title: socketTitle(type) + (perItem ? ' — évalué pour chaque élément' : ''),
+  title: socketTitle(type) + (perItem ? t(' — évalué pour chaque élément', ' — evaluated for each item') : ''),
 });
 
 /** Replie / déplie un nœud ; Vue Flow doit ensuite re-mesurer ses handles. */
@@ -147,13 +148,20 @@ export function useModelEditor(getData, ops, { source = false } = {}) {
     reset: () => (pending = null),
     actions: [
       {
-        label: 'Importer un exemple JSON',
+        get label() {
+          return t('Importer un exemple JSON', 'Import a JSON example');
+        },
         run: (text, setText) => {
           let doc;
           try {
             doc = parseDocument(text);
           } catch (e) {
-            throw new Error(`Remplacez le YAML par un document JSON d’exemple, puis cliquez à nouveau (${e.message}).`);
+            throw new Error(
+              t(
+                `Remplacez le YAML par un document JSON d’exemple, puis cliquez à nouveau (${e.message}).`,
+                `Replace the YAML with an example JSON document, then click again (${e.message}).`,
+              ),
+            );
           }
           const fields = syncFields(getData().fields, doc);
           pending = { fields, doc };
@@ -162,7 +170,9 @@ export function useModelEditor(getData, ops, { source = false } = {}) {
         },
       },
       {
-        label: 'Enregistrer',
+        get label() {
+          return t('Enregistrer', 'Save');
+        },
         primary: true,
         run: (text) => {
           const base = pending ?? { fields: getData().fields };

@@ -1,10 +1,10 @@
 <template>
-  <div v-if="!def" class="node">Nœud inconnu : {{ data.kind }}</div>
+  <div v-if="!def" class="node">{{ t('Nœud inconnu', 'Unknown node') }} : {{ data.kind }}</div>
   <div v-else class="node node-transform" :class="{ selected, collapsed: data.collapsed, locked: readOnly }">
     <div class="node-header" :style="{ background: HEADER_COLORS[def.category] }">
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
       <span class="node-title-static">{{ def.label }}</span>
-      <a class="icon-btn help-link nodrag" :href="`/noeuds#${data.kind}`" target="_blank" title="Documentation de ce nœud">?</a>
+      <a class="icon-btn help-link nodrag" :href="`/noeuds#${data.kind}`" target="_blank" :title="t('Documentation de ce nœud', 'Documentation of this node')">?</a>
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
@@ -35,13 +35,13 @@
         <Handle :id="o.id" type="source" :position="Position.Right" v-bind="socketAttrs(o.type)" />
       </div>
 
-      <div v-for="p in def.params ?? []" :key="p.id" class="row">
+      <div v-for="p in shownParams" :key="p.id" class="row">
         <select v-if="p.options" class="nodrag" :disabled="readOnly" :title="p.label" :value="params[p.id]" @change="setParam(p.id, $event.target.value)">
           <option v-for="o in p.options" :key="o" :value="o">{{ p.optionLabel ? p.optionLabel(o, params) : o }}</option>
         </select>
         <label v-else class="param-input">
           <span>{{ p.label }}</span>
-          <input class="nodrag" :disabled="readOnly" :value="params[p.id]" @input="setParam(p.id, $event.target.value)" />
+          <input class="nodrag" :disabled="readOnly" :value="params[p.id]" :title="params[p.id]" @input="setParam(p.id, $event.target.value)" />
         </label>
       </div>
 
@@ -54,7 +54,7 @@
       >
         <Handle :id="i.id" type="target" :position="Position.Left" v-bind="socketAttrs(i.type, i.perItem)" />
         <span>
-          <span v-if="issueOf(i)" class="issue-mark">{{ issueOf(i).level === 'error' ? '⛔' : '⚠' }}</span>{{ i.label }}<span v-if="i.perItem" class="per-item-mark" title="Évalué pour chaque élément de la liste"> ∀</span>
+          <span v-if="issueOf(i)" class="issue-mark">{{ issueOf(i).level === 'error' ? '⛔' : '⚠' }}</span>{{ i.label }}<span v-if="i.perItem" class="per-item-mark" :title="t('Évalué pour chaque élément de la liste', 'Evaluated for each item of the list')"> ∀</span>
         </span>
         <template v-if="hasInlineValue(i)">
           <input
@@ -86,6 +86,7 @@ import { computed, nextTick, watch } from 'vue';
 import { Handle, Position, useVueFlow } from '@vue-flow/core';
 import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
+import { t } from '../../lib/i18n';
 import { inputsOf, paramsWithDefaults, TRANSFORMS } from '../../lib/transforms';
 import { coerce, formatValue, HEADER_COLORS, isList, isNumeric } from '../../lib/types';
 import { socketAttrs, useReadOnly, useResults } from './shared';
@@ -105,6 +106,8 @@ const issueOf = (i) => issuesOf(props.id).get(i.id)?.[0];
 const readOnly = useReadOnly(() => props.data.locked);
 const def = computed(() => TRANSFORMS[props.data.kind]);
 const params = computed(() => paramsWithDefaults(def.value, props.data.params));
+// Un réglage avec `when` n'apparaît que s'il sert avec les autres réglages (ex. les noms des jours).
+const shownParams = computed(() => (def.value.params ?? []).filter((p) => !p.when || p.when(params.value)));
 const outputs = computed(() => outputsOf(props.id));
 const connected = computed(() => new Set(edges.value.filter((e) => e.target === props.id).map((e) => e.targetHandle)));
 /** Entrées affichées (pour « Concaténer » : celles utilisées, plus une libre en bas). */

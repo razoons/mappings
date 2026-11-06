@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 import { getRectOfNodes } from '@vue-flow/core';
 import { toBlob } from 'html-to-image';
 
@@ -35,7 +36,7 @@ function prepareForCapture(pane) {
 export async function schemaImage(nodes, flowEl) {
   // Nœuds rangés dans un groupe replié : masqués, ils ne comptent pas dans le cadrage.
   const shown = nodes.filter((n) => !n.hidden && !n.class?.masked);
-  if (!shown.length) throw new Error('le schéma est vide');
+  if (!shown.length) throw new Error(t('le schéma est vide', 'the schema is empty'));
   const rect = getRectOfNodes(shown);
   const width = Math.ceil(rect.width + 2 * PADDING);
   const height = Math.ceil(rect.height + 2 * PADDING);

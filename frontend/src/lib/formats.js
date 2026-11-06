@@ -1,30 +1,33 @@
+import { bilingual, t } from './i18n';
+
 /**
  * Règles d'un champ : `required` (booléen) et `format`, dont les clés dépendent du type
  * (pour un tableau de scalaires, elles portent sur chaque élément, plus le nombre d'éléments).
  */
 const FORMAT_KEYS = {
   string: [
-    { key: 'minLength', label: 'Longueur min.', kind: 'int' },
-    { key: 'maxLength', label: 'Longueur max.', kind: 'int' },
-    { key: 'pattern', label: 'Expression régulière', kind: 'text' },
+    { key: 'minLength', label: 'Longueur min.', en: 'Min. length', kind: 'int' },
+    { key: 'maxLength', label: 'Longueur max.', en: 'Max. length', kind: 'int' },
+    { key: 'pattern', label: 'Expression régulière', en: 'Regular expression', kind: 'text' },
   ],
   number: [
-    { key: 'min', label: 'Minimum', kind: 'number' },
-    { key: 'max', label: 'Maximum', kind: 'number' },
+    { key: 'min', label: 'Minimum', en: 'Minimum', kind: 'number' },
+    { key: 'max', label: 'Maximum', en: 'Maximum', kind: 'number' },
   ],
   integer: [
-    { key: 'min', label: 'Minimum', kind: 'integer' },
-    { key: 'max', label: 'Maximum', kind: 'integer' },
+    { key: 'min', label: 'Minimum', en: 'Minimum', kind: 'integer' },
+    { key: 'max', label: 'Maximum', en: 'Maximum', kind: 'integer' },
   ],
   date: [
-    { key: 'minDate', label: 'Au plus tôt', kind: 'date' },
-    { key: 'maxDate', label: 'Au plus tard', kind: 'date' },
+    { key: 'minDate', label: 'Au plus tôt', en: 'Earliest', kind: 'date' },
+    { key: 'maxDate', label: 'Au plus tard', en: 'Latest', kind: 'date' },
   ],
   array: [
-    { key: 'minItems', label: 'Éléments min.', kind: 'int' },
-    { key: 'maxItems', label: 'Éléments max.', kind: 'int' },
+    { key: 'minItems', label: 'Éléments min.', en: 'Min. items', kind: 'int' },
+    { key: 'maxItems', label: 'Éléments max.', en: 'Max. items', kind: 'int' },
   ],
 };
+for (const k of Object.values(FORMAT_KEYS).flat()) bilingual(k, 'label', k.en);
 
 /** Clés de format applicables à un champ. */
 export function formatKeys(f) {
@@ -50,8 +53,8 @@ export function formatSummary(f) {
     else if (isSet(min)) parts.push(`≥ ${min}${unit}`);
     else if (isSet(max)) parts.push(`≤ ${max}${unit}`);
   };
-  range(x.minItems, x.maxItems, ' élt');
-  range(x.minLength, x.maxLength, ' car.');
+  range(x.minItems, x.maxItems, t(' élt', ' items'));
+  range(x.minLength, x.maxLength, t(' car.', ' chars'));
   range(x.min, x.max);
   range(x.minDate, x.maxDate);
   if (isSet(x.pattern)) parts.push(`/${x.pattern}/`);

@@ -2,13 +2,13 @@
   <div class="node node-data" :class="{ selected, collapsed: data.collapsed, locked: readOnly }">
     <div class="node-header" :style="{ background: HEADER_COLORS.target }">
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
-      <span class="node-kind">Cible</span>
+      <span class="node-kind">{{ t('Cible', 'Target') }}</span>
       <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
       <span v-if="counts.errors || counts.warnings" class="issue-count" :class="{ error: counts.errors }" :title="countLabel">
         {{ counts.errors ? '⛔' : '⚠' }} {{ counts.errors + counts.warnings }}
       </span>
-      <button class="icon-btn nodrag result-btn" title="Voir le résultat (JSON produit et sa conformité au modèle)" @click="showResult = true">Résultat</button>
-      <button class="icon-btn nodrag" title="Modèle de données (YAML : type, obligatoire, format de chaque champ)" @click="editing = true">{ }</button>
+      <button class="icon-btn nodrag result-btn" :title="t('Voir le résultat (JSON produit et sa conformité au modèle)', 'Show the result (JSON produced and its conformity to the model)')" @click="showResult = true">{{ t('Résultat', 'Result') }}</button>
+      <button class="icon-btn nodrag" :title="t('Modèle de données (YAML : type, obligatoire, format de chaque champ)', 'Data model (YAML: type, required, format of each field)')" @click="editing = true">{ }</button>
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
@@ -36,8 +36,13 @@
 
     <TextDialog
       v-model="editing"
-      :title="`Modèle de données — ${data.label}`"
-      description="Modèle de données de la cible : pour chaque champ, son type, s’il est obligatoire (required) et son format. Les champs retrouvés par leur nom gardent leurs liens. Pour partir du format attendu, collez-le en JSON puis « Importer un exemple JSON »."
+      :title="`${t('Modèle de données', 'Data model')} — ${data.label}`"
+      :description="
+        t(
+          'Modèle de données de la cible : pour chaque champ, son type, s’il est obligatoire (required) et son format. Les champs retrouvés par leur nom gardent leurs liens. Pour partir du format attendu, collez-le en JSON puis « Importer un exemple JSON ».',
+          'Data model of the target: for each field, its type, whether it is required and its format. Fields found by name keep their links. To start from the expected format, paste it as JSON then “Import a JSON example”.',
+        )
+      "
       :initial="model.initial()"
       :actions="model.actions"
       :read-only="readOnly"
@@ -54,6 +59,7 @@ import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
 import FieldTree from './FieldTree.vue';
 import { allFields } from '../../lib/fields';
+import { t } from '../../lib/i18n';
 import { countIssues } from '../../lib/rules';
 import { HEADER_COLORS } from '../../lib/types';
 import { DATA_FILES_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults } from './shared';
@@ -83,7 +89,11 @@ const readOnly = useReadOnly(() => props.data.locked);
 const issues = computed(() => issuesOf(props.id));
 const counts = computed(() => countIssues(issues.value));
 const countLabel = computed(
-  () => `${counts.value.errors} erreur(s), ${counts.value.warnings} avertissement(s) — détail dans le panneau Contrôles`,
+  () =>
+    t(
+      `${counts.value.errors} erreur(s), ${counts.value.warnings} avertissement(s) — détail dans le panneau Contrôles`,
+      `${counts.value.errors} error(s), ${counts.value.warnings} warning(s) — details in the Checks panel`,
+    ),
 );
 
 const connected = computed(() => new Set(edges.value.filter((e) => e.target === props.id).map((e) => e.targetHandle)));

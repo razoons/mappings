@@ -1,7 +1,7 @@
 <template>
   <v-app-bar density="compact" flat border>
-    <v-btn class="ml-2" prepend-icon="mdi-arrow-left" to="/">Éditeur</v-btn>
-    <v-app-bar-title class="ml-4">Nœuds</v-app-bar-title>
+    <v-btn class="ml-2" prepend-icon="mdi-arrow-left" to="/">{{ t('Éditeur', 'Editor') }}</v-btn>
+    <v-app-bar-title class="ml-4">{{ t('Nœuds', 'Nodes') }}</v-app-bar-title>
     <v-text-field
       v-model="search"
       class="mr-3"
@@ -12,18 +12,19 @@
       hide-details
       clearable
       prepend-inner-icon="mdi-magnify"
-      placeholder="Rechercher un nœud"
+      :placeholder="t('Rechercher un nœud', 'Search a node')"
     />
+    <LangSwitch class="mr-2" />
   </v-app-bar>
 
   <v-main>
     <div class="help">
       <nav class="help-nav">
-        <div class="nav-title">Sommaire</div>
-        <a class="nav-category" href="#principes" :class="{ active: hash === 'principes' }">Principes</a>
-        <a class="nav-category" href="#legende" :class="{ active: hash === 'legende' }">Légende</a>
-        <div v-for="s in sections" :key="s.name" class="nav-group">
-          <a class="nav-category" :class="{ active: hash === `cat-${s.name}` }" :href="`#cat-${s.name}`">
+        <div class="nav-title">{{ t('Sommaire', 'Contents') }}</div>
+        <a class="nav-category" href="#principes" :class="{ active: hash === 'principes' }">{{ t('Principes', 'Principles') }}</a>
+        <a class="nav-category" href="#legende" :class="{ active: hash === 'legende' }">{{ t('Légende', 'Legend') }}</a>
+        <div v-for="s in sections" :key="s.key" class="nav-group">
+          <a class="nav-category" :class="{ active: hash === `cat-${s.key}` }" :href="`#cat-${s.key}`">
             <span class="nav-dot" :style="{ background: s.color }" />
             <span class="flex-grow-1">{{ s.name }}</span>
             <span class="nav-count">{{ s.nodes.length }}</span>
@@ -39,10 +40,44 @@
           <img class="logo" src="/icon.svg" alt="" />
           <span>
             ScheMap
-            <small>Schématiser et contrôler vos mappings de données</small>
+            <small>{{ t('Schématiser et contrôler vos mappings de données', 'Draw and check your data mappings') }}</small>
           </span>
         </h1>
-        <h2 class="chapter">Principes</h2>
+        <h2 class="chapter">{{ t('Principes', 'Principles') }}</h2>
+        <template v-if="lang === 'en'">
+          <p class="intro">
+            ScheMap is used to draw, exhaustively, the passage from one model to another: the mapping between two
+            interfaces, two formats or two applications. The goal is to stay in control of the transformation: each
+            field of the target shows where its value comes from and which steps it went through, with no blind spot.
+          </p>
+          <p class="intro">
+            The overall transformation is built as a chain of nodes. On the left, the <strong>sources</strong> describe
+            the data received; on the right, the <strong>targets</strong> describe the expected data; in between,
+            <strong>intermediate nodes</strong> clean, combine, compute or look up the values. Each node does one simple
+            thing, and their sequence forms the complete transformation.
+          </p>
+          <p class="intro">
+            The schema is more than a drawing: you can import one or more source examples to run the model, follow the
+            values computed at each step and check the result obtained in the target. Once ready, the schema can be
+            exported as a model, to be reused or shared, or as an image, for documentation.
+          </p>
+          <p class="intro">
+            This approach is largely inspired by the node editor of <strong>Blender</strong>, the 3D creation software:
+            the same sockets colored by type, the same links drawn from one node to another, the same way of building a
+            complex result from simple bricks.
+          </p>
+          <h3 class="sub-chapter">Reading a node</h3>
+          <p class="intro">
+            A node receives values through its input sockets (on the left) and produces some through its output sockets
+            (on the right). An unlinked input takes the value typed in the node. Any types can be linked: a different type
+            is converted and reported (⚠), an incompatible type is reported as an error (⛔, red dotted link).
+          </p>
+          <p class="intro">
+            A list plugged into a simple input applies the node to each item (except for list nodes, which work on the
+            whole list).
+          </p>
+        </template>
+        <template v-else>
         <p class="intro">
           ScheMap sert à schématiser, de manière exhaustive, le passage d’un modèle à un autre : le mapping entre
           deux interfaces, deux formats ou deux applications. L’objectif est de rester en contrôle de la transformation
@@ -75,20 +110,21 @@
           Une liste branchée sur une entrée simple applique le nœud à chaque élément (sauf pour les nœuds de liste, qui
           travaillent sur la liste entière).
         </p>
+        </template>
 
         <section id="legende" class="legend-chapter">
-          <h2 class="chapter">Légende</h2>
+          <h2 class="chapter">{{ t('Légende', 'Legend') }}</h2>
 
           <LegendGrid />
         </section>
 
-        <p v-if="!sections.length" class="text-medium-emphasis">Aucun nœud ne correspond à « {{ search }} ».</p>
+        <p v-if="!sections.length" class="text-medium-emphasis">{{ t('Aucun nœud ne correspond à', 'No node matches') }} « {{ search }} ».</p>
 
-        <section v-for="s in sections" :id="`cat-${s.name}`" :key="s.name">
+        <section v-for="s in sections" :id="`cat-${s.key}`" :key="s.key">
           <h2 class="chapter" :style="{ '--chapter': s.color }">
             <span class="chapter-dot" />
             {{ s.name }}
-            <span class="chapter-count">{{ s.nodes.length }} nœud{{ s.nodes.length > 1 ? 's' : '' }}</span>
+            <span class="chapter-count">{{ count(s.nodes.length, 'nœud', 'node') }}</span>
           </h2>
           <article v-for="n in s.nodes" :id="n.kind" :key="n.kind" class="node-doc" :class="{ highlight: hash === n.kind }">
             <header :style="{ background: n.color }">
@@ -100,7 +136,7 @@
               <table v-if="n.def">
                 <tbody>
                   <template v-if="n.def.inputs.length">
-                    <tr class="group-row"><th colspan="3">Entrées</th></tr>
+                    <tr class="group-row"><th colspan="3">{{ t('Entrées', 'Inputs') }}</th></tr>
                     <tr v-for="i in n.def.inputs" :key="`in-${i.id}`">
                       <td class="socket-cell">
                         <span class="swatch" :class="{ list: isList(i.type) }" :style="{ background: SOCKET_COLORS[baseOf(i.type)] }" />
@@ -109,23 +145,24 @@
                       </td>
                       <td class="type">{{ socketTitle(i.type) }}</td>
                       <td class="note">
-                        <template v-if="i.perItem">évaluée pour chaque élément</template>
-                        <template v-if="i.default !== undefined"><span v-if="i.perItem"> · </span>défaut : <code>{{ i.default }}</code></template>
+                        <template v-if="i.perItem">{{ t('évaluée pour chaque élément', 'evaluated for each item') }}</template>
+                        <template v-if="i.default !== undefined"><span v-if="i.perItem"> · </span>{{ t('défaut :', 'default:') }} <code>{{ i.default }}</code></template>
                       </td>
                     </tr>
                   </template>
                   <template v-if="n.def.params?.length">
-                    <tr class="group-row"><th colspan="3">Réglages</th></tr>
+                    <tr class="group-row"><th colspan="3">{{ t('Réglages', 'Settings') }}</th></tr>
                     <tr v-for="p in n.def.params" :key="`p-${p.id}`">
                       <td>{{ p.label }}</td>
-                      <td class="type">{{ p.options ? 'Choix' : 'Saisie' }}</td>
+                      <td class="type">{{ p.options ? t('Choix', 'Choice') : t('Saisie', 'Input') }}</td>
                       <td class="note">
-                        <template v-if="p.options">{{ p.options.join(' · ') }} — </template>
-                        défaut : <code>{{ p.default === '' ? '(vide)' : p.default }}</code>
+                        <template v-if="p.options">{{ p.options.map((o) => p.optionLabel(o, {})).join(' · ') }} — </template>
+                        {{ t('défaut :', 'default:') }}
+                        <code>{{ p.default === '' ? t('(vide)', '(empty)') : p.optionLabel ? p.optionLabel(p.default, {}) : p.default }}</code>
                       </td>
                     </tr>
                   </template>
-                  <tr class="group-row"><th colspan="3">Sorties</th></tr>
+                  <tr class="group-row"><th colspan="3">{{ t('Sorties', 'Outputs') }}</th></tr>
                   <tr v-for="o in n.def.outputs" :key="`out-${o.id}`">
                     <td class="socket-cell">
                       <span class="swatch" :class="{ list: isList(o.type) }" :style="{ background: SOCKET_COLORS[baseOf(o.type)] }" />
@@ -142,15 +179,20 @@
               </ul>
 
               <template v-if="n.preview">
-                <span class="label">Exemple</span>
+                <span class="label">{{ t('Exemple', 'Example') }}</span>
                 <NodePreview :def="n.def" :example="n.preview" />
               </template>
 
               <p v-if="n.def" class="guarantee">
-                <span class="label">Contrôle des cibles</span>
+                <span class="label">{{ t('Contrôle des cibles', 'Target checks') }}</span>
                 <template v-if="n.guarantee">{{ n.guarantee }}</template>
                 <template v-else>
-                  Pas de garantie déclarée : les champs cibles alimentés par ce nœud ne sont pas contrôlés (obligatoire, format).
+                  {{
+                    t(
+                      'Pas de garantie déclarée : les champs cibles alimentés par ce nœud ne sont pas contrôlés (obligatoire, format).',
+                      'No declared guarantee: the target fields fed by this node are not checked (required, format).',
+                    )
+                  }}
                 </template>
               </p>
             </div>
@@ -164,19 +206,25 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
+import LangSwitch from '../components/LangSwitch.vue';
 import LegendGrid from '../components/LegendGrid.vue';
 import NodePreview from '../components/NodePreview.vue';
+import { count, lang, t } from '../lib/i18n';
 import { BASE_NODES, NODE_DOCS } from '../lib/nodeDocs';
+import { NODE_DOCS_EN } from '../lib/nodeDocsEn';
 import { NODE_PREVIEWS } from '../lib/nodePreviews';
-import { CATEGORIES, TRANSFORMS } from '../lib/transforms';
+import { CATEGORIES, categoryLabel, TRANSFORMS } from '../lib/transforms';
 import { baseOf, HEADER_COLORS, isList, SOCKET_COLORS, socketTitle } from '../lib/types';
 
 const route = useRoute();
 const search = ref('');
 const hash = computed(() => route.hash.slice(1));
 
-const all = [
-  ...BASE_NODES.map((n) => ({ ...n, category: 'Modèle', color: HEADER_COLORS[n.color] })),
+/** Textes de la doc dans la langue de l'interface (le français si l'anglais manque). */
+const docOf = (kind) => (lang.value === 'en' ? NODE_DOCS_EN[kind] : undefined) ?? {};
+
+const all = computed(() => [
+  ...BASE_NODES.map((n) => ({ ...n, category: 'Modèle', color: HEADER_COLORS[n.color], ...docOf(n.kind) })),
   ...Object.entries(TRANSFORMS).map(([kind, def]) => ({
     kind,
     def,
@@ -184,17 +232,25 @@ const all = [
     category: def.category,
     color: HEADER_COLORS[def.category],
     ...NODE_DOCS[kind],
+    ...docOf(kind),
     preview: NODE_PREVIEWS[kind],
   })),
-];
+]);
 
+const categoryName = (c) => (c === 'Modèle' ? t('Modèle', 'Model') : categoryLabel(c));
 const normalize = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
 const sections = computed(() => {
   const q = normalize(search.value ?? '');
-  const match = (n) => !q || normalize(`${n.label} ${n.summary ?? ''} ${n.category}`).includes(q);
+  const match = (n) => !q || normalize(`${n.label} ${n.summary ?? ''} ${categoryName(n.category)}`).includes(q);
+  // `key` (français) sert aux ancres des liens, `name` est affiché.
   return ['Modèle', ...CATEGORIES]
-    .map((name) => ({ name, color: name === 'Modèle' ? HEADER_COLORS.source : HEADER_COLORS[name], nodes: all.filter((n) => n.category === name && match(n)) }))
+    .map((key) => ({
+      key,
+      name: categoryName(key),
+      color: key === 'Modèle' ? HEADER_COLORS.source : HEADER_COLORS[key],
+      nodes: all.value.filter((n) => n.category === key && match(n)),
+    }))
     .filter((s) => s.nodes.length);
 });
 

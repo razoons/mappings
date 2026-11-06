@@ -1,6 +1,7 @@
 import { findChain, isContainer, pathLabel } from './fields';
 import { getSocket, outputType } from './graph';
 import { isSet } from './formats';
+import { t } from './i18n';
 import { inputsOf, inputSocket, TRANSFORMS } from './transforms';
 import { baseOf, isList, socketTitle, typeMismatch } from './types';
 
@@ -91,24 +92,24 @@ function formatGaps(src, dst) {
   const sameKind = src.base === dstBase || (src.base === 'integer' && dstBase === 'number');
   const have = sameKind && src.array === (dst.type === 'array') ? src.format : {};
   const gaps = [];
-  const shown = (key) => (isSet(have[key]) ? have[key] : 'non bornée');
+  const shown = (key) => (isSet(have[key]) ? have[key] : t('non bornée', 'unbounded'));
   const atLeast = (key, label) => {
-    if (isSet(want[key]) && (!isSet(have[key]) || have[key] < want[key])) gaps.push(`${label} ≥ ${want[key]} (garanti : ${shown(key)})`);
+    if (isSet(want[key]) && (!isSet(have[key]) || have[key] < want[key])) gaps.push(`${label} ≥ ${want[key]} (${t('garanti', 'guaranteed')} : ${shown(key)})`);
   };
   const atMost = (key, label) => {
-    if (isSet(want[key]) && (!isSet(have[key]) || have[key] > want[key])) gaps.push(`${label} ≤ ${want[key]} (garanti : ${shown(key)})`);
+    if (isSet(want[key]) && (!isSet(have[key]) || have[key] > want[key])) gaps.push(`${label} ≤ ${want[key]} (${t('garanti', 'guaranteed')} : ${shown(key)})`);
   };
 
   if (dst.type === 'array') {
-    atLeast('minItems', 'éléments');
-    atMost('maxItems', 'éléments');
+    atLeast('minItems', t('éléments', 'items'));
+    atMost('maxItems', t('éléments', 'items'));
   }
-  atLeast('minLength', 'longueur');
-  atMost('maxLength', 'longueur');
-  if (isSet(want.pattern) && want.pattern !== have.pattern) gaps.push(`motif /${want.pattern}/ non garanti`);
-  atLeast('min', 'valeur');
-  atMost('max', 'valeur');
-  atLeast('minDate', 'date');
+  atLeast('minLength', t('longueur', 'length'));
+  atMost('maxLength', t('longueur', 'length'));
+  if (isSet(want.pattern) && want.pattern !== have.pattern) gaps.push(t(`motif /${want.pattern}/ non garanti`, `pattern /${want.pattern}/ not guaranteed`));
+  atLeast('min', t('valeur', 'value'));
+  atMost('max', t('valeur', 'value'));
+  atLeast('minDate', t('date', 'date'));
   atMost('maxDate', 'date');
   return gaps;
 }
@@ -122,8 +123,8 @@ export function linkMismatch(byId, e, incoming) {
   if (!kind) return null;
   const types = `${socketTitle(baseOf(from.type))} → ${socketTitle(baseOf(to.type))}`;
   return kind === 'incompatible'
-    ? { level: 'error', message: `Types incompatibles : ${types}` }
-    : { level: 'warning', message: `Type différent : ${types} (conversion implicite)` };
+    ? { level: 'error', message: t(`Types incompatibles : ${types}`, `Incompatible types: ${types}`) }
+    : { level: 'warning', message: t(`Type différent : ${types} (conversion implicite)`, `Different type: ${types} (implicit conversion)`) };
 }
 
 /**
@@ -160,17 +161,18 @@ export function validateTargets(nodes, edges) {
       for (const f of fields) {
         const chain = [...parents, f];
         const e = linkOf(f);
-        if (f.required && !isMapped(f)) add(f, chain, 'error', 'Obligatoire mais non mappé');
+        if (f.required && !isMapped(f)) add(f, chain, 'error', t('Obligatoire mais non mappé', 'Required but not mapped'));
         const mismatch = e && linkMismatch(byId, e, incoming);
         if (mismatch) add(f, chain, mismatch.level, mismatch.message);
         const info = e && infoOf(e.source, e.sourceHandle ?? '');
         if (info) {
           if (f.required && info.required === false) {
             const via = info.optionalFrom && info.optionalFrom !== info.label ? ` (via ${info.label})` : '';
-            add(f, chain, 'warning', `Obligatoire, mais la source ${info.optionalFrom ?? info.label}${via} est optionnelle`);
+            const from = `${info.optionalFrom ?? info.label}${via}`;
+            add(f, chain, 'warning', t(`Obligatoire, mais la source ${from} est optionnelle`, `Required, but the source ${from} is optional`));
           }
           const gaps = formatGaps(info, f);
-          if (gaps.length) add(f, chain, 'warning', `Format non garanti par ${info.label} : ${gaps.join(', ')}`);
+          if (gaps.length) add(f, chain, 'warning', t(`Format non garanti par ${info.label} : ${gaps.join(', ')}`, `Format not guaranteed by ${info.label}: ${gaps.join(', ')}`));
         }
         // Un conteneur optionnel laissé vide n'impose rien à ses sous-champs.
         if (isContainer(f) && (f.required || isMapped(f))) walk(f.children ?? [], chain);

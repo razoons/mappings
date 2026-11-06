@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { bindsOf, isPlainObject, tagList } from './lists';
 
 /**
@@ -23,26 +24,27 @@ export const SOCKET_COLORS = {
 };
 
 const TYPE_LABELS = {
-  string: 'Texte',
-  number: 'Nombre',
-  integer: 'Entier',
-  boolean: 'Booléen',
-  date: 'Date',
-  object: 'Objet',
-  any: 'Tout',
+  string: ['Texte', 'Text'],
+  number: ['Nombre', 'Number'],
+  integer: ['Entier', 'Integer'],
+  boolean: ['Booléen', 'Boolean'],
+  date: ['Date', 'Date'],
+  object: ['Objet', 'Object'],
+  any: ['Tout', 'Any'],
 };
 
 const LIST_LABELS = {
-  string: 'Liste de textes',
-  number: 'Liste de nombres',
-  integer: 'Liste d’entiers',
-  boolean: 'Liste de booléens',
-  date: 'Liste de dates',
-  object: 'Liste d’objets',
-  any: 'Liste',
+  string: ['Liste de textes', 'List of texts'],
+  number: ['Liste de nombres', 'List of numbers'],
+  integer: ['Liste d’entiers', 'List of integers'],
+  boolean: ['Liste de booléens', 'List of booleans'],
+  date: ['Liste de dates', 'List of dates'],
+  object: ['Liste d’objets', 'List of objects'],
+  any: ['Liste', 'List'],
 };
 
-export const socketTitle = (t) => (isList(t) ? LIST_LABELS[baseOf(t)] : TYPE_LABELS[t]);
+const pick = (pair) => pair && t(...pair);
+export const socketTitle = (type) => pick(isList(type) ? LIST_LABELS[baseOf(type)] : TYPE_LABELS[type]);
 
 /** Types numériques : un entier est aussi un nombre. */
 export const isNumeric = (t) => t === 'number' || t === 'integer';
@@ -127,7 +129,7 @@ export function formatValue(v, depth = 0) {
   if (v === undefined) return '';
   if (v === null) return 'null';
   if (v instanceof Date) {
-    if (isNaN(v.getTime())) return 'Date invalide';
+    if (isNaN(v.getTime())) return t('Date invalide', 'Invalid date');
     const iso = v.toISOString();
     return iso.endsWith('T00:00:00.000Z') ? iso.slice(0, 10) : iso.slice(0, 16).replace('T', ' ');
   }
@@ -141,7 +143,7 @@ export function formatValue(v, depth = 0) {
     return `{${keys.slice(0, 3).join(', ')}${keys.length > 3 ? ', …' : ''}}`;
   }
   if (typeof v === 'string') return `"${v}"`;
-  if (typeof v === 'boolean') return v ? 'vrai' : 'faux';
+  if (typeof v === 'boolean') return v ? t('vrai', 'true') : t('faux', 'false');
   if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(+v.toFixed(4));
   return String(v);
 }

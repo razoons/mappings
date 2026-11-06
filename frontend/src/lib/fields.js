@@ -1,3 +1,4 @@
+import { bilingual, t } from './i18n';
 import { cleanFormat } from './formats';
 import { isPlainObject } from './lists';
 import { listOf, uid } from './types';
@@ -80,20 +81,25 @@ export function flattenRows(fields, depth = 0, parents = []) {
   });
 }
 
+/** Types proposés pour un champ : `[clé, libellé]` (libellé dans la langue de l'interface). */
 export const TYPE_OPTIONS = [
-  ['string', 'Texte'],
-  ['number', 'Nombre'],
-  ['integer', 'Entier'],
-  ['boolean', 'Booléen'],
-  ['date', 'Date'],
-  ['object', 'Objet'],
-  ['array:object', 'Liste d’objets'],
-  ['array:string', 'Liste de textes'],
-  ['array:number', 'Liste de nombres'],
-  ['array:integer', 'Liste d’entiers'],
-  ['array:boolean', 'Liste de booléens'],
-  ['array:date', 'Liste de dates'],
-];
+  ['string', 'Texte', 'Text'],
+  ['number', 'Nombre', 'Number'],
+  ['integer', 'Entier', 'Integer'],
+  ['boolean', 'Booléen', 'Boolean'],
+  ['date', 'Date', 'Date'],
+  ['object', 'Objet', 'Object'],
+  ['array:object', 'Liste d’objets', 'List of objects'],
+  ['array:string', 'Liste de textes', 'List of texts'],
+  ['array:number', 'Liste de nombres', 'List of numbers'],
+  ['array:integer', 'Liste d’entiers', 'List of integers'],
+  ['array:boolean', 'Liste de booléens', 'List of booleans'],
+  ['array:date', 'Liste de dates', 'List of dates'],
+].map(([key, fr, en]) => {
+  const option = [key, fr];
+  bilingual(option, 1, en);
+  return option;
+});
 
 export const typeKey = (f) => (f.type === 'array' ? `array:${f.item ?? 'string'}` : f.type);
 
@@ -110,7 +116,7 @@ export function applyTypeKey(f, key) {
 
 export const newField = (siblings, name) => ({
   id: uid('f'),
-  name: name ?? `champ_${siblings.length + 1}`,
+  name: name ?? `${t('champ', 'field')}_${siblings.length + 1}`,
   type: 'string',
 });
 

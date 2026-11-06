@@ -8,35 +8,36 @@
       variant="solo-filled"
       flat
       hide-details
-      placeholder="Sans titre"
-      title="Nom du mapping (nom proposé à l’export et dans les liens de partage)"
+      :placeholder="t('Sans titre', 'Untitled')"
+      :title="t('Nom du mapping (nom proposé à l’export et dans les liens de partage)', 'Mapping name (suggested when exporting and in share links)')"
     />
     <v-divider vertical inset class="mx-2" />
-    <v-btn prepend-icon="mdi-file-outline" :disabled="schemaLocked" @click="newMapping">Nouveau</v-btn>
-    <v-btn prepend-icon="mdi-folder-open-outline" title="Ouvrir un fichier (Ctrl O)" :disabled="schemaLocked" @click="open">
-      Ouvrir
+    <v-btn prepend-icon="mdi-file-outline" :disabled="schemaLocked" @click="newMapping">{{ t('Nouveau', 'New') }}</v-btn>
+    <v-btn prepend-icon="mdi-folder-open-outline" :title="t('Ouvrir un fichier (Ctrl O)', 'Open a file (Ctrl O)')" :disabled="schemaLocked" @click="open">
+      {{ t('Ouvrir', 'Open') }}
     </v-btn>
     <v-menu>
       <template #activator="{ props: menu }">
-        <v-btn v-bind="menu" prepend-icon="mdi-export" append-icon="mdi-menu-down">Exporter</v-btn>
+        <v-btn v-bind="menu" prepend-icon="mdi-export" append-icon="mdi-menu-down">{{ t('Exporter', 'Export') }}</v-btn>
       </template>
       <v-list density="compact">
-        <v-list-item prepend-icon="mdi-code-json" title="Mapping (.json)" subtitle="Pour le rouvrir ou le partager" @click="exportMapping">
+        <v-list-item prepend-icon="mdi-code-json" title="Mapping (.json)" :subtitle="t('Pour le rouvrir ou le partager', 'To reopen or share it')" @click="exportMapping">
           <template #append><kbd>Ctrl S</kbd></template>
         </v-list-item>
-        <v-list-item prepend-icon="mdi-image-outline" title="Image du schéma (.png)" subtitle="Tout le schéma, sur le fond du thème" @click="exportImage" />
+        <v-list-item prepend-icon="mdi-image-outline" :title="t('Image du schéma (.png)', 'Schema image (.png)')" :subtitle="t('Tout le schéma, sur le fond du thème', 'The whole schema, on the theme background')" @click="exportImage" />
       </v-list>
     </v-menu>
-    <v-btn prepend-icon="mdi-share-variant" title="Copier un lien qui ouvre ce schéma" @click="shareMapping">Partager</v-btn>
-    <v-btn prepend-icon="mdi-school-outline" :disabled="schemaLocked" @click="loadDemo">Démo</v-btn>
+    <v-btn prepend-icon="mdi-share-variant" :title="t('Copier un lien qui ouvre ce schéma', 'Copy a link that opens this schema')" @click="shareMapping">{{ t('Partager', 'Share') }}</v-btn>
+    <v-btn prepend-icon="mdi-school-outline" :disabled="schemaLocked" @click="loadDemo">{{ t('Démo', 'Demo') }}</v-btn>
     <v-divider vertical inset class="mx-2" />
-    <v-btn icon="mdi-arrow-collapse-vertical" title="Tout replier" @click="collapseAll(true)" />
-    <v-btn icon="mdi-arrow-expand-vertical" title="Tout déplier" @click="collapseAll(false)" />
-    <v-btn icon="mdi-graph-outline" title="Réorganiser le schéma (colonnes dans le sens des liens)" :disabled="schemaLocked" @click="arrangeSchema" />
+    <v-btn icon="mdi-arrow-collapse-vertical" :title="t('Tout replier', 'Collapse all')" @click="collapseAll(true)" />
+    <v-btn icon="mdi-arrow-expand-vertical" :title="t('Tout déplier', 'Expand all')" @click="collapseAll(false)" />
+    <v-btn icon="mdi-graph-outline" :title="t('Réorganiser le schéma (colonnes dans le sens des liens)', 'Rearrange the schema (columns following the links)')" :disabled="schemaLocked" @click="arrangeSchema" />
     <v-spacer />
-    <v-btn prepend-icon="mdi-map-legend" title="Légende : types, sockets, liens, couleurs" @click="legendOpen = true">Légende</v-btn>
-    <v-btn prepend-icon="mdi-help-circle-outline" href="/noeuds" target="_blank" title="Documentation des nœuds (nouvel onglet)">Nœuds</v-btn>
-    <v-btn :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'" title="Changer de thème" @click="toggleTheme" />
+    <v-btn prepend-icon="mdi-map-legend" :title="t('Légende : types, sockets, liens, couleurs', 'Legend: types, sockets, links, colors')" @click="legendOpen = true">{{ t('Légende', 'Legend') }}</v-btn>
+    <v-btn prepend-icon="mdi-help-circle-outline" href="/noeuds" target="_blank" :title="t('Documentation des nœuds (nouvel onglet)', 'Node documentation (new tab)')">{{ t('Nœuds', 'Nodes') }}</v-btn>
+    <LangSwitch />
+    <v-btn :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'" :title="t('Changer de thème', 'Switch theme')" @click="toggleTheme" />
   </v-app-bar>
 
   <v-main>
@@ -61,7 +62,7 @@
           <ControlButton
             class="schema-lock"
             :class="{ on: schemaLocked }"
-            :title="schemaLocked ? 'Déverrouiller le schéma' : 'Verrouiller tout le schéma (positions, liens et valeurs)'"
+            :title="schemaLocked ? t('Déverrouiller le schéma', 'Unlock the schema') : t('Verrouiller tout le schéma (positions, liens et valeurs)', 'Lock the whole schema (positions, links and values)')"
             @click="schemaLocked = !schemaLocked"
           >
             <LockIcon :locked="schemaLocked" />
@@ -78,10 +79,10 @@
             elevation="4"
             prepend-icon="mdi-plus"
             :disabled="schemaLocked"
-            title="Ajouter un nœud (Shift A, ou clic droit sur le fond)"
+            :title="t('Ajouter un nœud (Shift A, ou clic droit sur le fond)', 'Add a node (Shift A, or right-click on the background)')"
             @click="openAddMenuBelow"
           >
-            Ajouter <kbd>Shift A</kbd>
+            {{ t('Ajouter', 'Add') }} <kbd>Shift A</kbd>
           </v-btn>
           <ChecksPanel :issues="results.issues.list" :has-targets="nodes.some((n) => n.type === 'target')" @focus="focusNode" />
         </Panel>
@@ -96,7 +97,7 @@
       @update:model-value="!$event && (nodeMenu = null)"
     >
       <v-list density="compact" min-width="220">
-        <v-list-subheader v-if="nodeMenu?.ids.length > 1">{{ nodeMenu.ids.length }} nœuds</v-list-subheader>
+        <v-list-subheader v-if="nodeMenu?.ids.length > 1">{{ count(nodeMenu.ids.length, 'nœud', 'node') }}</v-list-subheader>
         <v-list-item
           v-for="entry in nodeMenuEntries"
           :key="entry.label"
@@ -113,9 +114,9 @@
     <v-dialog v-model="legendOpen" max-width="980" scrollable>
       <v-card>
         <v-card-title class="d-flex align-center">
-          Légende
+          {{ t('Légende', 'Legend') }}
           <v-spacer />
-          <v-btn icon="mdi-close" variant="text" size="small" title="Fermer" @click="legendOpen = false" />
+          <v-btn icon="mdi-close" variant="text" size="small" :title="t('Fermer', 'Close')" @click="legendOpen = false" />
         </v-card-title>
         <v-card-text><LegendGrid link-base="/noeuds" /></v-card-text>
       </v-card>
@@ -138,6 +139,7 @@ import { Background } from '@vue-flow/background';
 import { ControlButton, Controls } from '@vue-flow/controls';
 import AddMenu from '../components/AddMenu.vue';
 import LegendGrid from '../components/LegendGrid.vue';
+import LangSwitch from '../components/LangSwitch.vue';
 import LockIcon from '../components/LockIcon.vue';
 import ChecksPanel from '../components/ChecksPanel.vue';
 import SourceNode from '../components/nodes/SourceNode.vue';
@@ -148,12 +150,13 @@ import TypedEdge from '../components/nodes/TypedEdge.vue';
 import { DATA_FILES_KEY, EDGE_INSERT_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
 import { checkDocument, describeProblem } from '../lib/conformity';
 import { demoGraph } from '../lib/demo';
+import { count, t } from '../lib/i18n';
 import { fieldFromSocket, migrateFields, parseDocument, newField, setTreeCollapsed } from '../lib/fields';
 import { autoLayout } from '../lib/layout';
 import { fitGroup, groupAround, groupAt, groupsFirst, isGroup, newGroup, removeKeepingChildren, reparent } from '../lib/groups';
 import { createsCycle, evaluateGraph, getSocket } from '../lib/graph';
 import { validateTargets } from '../lib/rules';
-import { inputsOf, TRANSFORMS } from '../lib/transforms';
+import { initialParams, inputsOf, TRANSFORMS } from '../lib/transforms';
 import { canConnect, isList, typeMismatch, uid } from '../lib/types';
 import { exportFile, openFile } from '../services/files';
 import { schemaImage } from '../services/image';
@@ -252,7 +255,7 @@ watch(
 // ── Chargement et export ────────────────────────────────────
 
 /** Nom du mapping (champ de la barre d'outils) : nom de fichier proposé à l'export, repris par les liens de partage. */
-const current = reactive({ name: 'Sans titre' });
+const current = reactive({ name: t('Sans titre', 'Untitled') });
 const legendOpen = ref(false);
 const snack = reactive({ show: false, text: '', color: undefined, action: null });
 /** Message en bas de l'écran ; `action` : bouton `{ label, run }` (ex. annuler). */
@@ -360,9 +363,9 @@ async function exportMapping() {
   try {
     const text = JSON.stringify({ version: 1, name: current.name, ...serialize() }, null, 2);
     const name = await exportFile(text, `${current.name || 'mapping'}.json`);
-    if (name) notify(`Exporté : ${name}`, 'success');
+    if (name) notify(`${t('Exporté', 'Exported')} : ${name}`, 'success');
   } catch (e) {
-    notify(`Export impossible : ${e.message}`, 'error');
+    notify(`${t('Export impossible', 'Export failed')} : ${e.message}`, 'error');
   }
 }
 
@@ -371,9 +374,9 @@ async function exportImage() {
   try {
     const blob = await schemaImage(nodes.value, vueFlowRef.value);
     const name = await exportFile(blob, `${current.name || 'schema'}.png`, { image: true });
-    if (name) notify(`Image exportée : ${name}`, 'success');
+    if (name) notify(`${t('Image exportée', 'Image exported')} : ${name}`, 'success');
   } catch (e) {
-    notify(`Export de l’image impossible : ${e.message}`, 'error');
+    notify(`${t('Export de l’image impossible', 'Image export failed')} : ${e.message}`, 'error');
   }
 }
 
@@ -382,10 +385,9 @@ async function shareMapping() {
   try {
     const link = await shareLink({ version: 1, name: current.name, ...serialize() });
     await navigator.clipboard.writeText(link);
-    const size = link.length.toLocaleString('fr-FR');
-    notify(`Lien copié`, 'success');
+    notify(t('Lien copié', 'Link copied'), 'success');
   } catch (e) {
-    notify(`Partage impossible : ${e.message}`, 'error');
+    notify(`${t('Partage impossible', 'Sharing failed')} : ${e.message}`, 'error');
   }
 }
 
@@ -396,16 +398,20 @@ async function openShared() {
     graph = await sharedGraph();
   } catch {
     clearSharedGraph();
-    return notify('Lien de partage illisible (incomplet ou abîmé) : le mapping en cours est conservé.', 'error');
+    return notify(t('Lien de partage illisible (incomplet ou abîmé) : le mapping en cours est conservé.', 'Unreadable share link (incomplete or damaged): the current mapping is kept.'), 'error');
   }
   if (!graph) return;
   clearSharedGraph();
-  if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return notify('Le lien ne contient pas un mapping.', 'error');
-  const name = graph.name || 'Sans titre';
-  if (nodes.value.length && !confirm(`Ouvrir le schéma partagé « ${name} » ? Il remplace le mapping en cours (exportez-le d'abord si besoin).`)) return;
+  if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return notify(t('Le lien ne contient pas un mapping.', 'The link does not contain a mapping.'), 'error');
+  const name = graph.name || t('Sans titre', 'Untitled');
+  const question = t(
+    `Ouvrir le schéma partagé « ${name} » ? Il remplace le mapping en cours (exportez-le d'abord si besoin).`,
+    `Open the shared schema « ${name} »? It replaces the current mapping (export it first if needed).`,
+  );
+  if (nodes.value.length && !confirm(question)) return;
   current.name = name;
   load(graph);
-  notify(`Schéma partagé « ${name} » ouvert.`, 'success');
+  notify(t(`Schéma partagé « ${name} » ouvert.`, `Shared schema « ${name} » opened.`), 'success');
 }
 
 async function open() {
@@ -414,22 +420,22 @@ async function open() {
     const file = await openFile();
     if (!file) return;
     const graph = JSON.parse(file.text);
-    if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) throw new Error('ce n’est pas un fichier de mapping');
+    if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) throw new Error(t('ce n’est pas un fichier de mapping', 'this is not a mapping file'));
     current.name = graph.name ?? file.name.replace(/\.json$/i, '');
     load(graph);
   } catch (e) {
-    notify(`Ouverture impossible : ${e.message}`, 'error');
+    notify(`${t('Ouverture impossible', 'Cannot open')} : ${e.message}`, 'error');
   }
 }
 
 function newMapping() {
-  if (nodes.value.length && !confirm('Tout effacer ?')) return;
-  current.name = 'Sans titre';
+  if (nodes.value.length && !confirm(t('Tout effacer ?', 'Clear everything?'))) return;
+  current.name = t('Sans titre', 'Untitled');
   load({ nodes: [], edges: [] });
 }
 
 function loadDemo() {
-  current.name = 'Démo';
+  current.name = t('Démo', 'Demo');
   load(demoGraph());
 }
 
@@ -449,7 +455,7 @@ provide(DATA_FILES_KEY, {
     try {
       dataFiles.set(id, { name, doc: markRaw(parseDocument(text)) });
     } catch (e) {
-      dataFiles.set(id, { name, error: `JSON invalide : ${e.message}` });
+      dataFiles.set(id, { name, error: `${t('JSON invalide', 'Invalid JSON')} : ${e.message}` });
     }
   },
   clear: (id) => dataFiles.delete(id),
@@ -467,7 +473,7 @@ function checkDataFiles() {
       ? [{ level: 'error', fieldId: null, path: '', message: file.error, count: 1 }]
       : checkDocument(node.data.fields, file.doc);
     for (const p of problems) {
-      const issue = { level: p.level, message: `Fichier : ${p.path ? `${p.path} — ` : ''}${describeProblem(p)}` };
+      const issue = { level: p.level, message: `${t('Fichier', 'File')} : ${p.path ? `${p.path} — ` : ''}${describeProblem(p)}` };
       const key = p.fieldId ?? '';
       issues.set(key, [...(issues.get(key) ?? []), issue]);
       list.push({ nodeId: id, fieldId: key, path: `${node.data.label} › ${file.name}${p.path ? ` › ${p.path}` : ''}`, level: p.level, message: describeProblem(p) });
@@ -598,12 +604,12 @@ function addNode(kind, screen, link) {
     const field = matches ? fieldFromSocket(link.socket.name.replace(/\s+/g, '_').toLowerCase(), link.socket.type) : newField([], 'id');
     node =
       kind === 'source'
-        ? { id, type: 'source', position, data: { label: 'Nouvelle source', fields: [field], sample: '{}' } }
-        : { id, type: 'target', position, data: { label: 'Nouvelle cible', fields: [field] } };
+        ? { id, type: 'source', position, data: { label: t('Nouvelle source', 'New source'), fields: [field], sample: '{}' } }
+        : { id, type: 'target', position, data: { label: t('Nouvelle cible', 'New target'), fields: [field] } };
     if (matches) handle = field.id;
   } else {
     const def = TRANSFORMS[kind];
-    node = { id, type: 'transform', position, data: { kind, params: {}, values: {} } };
+    node = { id, type: 'transform', position, data: { kind, params: initialParams(TRANSFORMS[kind]), values: {} } };
     if (link) {
       const candidates = link.side === 'source' ? def.inputs : def.outputs;
       const ok = (s) => (link.side === 'source' ? canConnect(link.socket.type, s.type) : canConnect(s.type, link.socket.type));
@@ -639,7 +645,7 @@ function onKeydown(e) {
   if (schemaLocked.value) {
     if (ctrl && (key === 'z' || key === 'y')) {
       e.preventDefault();
-      notify('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour annuler ou rétablir.', 'warning');
+      notify(t('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour annuler ou rétablir.', 'Schema locked: unlock it (padlock at the bottom left) to undo or redo.'), 'warning');
     }
     return;
   }
@@ -765,7 +771,7 @@ function addOnEdge(kind, screen, edgeId) {
   if (!edge || !def) return;
   const id = uid('n');
   const p = toFlow(screen);
-  const node = { id, type: 'transform', position: { x: p.x - 100, y: p.y - 40 }, data: { kind, params: {}, values: {} } };
+  const node = { id, type: 'transform', position: { x: p.x - 100, y: p.y - 40 }, data: { kind, params: initialParams(TRANSFORMS[kind]), values: {} } };
   const sockets = insertSockets(def, node, edge);
   if (!sockets) return;
   for (const n of nodes.value) n.selected = false;
@@ -851,8 +857,14 @@ function arrangeSchema() {
   rebuild((ns) => ns.map((n) => (positions.has(n.id) ? { ...n, position: positions.get(n.id) } : n)));
   nextTick(() => fitView({ padding: 0.15, duration: 300 }));
   const locked = nodes.value.filter((n) => n.data.locked).length;
-  notify(`Schéma réorganisé${locked ? ` (${locked} nœud${locked > 1 ? 's' : ''} verrouillé${locked > 1 ? 's' : ''} laissé${locked > 1 ? 's' : ''} en place)` : ''}.`, 'success', {
-    label: 'Annuler',
+  const kept = locked
+    ? t(
+        ` (${locked} nœud${locked > 1 ? 's' : ''} verrouillé${locked > 1 ? 's' : ''} laissé${locked > 1 ? 's' : ''} en place)`,
+        ` (${count(locked, 'nœud verrouillé', 'locked node', 'nœuds verrouillés')} left in place)`,
+      )
+    : '';
+  notify(`${t('Schéma réorganisé', 'Schema rearranged')}${kept}.`, 'success', {
+    label: t('Annuler', 'Undo'),
     run: () => {
       rebuild((ns) => ns.map((n) => (before.has(n.id) ? { ...n, position: before.get(n.id) } : n)));
       nextTick(() => fitView({ padding: 0.15, duration: 300 }));
@@ -890,7 +902,7 @@ function duplicate(ids) {
   const copies = originals.map(({ parentNode, selected: _, ...n }) => {
     const data = JSON.parse(JSON.stringify(n.data));
     delete data.locked;
-    if ('label' in data) data.label = `${data.label} (copie)`;
+    if ('label' in data) data.label = `${data.label} (${t('copie', 'copy')})`;
     const copy = { ...n, id: newId.get(n.id), data, selected: false };
     if (inCopiedGroup({ parentNode })) return { ...copy, parentNode: newId.get(parentNode), position: { ...n.position } };
     const p = abs({ ...n, parentNode });
@@ -991,32 +1003,35 @@ const nodeMenuEntries = computed(() => {
   const grouped = targets.filter((n) => n.parentNode).map((n) => n.id);
   const groups = targets.filter(isGroup).map((n) => n.id);
   return [
-    { label: allCollapsed ? 'Déplier' : 'Replier', action: () => patchNodes(targets, () => ({ collapsed: !allCollapsed })) },
+    { label: allCollapsed ? t('Déplier', 'Expand') : t('Replier', 'Collapse'), action: () => patchNodes(targets, () => ({ collapsed: !allCollapsed })) },
     ...(trees.length
       ? [
-          { label: 'Déplier toute l’arborescence', action: () => tree(false) },
-          { label: 'Replier toute l’arborescence', action: () => tree(true) },
+          { label: t('Déplier toute l’arborescence', 'Expand the whole tree'), action: () => tree(false) },
+          { label: t('Replier toute l’arborescence', 'Collapse the whole tree'), action: () => tree(true) },
         ]
       : []),
     ...(groupable.length
       ? [
           {
-            label: groupable.length > 1 ? 'Grouper la sélection' : 'Créer un groupe autour',
+            label: groupable.length > 1 ? t('Grouper la sélection', 'Group the selection') : t('Créer un groupe autour', 'Create a group around'),
             hint: 'Ctrl G',
             disabled: ro,
             action: () => groupSelection(groupable),
           },
         ]
       : []),
-    ...(grouped.length ? [{ label: 'Sortir du groupe', disabled: ro, action: () => rebuild((ns) => reparent(ns, grouped, null)) }] : []),
+    ...(grouped.length ? [{ label: t('Sortir du groupe', 'Remove from the group'), disabled: ro, action: () => rebuild((ns) => reparent(ns, grouped, null)) }] : []),
     ...(groups.length
-      ? [{ label: 'Dégrouper (garder les nœuds)', disabled: ro, action: () => rebuild((ns) => removeKeepingChildren(ns, groups)) }]
+      ? [{ label: t('Dégrouper (garder les nœuds)', 'Ungroup (keep the nodes)'), disabled: ro, action: () => rebuild((ns) => removeKeepingChildren(ns, groups)) }]
       : []),
-    { label: 'Dupliquer', hint: 'Ctrl D', disabled: ro, action: () => duplicate(ids) },
-    { label: allLocked ? 'Déverrouiller' : 'Verrouiller', disabled: ro, action: () => patchNodes(targets, () => ({ locked: !allLocked })) },
+    { label: t('Dupliquer', 'Duplicate'), hint: 'Ctrl D', disabled: ro, action: () => duplicate(ids) },
+    { label: allLocked ? t('Déverrouiller', 'Unlock') : t('Verrouiller', 'Lock'), disabled: ro, action: () => patchNodes(targets, () => ({ locked: !allLocked })) },
     {
-      label: unlocked.length && unlocked.length < ids.length ? `Supprimer (${unlocked.length} non verrouillé${unlocked.length > 1 ? 's' : ''})` : 'Supprimer',
-      hint: 'Suppr',
+      label:
+        unlocked.length && unlocked.length < ids.length
+          ? t(`Supprimer (${unlocked.length} non verrouillé${unlocked.length > 1 ? 's' : ''})`, `Delete (${unlocked.length} unlocked)`)
+          : t('Supprimer', 'Delete'),
+      hint: t('Suppr', 'Del'),
       danger: true,
       disabled: ro || !unlocked.length,
       action: () => deleteNodes(unlocked),

@@ -2,7 +2,7 @@
   <button
     class="chevron nodrag"
     :class="{ collapsed }"
-    :title="collapsed ? 'Déplier le nœud' : 'Replier le nœud'"
+    :title="collapsed ? t('Déplier le nœud', 'Expand the node') : t('Replier le nœud', 'Collapse the node')"
     @click="setCollapsed(!collapsed)"
   >
     <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
@@ -12,6 +12,7 @@
 </template>
 
 <script setup>
+import { t } from '../../lib/i18n';
 import { useCollapse } from './shared';
 
 const props = defineProps({

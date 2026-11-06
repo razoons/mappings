@@ -5,17 +5,17 @@
         v-bind="menu"
         class="rules-btn nodrag"
         :class="{ set: !!summary }"
-        :title="summary ? `Format : ${summary}` : 'Règles du champ (obligatoire, format)'"
+        :title="summary ? `Format : ${summary}` : t('Règles du champ (obligatoire, format)', 'Field rules (required, format)')"
       >{{ summary || '⚙' }}</button>
     </template>
 
     <v-card class="rules-card" width="260" density="compact">
-      <v-card-title class="text-subtitle-2">Règles — {{ field.name }}</v-card-title>
+      <v-card-title class="text-subtitle-2">{{ t('Règles', 'Rules') }} — {{ field.name }}</v-card-title>
       <v-card-text>
         <v-checkbox
           :model-value="!!field.required"
           :disabled="locked"
-          label="Obligatoire"
+          :label="t('Obligatoire', 'Required')"
           density="compact"
           hide-details
           @update:model-value="emit('update', { required: $event })"
@@ -45,7 +45,7 @@
             @update:model-value="set(k, $event)"
           />
         </template>
-        <p v-if="!keys.length" class="text-caption text-medium-emphasis mt-2">Pas de format pour ce type.</p>
+        <p v-if="!keys.length" class="text-caption text-medium-emphasis mt-2">{{ t('Pas de format pour ce type.', 'No format for this type.') }}</p>
       </v-card-text>
     </v-card>
   </v-menu>
@@ -54,6 +54,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { formatKeys, formatSummary } from '../../lib/formats';
+import { t } from '../../lib/i18n';
 
 const props = defineProps({
   field: { type: Object, required: true },

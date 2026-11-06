@@ -13,7 +13,7 @@
           <span class="pill out" :title="show(outputs[o.id])">{{ show(outputs[o.id]) }}</span>
         </div>
 
-        <div v-for="p in def.params ?? []" :key="p.id" class="row">
+        <div v-for="p in (def.params ?? []).filter((p) => !p.when || p.when(params))" :key="p.id" class="row">
           <select v-if="p.options" disabled :title="p.label">
             <option>{{ p.optionLabel ? p.optionLabel(params[p.id], params) : params[p.id] }}</option>
           </select>
@@ -43,6 +43,7 @@
 <script setup>
 import { computed } from 'vue';
 import { socketAttrs } from './nodes/shared';
+import { t } from '../lib/i18n';
 import { isPlainObject } from '../lib/lists';
 import { inputsOf, paramsWithDefaults } from '../lib/transforms';
 import { baseOf, coerce, HEADER_COLORS, isList, SOCKET_COLORS } from '../lib/types';
@@ -60,7 +61,8 @@ const params = computed(() => paramsWithDefaults(props.def, props.example.params
 /** Une liste ou un objet arrive par un lien (on ne peut pas les saisir dans le nœud), comme une entrée ∀. */
 const wired = (id) => id in each.value || Array.isArray(values.value[id]) || isPlainObject(values.value[id]);
 const inline = (i) => values.value[i.id] ?? i.default ?? '';
-const incoming = (id) => (each.value[id] ? each.value[id][0] : show(values.value[id]));
+const label = (l) => (Array.isArray(l) ? t(...l) : l);
+const incoming = (id) => (each.value[id] ? label(each.value[id][0]) : show(values.value[id]));
 
 const inputs = computed(() => inputsOf(props.def, { data: { values: values.value } }, Object.keys(values.value).filter(wired)));
 
@@ -85,12 +87,12 @@ const outputs = computed(() => {
 
 /** Valeur écrite en entier, façon JSON lisible : "texte", [1, 2], { clé: valeur }, vrai. */
 function show(v) {
-  if (v === undefined || v === null) return 'vide';
-  if (v instanceof Date) return isNaN(v.getTime()) ? 'date invalide' : v.toISOString().replace('T00:00:00.000Z', '').slice(0, 16).replace('T', ' ');
+  if (v === undefined || v === null) return t('vide', 'empty');
+  if (v instanceof Date) return isNaN(v.getTime()) ? t('date invalide', 'invalid date') : v.toISOString().replace('T00:00:00.000Z', '').slice(0, 16).replace('T', ' ');
   if (Array.isArray(v)) return `[${v.map(show).join(', ')}]`;
   if (isPlainObject(v)) return `{ ${Object.entries(v).map(([k, x]) => `${k}: ${show(x)}`).join(', ')} }`;
   if (typeof v === 'string') return `"${v}"`;
-  if (typeof v === 'boolean') return v ? 'vrai' : 'faux';
+  if (typeof v === 'boolean') return v ? t('vrai', 'true') : t('faux', 'false');
   if (typeof v === 'number') return String(+v.toFixed(4));
   return String(v);
 }

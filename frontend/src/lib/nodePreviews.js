@@ -3,7 +3,8 @@
  * résultat n'est pas écrit ici : il est calculé par le nœud lui-même.
  * - `inputs` : valeurs des entrées. Un texte ou un nombre est saisi dans le nœud ; une liste ou un objet arrive par
  *   un lien ;
- * - `each` : entrées « pour chaque élément » (∀) reliées, `[libellé affiché, (élément) => valeur]` ;
+ * - `each` : entrées « pour chaque élément » (∀) reliées, `[libellé affiché, (élément) => valeur]` (libellé : texte,
+ *   ou paire `[français, anglais]`) ;
  * - `current` : élément en cours de parcours (`{ item, index }`), pour « Élément courant » ;
  * - `params` : réglages.
  */
@@ -22,7 +23,7 @@ export const NODE_PREVIEWS = {
   list_create: { inputs: { a: 'x', b: ['y', 'z'] } },
 
   // ── Liste ───────────────────────────────────────────────
-  list_filter: { inputs: { list: [1, 5, 8, 3] }, each: { cond: ['élément > 4', (x) => x > 4] } },
+  list_filter: { inputs: { list: [1, 5, 8, 3] }, each: { cond: [['élément > 4', 'item > 4'], (x) => x > 4] } },
   list_sort: { inputs: { list: ['Zoé', 'Ada', 'Léo'] } },
   list_map: {
     inputs: { list: [{ qty: 2, price: 5 }, { qty: 1, price: 3 }] },
@@ -31,11 +32,11 @@ export const NODE_PREVIEWS = {
   list_at: { inputs: { list: ['a', 'b', 'c'], index: '0' }, params: { from: 'Fin' } },
   list_find: {
     inputs: { list: [{ email: 'paul@mail.fr', nom: 'Paul' }, { email: 'ada@mail.fr', nom: 'Ada' }] },
-    each: { cond: ['email = « ada@mail.fr »', (x) => x.email === 'ada@mail.fr'], value: ['nom', (x) => x.nom] },
+    each: { cond: [['email = « ada@mail.fr »', 'email = “ada@mail.fr”'], (x) => x.email === 'ada@mail.fr'], value: [['nom', 'name'], (x) => x.nom] },
   },
   list_count: { inputs: { list: ['a', 'b', 'c'] } },
   list_aggregate: { inputs: { list: [2, 4, 9] }, params: { op: 'Moyenne' } },
-  list_test: { inputs: { list: [12, 30, 7] }, each: { cond: ['élément ≥ 10', (x) => x >= 10] }, params: { op: 'Tous' } },
+  list_test: { inputs: { list: [12, 30, 7] }, each: { cond: [['élément ≥ 10', 'item ≥ 10'], (x) => x >= 10] }, params: { op: 'Tous' } },
   list_slice: { inputs: { list: ['a', 'b', 'c', 'd'], start: '1', count: '2' } },
   list_reverse: { inputs: { list: [1, 2, 3] } },
   list_unique: { inputs: { list: ['a', 'b', 'a', 'c'] } },
@@ -70,6 +71,6 @@ export const NODE_PREVIEWS = {
 
   // ── Date ────────────────────────────────────────────────
   date_format: { inputs: { date: '2026-09-14' }, params: { format: 'JJ/MM/AAAA' } },
-  date_part: { inputs: { date: '2026-09-14' }, params: { part: 'Jour de la semaine', names: 'lundi, mardi…' } },
+  date_part: { inputs: { date: '2026-09-14' }, params: { part: 'Jour de la semaine', days: 'lun, mar, mer, jeu, ven, sam, dim' } },
   age: { inputs: { date: '1990-06-15', ref: '2026-06-14' } },
 };
