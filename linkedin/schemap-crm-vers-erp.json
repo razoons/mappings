@@ -1,0 +1,370 @@
+{
+  "version": 1,
+  "name": "CRM vers ERP",
+  "nodes": [
+    {
+      "id": "crm",
+      "type": "source",
+      "position": {
+        "x": 0,
+        "y": 60
+      },
+      "data": {
+        "label": "CRM – Client",
+        "sample": "{\n  \"idClient\": \"C-1042\",\n  \"prenom\": \"Julie\",\n  \"nom\": \"Martin\",\n  \"email\": \"Julie.Martin@Mail.com\",\n  \"dateCreation\": \"2026-03-15T10:00:00Z\"\n}",
+        "fields": [
+          {
+            "id": "s_nom",
+            "name": "nom",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "s_prenom",
+            "name": "prenom",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "s_email",
+            "name": "email",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "s_date",
+            "name": "dateCreation",
+            "type": "date",
+            "required": true
+          },
+          {
+            "id": "s_id",
+            "name": "idClient",
+            "type": "string",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "fact",
+      "type": "source",
+      "position": {
+        "x": 0,
+        "y": 560
+      },
+      "data": {
+        "label": "Facturation – Comptes",
+        "sample": "{\n  \"comptes\": [\n    {\n      \"idClient\": \"C-0877\",\n      \"montantHT\": 480\n    },\n    {\n      \"idClient\": \"C-1042\",\n      \"montantHT\": 1250\n    },\n    {\n      \"idClient\": \"C-1310\",\n      \"montantHT\": 2300\n    }\n  ]\n}",
+        "fields": [
+          {
+            "id": "f_comptes",
+            "name": "comptes",
+            "type": "array",
+            "item": "object",
+            "required": true,
+            "children": [
+              {
+                "id": "f_id",
+                "name": "idClient",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": "f_ht",
+                "name": "montantHT",
+                "type": "number",
+                "required": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "upper",
+      "type": "transform",
+      "position": {
+        "x": 580,
+        "y": -60
+      },
+      "data": {
+        "kind": "case",
+        "params": {
+          "mode": "MAJUSCULES"
+        },
+        "values": {}
+      }
+    },
+    {
+      "id": "lower",
+      "type": "transform",
+      "position": {
+        "x": 580,
+        "y": 170
+      },
+      "data": {
+        "kind": "case",
+        "params": {
+          "mode": "minuscules"
+        },
+        "values": {}
+      }
+    },
+    {
+      "id": "date",
+      "type": "transform",
+      "position": {
+        "x": 580,
+        "y": 320
+      },
+      "data": {
+        "kind": "date_format",
+        "params": {
+          "format": "JJ/MM/AAAA"
+        },
+        "values": {}
+      }
+    },
+    {
+      "id": "pivot",
+      "type": "transform",
+      "position": {
+        "x": 580,
+        "y": 450
+      },
+      "data": {
+        "kind": "compare",
+        "params": {
+          "op": "="
+        },
+        "values": {}
+      }
+    },
+    {
+      "id": "full",
+      "type": "transform",
+      "position": {
+        "x": 860,
+        "y": -10
+      },
+      "data": {
+        "kind": "concat",
+        "params": {
+          "sep": " "
+        },
+        "values": {}
+      }
+    },
+    {
+      "id": "find",
+      "type": "transform",
+      "position": {
+        "x": 860,
+        "y": 520
+      },
+      "data": {
+        "kind": "list_find",
+        "params": {},
+        "values": {}
+      }
+    },
+    {
+      "id": "ttc",
+      "type": "transform",
+      "position": {
+        "x": 1140,
+        "y": 470
+      },
+      "data": {
+        "kind": "math",
+        "params": {
+          "op": "Multiplication"
+        },
+        "values": {
+          "b": "1.2"
+        }
+      }
+    },
+    {
+      "id": "vip",
+      "type": "transform",
+      "position": {
+        "x": 1140,
+        "y": 640
+      },
+      "data": {
+        "kind": "compare",
+        "params": {
+          "op": "≥"
+        },
+        "values": {
+          "b": "1000"
+        }
+      }
+    },
+    {
+      "id": "erp",
+      "type": "target",
+      "position": {
+        "x": 1420,
+        "y": 100
+      },
+      "data": {
+        "label": "ERP – Fiche client",
+        "fields": [
+          {
+            "id": "t_nom",
+            "name": "nomComplet",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "t_email",
+            "name": "email",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "t_date",
+            "name": "clientDepuis",
+            "type": "string",
+            "required": true
+          },
+          {
+            "id": "t_ttc",
+            "name": "totalTTC",
+            "type": "number",
+            "required": true
+          },
+          {
+            "id": "t_vip",
+            "name": "vip",
+            "type": "boolean"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-crm-s_nom-upper-text",
+      "source": "crm",
+      "sourceHandle": "s_nom",
+      "target": "upper",
+      "targetHandle": "text"
+    },
+    {
+      "id": "e-upper-result-full-a",
+      "source": "upper",
+      "sourceHandle": "result",
+      "target": "full",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e-crm-s_prenom-full-b",
+      "source": "crm",
+      "sourceHandle": "s_prenom",
+      "target": "full",
+      "targetHandle": "b"
+    },
+    {
+      "id": "e-full-result-erp-t_nom",
+      "source": "full",
+      "sourceHandle": "result",
+      "target": "erp",
+      "targetHandle": "t_nom"
+    },
+    {
+      "id": "e-crm-s_email-lower-text",
+      "source": "crm",
+      "sourceHandle": "s_email",
+      "target": "lower",
+      "targetHandle": "text"
+    },
+    {
+      "id": "e-lower-result-erp-t_email",
+      "source": "lower",
+      "sourceHandle": "result",
+      "target": "erp",
+      "targetHandle": "t_email"
+    },
+    {
+      "id": "e-crm-s_date-date-date",
+      "source": "crm",
+      "sourceHandle": "s_date",
+      "target": "date",
+      "targetHandle": "date"
+    },
+    {
+      "id": "e-date-result-erp-t_date",
+      "source": "date",
+      "sourceHandle": "result",
+      "target": "erp",
+      "targetHandle": "t_date"
+    },
+    {
+      "id": "e-crm-s_id-pivot-a",
+      "source": "crm",
+      "sourceHandle": "s_id",
+      "target": "pivot",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e-fact-f_id-pivot-b",
+      "source": "fact",
+      "sourceHandle": "f_id",
+      "target": "pivot",
+      "targetHandle": "b"
+    },
+    {
+      "id": "e-fact-f_comptes-find-list",
+      "source": "fact",
+      "sourceHandle": "f_comptes",
+      "target": "find",
+      "targetHandle": "list"
+    },
+    {
+      "id": "e-pivot-result-find-cond",
+      "source": "pivot",
+      "sourceHandle": "result",
+      "target": "find",
+      "targetHandle": "cond"
+    },
+    {
+      "id": "e-fact-f_ht-find-value",
+      "source": "fact",
+      "sourceHandle": "f_ht",
+      "target": "find",
+      "targetHandle": "value"
+    },
+    {
+      "id": "e-find-result-ttc-a",
+      "source": "find",
+      "sourceHandle": "result",
+      "target": "ttc",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e-ttc-result-erp-t_ttc",
+      "source": "ttc",
+      "sourceHandle": "result",
+      "target": "erp",
+      "targetHandle": "t_ttc"
+    },
+    {
+      "id": "e-find-result-vip-a",
+      "source": "find",
+      "sourceHandle": "result",
+      "target": "vip",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e-vip-result-erp-t_vip",
+      "source": "vip",
+      "sourceHandle": "result",
+      "target": "erp",
+      "targetHandle": "t_vip"
+    }
+  ]
+}

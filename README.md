@@ -67,6 +67,8 @@ Les garanties traversent les transformations qui savent les calculer (Extraire, 
 
 La page **Nœuds** (bouton de la barre d’outils, ou `?` dans l’en-tête d’un nœud) détaille chaque nœud : entrées, sorties, réglages, comportement, exemple et garanties pour le contrôle des cibles.
 
+La page **Aide** (bouton de la barre d’outils) donne l’adresse email de contact et les versions de navigateur compatibles.
+
 Formes des sockets : rond = valeur unique, losange = liste, losange pointé (`∀`) = entrée évaluée pour chaque élément. Un lien prend la couleur du type qu'il transporte, en pointillés pour une liste.
 
 ### Organisation du code

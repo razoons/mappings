@@ -440,7 +440,7 @@ kbd {
 }
 
 /* ── Panneau des contrôles ─────────────────────────────── */
-/* Colonne de droite : bouton d'ajout puis panneau des contrôles, de même largeur et de même allure. */
+/* Colonne de droite : boutons d'ajout et de légende puis panneau des contrôles, de même largeur et de même allure. */
 .side-panel {
   display: flex;
   flex-direction: column;

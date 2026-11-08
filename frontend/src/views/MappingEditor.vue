@@ -34,8 +34,8 @@
     <v-btn icon="mdi-arrow-expand-vertical" :title="t('Tout déplier', 'Expand all')" @click="collapseAll(false)" />
     <v-btn icon="mdi-graph-outline" :title="t('Réorganiser le schéma (colonnes dans le sens des liens)', 'Rearrange the schema (columns following the links)')" :disabled="schemaLocked" @click="arrangeSchema" />
     <v-spacer />
-    <v-btn prepend-icon="mdi-map-legend" :title="t('Légende : types, sockets, liens, couleurs', 'Legend: types, sockets, links, colors')" @click="legendOpen = true">{{ t('Légende', 'Legend') }}</v-btn>
-    <v-btn prepend-icon="mdi-help-circle-outline" href="/noeuds" target="_blank" :title="t('Documentation des nœuds (nouvel onglet)', 'Node documentation (new tab)')">{{ t('Nœuds', 'Nodes') }}</v-btn>
+    <v-btn prepend-icon="mdi-help-circle-outline" href="/noeuds" :title="t('Documentation des nœuds', 'Node documentation')">{{ t('Nœuds', 'Nodes') }}</v-btn>
+    <v-btn prepend-icon="mdi-email-outline" href="/aide" :title="t('Aide et contact', 'Help and contact')">{{ t('Aide', 'Help') }}</v-btn>
     <LangSwitch />
     <v-btn :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'" :title="t('Changer de thème', 'Switch theme')" @click="toggleTheme" />
   </v-app-bar>
@@ -69,7 +69,7 @@
           </ControlButton>
         </Controls>
         <Panel position="top-right" class="side-panel">
-          <!-- Bouton flottant d'ajout, au-dessus du panneau des contrôles. -->
+          <!-- Boutons flottants d'ajout et de légende, au-dessus du panneau des contrôles. -->
           <v-btn
             class="add-fab side-block text-none"
             color="primary"
@@ -83,6 +83,18 @@
             @click="openAddMenuBelow"
           >
             {{ t('Ajouter', 'Add') }} <kbd>Shift A</kbd>
+          </v-btn>
+          <v-btn
+            class="side-block text-none font-weight-bold"
+            block
+            height="48"
+            rounded="lg"
+            elevation="4"
+            prepend-icon="mdi-map-legend"
+            :title="t('Légende : types, sockets, liens, couleurs', 'Legend: types, sockets, links, colors')"
+            @click="legendOpen = true"
+          >
+            {{ t('Légende', 'Legend') }}
           </v-btn>
           <ChecksPanel :issues="results.issues.list" :has-targets="nodes.some((n) => n.type === 'target')" @focus="focusNode" />
         </Panel>

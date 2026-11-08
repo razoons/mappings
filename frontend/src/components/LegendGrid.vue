@@ -78,7 +78,6 @@
           :key="c.label"
           class="lg-chip"
           :href="linkBase + c.href"
-          :target="linkBase ? '_blank' : undefined"
           :style="{ background: c.color }"
         >{{ c.label }}</a>
       </div>

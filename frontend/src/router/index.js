@@ -4,6 +4,7 @@ import MappingEditor from '../views/MappingEditor.vue';
 const routes = [
   { path: '/', component: MappingEditor },
   { path: '/noeuds', component: () => import('../views/NodesHelp.vue') },
+  { path: '/aide', component: () => import('../views/HelpPage.vue') },
 ];
 
 export default createRouter({

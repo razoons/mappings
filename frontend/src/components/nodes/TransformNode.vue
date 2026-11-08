@@ -4,7 +4,7 @@
     <div class="node-header" :style="{ background: HEADER_COLORS[def.category] }">
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
       <span class="node-title-static">{{ def.label }}</span>
-      <a class="icon-btn help-link nodrag" :href="`/noeuds#${data.kind}`" target="_blank" :title="t('Documentation de ce nœud', 'Documentation of this node')">?</a>
+      <a class="icon-btn help-link nodrag" :href="`/noeuds#${data.kind}`" :title="t('Documentation de ce nœud', 'Documentation of this node')">?</a>
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
