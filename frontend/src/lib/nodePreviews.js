@@ -66,6 +66,7 @@ export const NODE_PREVIEWS = {
   // ── Conversion ──────────────────────────────────────────
   to_string: { inputs: { value: 19.6 } },
   to_number: { inputs: { value: '3,5' } },
+  transcode: { inputs: { table: { FRA: 'FR', ENG: 'GB', ESP: 'ES' }, value: 'ENG', fallback: '??' } },
   to_integer: { inputs: { value: '2.7' }, params: { mode: 'Arrondi' } },
   to_bool: { inputs: { value: 'oui' } },
 

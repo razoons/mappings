@@ -22,6 +22,12 @@ export function useResults() {
   };
 }
 
+/** Bibliothèques de valeurs du schéma (ref d'une Map, voir lib/libraries.js), fournies par l'éditeur. */
+export const LIBRARIES_KEY = Symbol('libraries');
+
+/** Bibliothèques de valeurs du schéma (ref d'une Map id → bibliothèque ; vide hors de l'éditeur). */
+export const useLibraries = () => inject(LIBRARIES_KEY, computed(() => new Map()));
+
 /** Fichiers de données des sources (`get`, `load`, `clear` par id de nœud), fournis par l'éditeur. */
 export const DATA_FILES_KEY = Symbol('dataFiles');
 
@@ -133,6 +139,7 @@ export function useFieldEditor(nodeId, getData, { reshape = true } = {}) {
 export function useModelEditor(getData, ops, { source = false } = {}) {
   /** Exemple JSON importé, pas encore enregistré : `{ fields, doc }`. */
   let pending = null;
+  const libraries = useLibraries();
   const hasSample = () => getData().sample !== undefined;
   const currentDoc = () => {
     try {
@@ -144,7 +151,7 @@ export function useModelEditor(getData, ops, { source = false } = {}) {
   };
 
   return {
-    initial: () => fieldsToYaml(getData().fields, hasSample() ? currentDoc() : undefined),
+    initial: () => fieldsToYaml(getData().fields, hasSample() ? currentDoc() : undefined, libraries.value),
     reset: () => (pending = null),
     actions: [
       {
@@ -165,7 +172,7 @@ export function useModelEditor(getData, ops, { source = false } = {}) {
           }
           const fields = syncFields(getData().fields, doc);
           pending = { fields, doc };
-          setText(fieldsToYaml(fields, doc));
+          setText(fieldsToYaml(fields, doc, libraries.value));
           return false;
         },
       },
@@ -177,7 +184,7 @@ export function useModelEditor(getData, ops, { source = false } = {}) {
         run: (text) => {
           const base = pending ?? { fields: getData().fields };
           // Source : données de calcul complètes (valeur type sans exemple) ; cible : seuls les exemples donnés.
-          const { fields: next, sample, hasExamples } = yamlToFields(text, base.fields, { defaults: source });
+          const { fields: next, sample, hasExamples } = yamlToFields(text, base.fields, { defaults: source, libraries: libraries.value });
           const extra = source || hasExamples || hasSample() ? { sample: JSON.stringify(sample, null, 2) } : {};
           ops.sync(next, extra);
           pending = null;

@@ -42,6 +42,7 @@ client:
   required: true
   fields:
     nom: { type: string, required: true, maxLength: 60, example: Ada Lovelace }
+    pays: { type: string, library: Pays }   # nom d'un nœud Bibliothèque
     age: integer
 commandes:
   type: array
@@ -55,7 +56,11 @@ commandes:
 
 « Importer un exemple JSON » déduit le modèle d’un document collé dans la fenêtre (les champs existants gardent leurs règles et leurs liens ; les valeurs du document deviennent les exemples).
 
-Règles des champs : `*` à côté du nom rend un champ obligatoire, `⚙` (au survol) définit son format — longueur min. / max. et expression régulière pour un texte, bornes pour un nombre ou un entier, bornes pour une date, nombre d’éléments pour une liste. Chaque champ cible est contrôlé (panneau **Contrôles** en haut à droite — son icône donne le résultat global : ✔ conforme, ⚠ avertissements, ⛔ erreurs ; un clic sur un problème centre la vue sur le nœud — compteur dans l’en-tête de la cible, ligne surlignée) :
+Règles des champs : `*` à côté du nom rend un champ obligatoire, `⚙` (au survol) définit son format — longueur min. / max. et expression régulière pour un texte, bornes pour un nombre ou un entier, bornes pour une date, nombre d’éléments pour une liste, et **valeurs autorisées** (texte, nombre, entier, date) : une bibliothèque de valeurs.
+
+Bibliothèques de valeurs : le nœud **Bibliothèque** (menu d’ajout › Données) porte une liste de valeurs typée (textes, entiers, nombres ou dates), saisie ligne à ligne ou en bloc (`≡`, une valeur par ligne). Un champ s’y réfère dans ses règles (`⚙` › Valeurs autorisées ; en YAML `bibliothèque: Pays`) : sa valeur, ou chaque élément d’une liste, doit en faire partie. Plusieurs champs, dans des sources et cibles différentes, partagent la même bibliothèque ; le nœud indique combien de champs l’utilisent. Sa sortie **Valeurs** fournit la liste aux transformations. Contrôles : ⛔ valeur hors bibliothèque (fichier de données, exemple, résultat d’une cible) ; ⚠ champ cible alimenté par une source qui ne garantit pas ces valeurs (elle doit se référer à la même bibliothèque, ou à une bibliothèque dont toutes les valeurs y figurent) ; ⚠ bibliothèque supprimée. Dans une source, l’exemple d’un champ à bibliothèque se choisit dans une liste déroulante.
+
+Transcodage : cocher **Table de correspondance** dans une bibliothèque ajoute une colonne (avec son propre type) qui associe à chaque valeur sa valeur dans un autre référentiel (`FRA → FR`), et une sortie **Table**. En bloc (`≡`) : `valeur ; correspondance` par ligne, ou un copier-coller de deux colonnes de tableur. Le nœud **Transcoder** (catégorie Conversion) reçoit cette table et une valeur (ou une liste, traduite élément par élément) et sort sa correspondance, ou sa valeur « Si absente ». Les contrôles suivent : une source liée à `ISO3`, transcodée vers une cible liée à `ISO2`, n’est pas signalée si toutes les correspondances (et la valeur « Si absente ») font partie d’`ISO2` ; ⚠ si une valeur peut rester sans correspondance alors que la cible est obligatoire. Chaque champ cible est contrôlé (panneau **Contrôles** en haut à droite — son icône donne le résultat global : ✔ conforme, ⚠ avertissements, ⛔ erreurs ; un clic sur un problème centre la vue sur le nœud — compteur dans l’en-tête de la cible, ligne surlignée) :
 
 - ⛔ obligatoire mais non mappé ;
 - ⛔ types incompatibles (ex. texte → date ; le lien est tracé en pointillés rouges) — tout lien est permis, le contrôle le signale ; contrôlé aussi sur les entrées des transformations ;

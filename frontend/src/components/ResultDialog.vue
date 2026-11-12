@@ -32,6 +32,7 @@ import { computed, ref } from 'vue';
 import { checkDocument, describeProblem } from '../lib/conformity';
 import { t } from '../lib/i18n';
 import { exportFile } from '../services/files';
+import { useLibraries } from './nodes/shared';
 
 /** Document produit par une cible, et sa conformité au modèle de la cible. */
 const props = defineProps({
@@ -46,7 +47,8 @@ const emit = defineEmits(['update:modelValue']);
 
 const copied = ref(false);
 const text = computed(() => JSON.stringify(props.value, null, 2));
-const problems = computed(() => (props.modelValue ? checkDocument(props.fields, props.value) : []));
+const libraries = useLibraries();
+const problems = computed(() => (props.modelValue ? checkDocument(props.fields, props.value, libraries.value) : []));
 
 const sourcesLabel = computed(() => {
   if (!props.sources.length)

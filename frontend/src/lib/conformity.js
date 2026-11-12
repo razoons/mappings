@@ -1,5 +1,6 @@
 import { isSet } from './formats';
 import { t } from './i18n';
+import { libraryName } from './libraries';
 import { isPlainObject } from './lists';
 
 /**
@@ -9,8 +10,9 @@ import { isPlainObject } from './lists';
  * - erreur : champ obligatoire absent, type ou format non respecté ;
  * - avertissement : champ en trop, absent du modèle (\`fieldId\` : celui de l'objet qui le contient, ou nul à la racine).
  * Un champ vaut absent s'il manque, s'il est \`null\` ou si c'est un texte vide. Le document n'est pas modifié.
+ * \`libraries\` (voir lib/libraries.js) : bibliothèques de valeurs auxquelles les champs peuvent se référer.
  */
-export function checkDocument(fields, doc) {
+export function checkDocument(fields, doc, libraries = new Map()) {
   const found = new Map();
   const add = (level, fieldId, path, message, example) => {
     const key = `${level}|${path}|${message}`;
@@ -59,6 +61,14 @@ export function checkDocument(fields, doc) {
   function checkValue(f, type, v, path) {
     const x = f.format ?? {};
     const err = (message) => add('error', f.id, path, message, v);
+    checkTyped(f, type, v, path, x, err);
+    if (!isSet(x.library)) return;
+    const lib = libraries.get(x.library);
+    if (!lib) add('warning', f.id, path, t('Bibliothèque de valeurs supprimée : valeurs non contrôlées', 'Value library deleted: values not checked'));
+    else if (!lib.has(v)) err(t(`Absent de la bibliothèque « ${libraryName(libraries, x.library)} »`, `Not in the library “${libraryName(libraries, x.library)}”`));
+  }
+
+  function checkTyped(f, type, v, path, x, err) {
     switch (type) {
       case 'string': {
         if (typeof v !== 'string') return err(t('Texte attendu', 'Text expected'));

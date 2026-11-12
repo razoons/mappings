@@ -55,6 +55,18 @@
         :title="t('Exemple (données du calcul tant qu’aucun fichier n’est chargé)', 'Example (data used until a file is loaded)')"
         @change="setExample(chain, $event.target.checked)"
       />
+      <select
+        v-else-if="libraryOf(f)"
+        class="value-input nodrag"
+        :class="{ invalid: exampleProblem(f, chain) }"
+        :value="libraryChoice(f, chain)"
+        :title="exampleProblem(f, chain) || `${t('Exemple, parmi les valeurs de', 'Example, among the values of')} « ${libraryOf(f).label} »`"
+        @change="setExample(chain, $event.target.value === '' ? null : libraryOf(f).values[Number($event.target.value)])"
+      >
+        <option value="">—</option>
+        <option v-if="libraryChoice(f, chain) === '?'" value="?" disabled>{{ exampleText(chain) }}</option>
+        <option v-for="(v, i) in libraryOf(f).values" :key="i" :value="i">{{ v }}</option>
+      </select>
       <input
         v-else
         class="value-input nodrag"
@@ -112,7 +124,7 @@ import { descendantIds, flattenRows, isContainer, sourceSocketType, targetSocket
 import { isPlainObject } from '../../lib/lists';
 import { formatValue } from '../../lib/types';
 import FieldRules from './FieldRules.vue';
-import { DATA_FILES_KEY, dragState, socketAttrs, useFieldEditor } from './shared';
+import { DATA_FILES_KEY, dragState, socketAttrs, useFieldEditor, useLibraries } from './shared';
 
 const props = defineProps({
   nodeId: { type: String, required: true },
@@ -141,6 +153,17 @@ const socketType = (chain) => (props.side === 'source' ? sourceSocketType(chain)
 
 const isMapped = (f) => props.connected.has(f.id) || (f.children ?? []).some(isMapped);
 const isUnmapped = (f) => props.connected !== null && !isMapped(f);
+
+const libraries = useLibraries();
+/** Bibliothèque d'un champ simple (pas une liste), si elle existe. */
+const libraryOf = (f) => (f.type !== 'array' && f.format?.library ? libraries.value.get(f.format.library) : undefined);
+/** Rang de l'exemple dans la bibliothèque (`''` sans exemple, `'?'` s'il n'en fait pas partie). */
+function libraryChoice(f, chain) {
+  const v = exampleOf(chain);
+  if (v === undefined || v === null || v === '') return '';
+  const i = libraryOf(f).indexOf(v);
+  return i >= 0 ? i : '?';
+}
 
 const issuesOf = (f) => props.issues?.get(f.id) ?? [];
 const levelOf = (f) => {
@@ -248,7 +271,7 @@ function parseScalar(type, text) {
 function exampleProblem(f, chain) {
   const v = exampleOf(chain);
   if (v === undefined || v === null) return f.required ? t('Obligatoire : donnez un exemple', 'Required: give an example') : null;
-  const p = checkDocument([f], { [f.name]: v }).find((x) => x.level === 'error');
+  const p = checkDocument([f], { [f.name]: v }, libraries.value).find((x) => x.level === 'error');
   return p ? describeProblem(p) : null;
 }
 

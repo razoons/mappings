@@ -115,6 +115,61 @@ kbd {
 .node-transform {
   width: 210px;
 }
+.node-library {
+  width: 230px;
+}
+
+/* Bibliothèque de valeurs */
+.library-values {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.library-value {
+  min-height: 22px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.node .library-value input.value-input,
+.node-library .row > input.value-input {
+  flex: 1;
+  min-width: 0;
+}
+.library-value .icon-btn {
+  visibility: hidden;
+}
+.library-value:hover .icon-btn {
+  visibility: visible;
+}
+.library-empty,
+.library-usage {
+  margin: 0;
+  padding: 2px 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.library-usage {
+  cursor: default;
+}
+/* Table de correspondance : deux colonnes (valeur → correspondance). */
+.node-library.mapped {
+  width: 300px;
+}
+.library-types select {
+  flex: 1;
+  min-width: 0;
+}
+.library-arrow {
+  flex: none;
+  color: var(--muted);
+}
+.library-toggle {
+  min-height: 22px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.library-toggle input {
+  margin: 0;
+}
 .node.collapsed {
   width: auto;
   min-width: 160px;
@@ -909,7 +964,8 @@ kbd {
   align-items: center;
   padding-left: 0;
 }
-.node input.value-input {
+.node input.value-input,
+.node select.value-input {
   height: 19px;
   padding: 1px 4px;
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
@@ -919,14 +975,18 @@ kbd {
   border-color: transparent;
 }
 .node input.value-input:hover,
-.node input.value-input:focus {
+.node input.value-input:focus,
+.node select.value-input:hover,
+.node select.value-input:focus {
   background: var(--field);
   border-color: var(--field-border);
 }
-.node input.value-input:focus {
+.node input.value-input:focus,
+.node select.value-input:focus {
   border-color: var(--primary);
 }
-.node input.value-input.invalid {
+.node input.value-input.invalid,
+.node select.value-input.invalid {
   border-color: var(--danger);
 }
 

@@ -30,6 +30,21 @@
             hide-details
             @update:model-value="set(k, $event)"
           />
+          <v-select
+            v-else-if="k.kind === 'library'"
+            :model-value="format[k.key] ?? null"
+            :items="libraryItems"
+            :disabled="locked"
+            :label="k.label"
+            :no-data-text="t('Aucune bibliothèque de ce type : ajoutez un nœud Bibliothèque', 'No library of this type: add a Library node')"
+            :hint="t('La valeur doit faire partie de la bibliothèque', 'The value must belong to the library')"
+            persistent-hint
+            density="compact"
+            variant="outlined"
+            clearable
+            class="mt-2"
+            @update:model-value="set(k, $event)"
+          />
           <v-text-field
             v-else
             :model-value="format[k.key] ?? ''"
@@ -55,6 +70,8 @@
 import { computed, ref } from 'vue';
 import { formatKeys, formatSummary } from '../../lib/formats';
 import { t } from '../../lib/i18n';
+import { libraryName } from '../../lib/libraries';
+import { useLibraries } from './shared';
 
 const props = defineProps({
   field: { type: Object, required: true },
@@ -65,7 +82,19 @@ const emit = defineEmits(['update']);
 const open = ref(false);
 const keys = computed(() => formatKeys(props.field));
 const format = computed(() => props.field.format ?? {});
-const summary = computed(() => formatSummary(props.field));
+const libraries = useLibraries();
+const summary = computed(() => formatSummary(props.field, libraries.value));
+
+/** Bibliothèques proposées : celles du type du champ (une bibliothèque d'entiers convient à un nombre), plus celle déjà choisie. */
+const libraryItems = computed(() => {
+  const base = props.field.type === 'array' ? (props.field.item ?? 'string') : props.field.type;
+  const current = format.value.library;
+  const items = [...libraries.value.values()]
+    .filter((l) => l.id === current || l.item === base || (base === 'number' && l.item === 'integer'))
+    .map((l) => ({ title: `${l.label} (${l.values.length})`, value: l.id }));
+  if (current && !libraries.value.has(current)) items.push({ title: libraryName(libraries.value, current), value: current });
+  return items;
+});
 
 function set(k, raw) {
   let v = raw;
@@ -75,7 +104,7 @@ function set(k, raw) {
     if (k.kind === 'integer' && v !== undefined) v = Math.trunc(v);
     if (k.kind === 'int' && v !== undefined) v = Math.max(0, Math.trunc(v));
   }
-  if (k.kind === 'text' || k.kind === 'date') v = raw || undefined;
+  if (k.kind === 'text' || k.kind === 'date' || k.kind === 'library') v = raw || undefined;
   emit('update', { format: { ...format.value, [k.key]: v } });
 }
 </script>

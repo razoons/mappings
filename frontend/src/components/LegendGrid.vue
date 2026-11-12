@@ -158,6 +158,7 @@ const LINK_DOCS = [
 const NODE_COLORS = computed(() => [
   { label: t('Source', 'Source'), color: HEADER_COLORS.source, href: '#source' },
   { label: t('Cible', 'Target'), color: HEADER_COLORS.target, href: '#target' },
+  { label: t('Bibliothèque', 'Library'), color: HEADER_COLORS.library, href: '#library' },
   { label: t('Groupe', 'Group'), color: HEADER_COLORS.group, href: '#group' },
   ...CATEGORIES.map((c) => ({ label: categoryLabel(c), color: HEADER_COLORS[c], href: `#cat-${c}` })),
 ]);

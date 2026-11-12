@@ -1,26 +1,33 @@
 import { bilingual, t } from './i18n';
+import { libraryName } from './libraries';
 
 /**
  * Règles d'un champ : `required` (booléen) et `format`, dont les clés dépendent du type
  * (pour un tableau de scalaires, elles portent sur chaque élément, plus le nombre d'éléments).
+ * `library` : id d'un nœud Bibliothèque dont la valeur doit faire partie (voir lib/libraries.js).
  */
+const LIBRARY_KEY = { key: 'library', label: 'Valeurs autorisées', en: 'Allowed values', kind: 'library' };
 const FORMAT_KEYS = {
   string: [
     { key: 'minLength', label: 'Longueur min.', en: 'Min. length', kind: 'int' },
     { key: 'maxLength', label: 'Longueur max.', en: 'Max. length', kind: 'int' },
     { key: 'pattern', label: 'Expression régulière', en: 'Regular expression', kind: 'text' },
+    LIBRARY_KEY,
   ],
   number: [
     { key: 'min', label: 'Minimum', en: 'Minimum', kind: 'number' },
     { key: 'max', label: 'Maximum', en: 'Maximum', kind: 'number' },
+    LIBRARY_KEY,
   ],
   integer: [
     { key: 'min', label: 'Minimum', en: 'Minimum', kind: 'integer' },
     { key: 'max', label: 'Maximum', en: 'Maximum', kind: 'integer' },
+    LIBRARY_KEY,
   ],
   date: [
     { key: 'minDate', label: 'Au plus tôt', en: 'Earliest', kind: 'date' },
     { key: 'maxDate', label: 'Au plus tard', en: 'Latest', kind: 'date' },
+    LIBRARY_KEY,
   ],
   array: [
     { key: 'minItems', label: 'Éléments min.', en: 'Min. items', kind: 'int' },
@@ -44,8 +51,8 @@ export function cleanFormat(f, format = f.format) {
   return Object.keys(kept).length ? kept : undefined;
 }
 
-/** Résumé court du format (`≤ 50 car.`, `0 … 100`, `entier`…). */
-export function formatSummary(f) {
+/** Résumé court du format (`≤ 50 car.`, `0 … 100`, `∈ Pays`…) ; `libraries` : bibliothèques du schéma (lib/libraries.js). */
+export function formatSummary(f, libraries) {
   const x = f.format ?? {};
   const parts = [];
   const range = (min, max, unit = '') => {
@@ -58,5 +65,6 @@ export function formatSummary(f) {
   range(x.min, x.max);
   range(x.minDate, x.maxDate);
   if (isSet(x.pattern)) parts.push(`/${x.pattern}/`);
+  if (isSet(x.library)) parts.push(`∈ ${libraryName(libraries, x.library)}`);
   return parts.join(', ');
 }

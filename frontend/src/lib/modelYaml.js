@@ -50,6 +50,7 @@ const KEYS_FR = {
   maxDate: 'dateMax',
   minItems: 'élémentsMin',
   maxItems: 'élémentsMax',
+  library: 'bibliothèque',
 };
 const TYPES_FR = { string: 'texte', number: 'nombre', integer: 'entier', boolean: 'booléen', date: 'date', object: 'objet', array: 'liste' };
 
@@ -81,7 +82,8 @@ export const yamlHelp = () =>
 #   type        : texte, nombre, entier, booléen, date, objet, liste (forme courte : « nom: texte »)
 #   obligatoire : oui pour un champ obligatoire
 #   format      : longueurMin, longueurMax, motif (texte) ; min, max (nombre, entier) ;
-#                 dateMin, dateMax (date, ex. 2026-01-31) ; élémentsMin, élémentsMax (liste)
+#                 dateMin, dateMax (date, ex. 2026-01-31) ; élémentsMin, élémentsMax (liste) ;
+#                 bibliothèque : nom d'un nœud Bibliothèque (valeurs autorisées)
 #   exemple     : valeur d'exemple (données du calcul d'une source sans fichier) ; une liste d'objets
 #                 peut recevoir la liste complète, ex. plusieurs commandes
 #   objet       : ses sous-champs dans « champs »
@@ -92,7 +94,8 @@ export const yamlHelp = () =>
 #   type     : string, number, integer, boolean, date, object, array (short form: “name: string”)
 #   required : true for a required field
 #   format   : minLength, maxLength, pattern (text); min, max (number, integer);
-#              minDate, maxDate (date, e.g. 2026-01-31); minItems, maxItems (list)
+#              minDate, maxDate (date, e.g. 2026-01-31); minItems, maxItems (list);
+#              library: name of a Library node (allowed values)
 #   example  : example value (data used by a source without a file); a list of objects
 #              can receive the full list, e.g. several orders
 #   object   : its sub-fields in “fields”
@@ -103,17 +106,17 @@ export const yamlHelp = () =>
 // ── Champs → YAML ──────────────────────────────────────────
 
 /** Description YAML d'un champ ; `value` : sa valeur dans le document d'exemple (`undefined` s'il n'y en a pas). */
-function describe(f, value) {
+function describe(f, value, libs) {
   const node = { [word('type')]: typeWord(f.type) };
   if (f.type === 'array') node[word('items')] = typeWord(f.item ?? 'string');
   if (f.required) node[word('required')] = lang.value === 'fr' ? 'oui' : true;
-  for (const [k, v] of Object.entries(f.format ?? {})) node[word(k)] = v;
+  for (const [k, v] of Object.entries(f.format ?? {})) node[word(k)] = k === 'library' ? (libs.get(v)?.label ?? v) : v;
   if (f.type === 'object') {
-    node[word('fields')] = toPlain(f.children ?? [], isPlainObject(value) ? value : undefined);
+    node[word('fields')] = toPlain(f.children ?? [], isPlainObject(value) ? value : undefined, libs);
   } else if (f.type === 'array' && f.item === 'object') {
     // Plusieurs éléments : la liste complète en exemple ; sinon, l'exemple de chaque sous-champ.
     const list = Array.isArray(value) ? value : undefined;
-    node[word('fields')] = toPlain(f.children ?? [], list?.length === 1 && isPlainObject(list[0]) ? list[0] : undefined);
+    node[word('fields')] = toPlain(f.children ?? [], list?.length === 1 && isPlainObject(list[0]) ? list[0] : undefined, libs);
     if (list && list.length > 1) node[word('example')] = list;
   } else if (value !== undefined && value !== null) {
     node[word('example')] = value;
@@ -122,15 +125,16 @@ function describe(f, value) {
   return Object.keys(node).length === 1 ? typeWord(f.type) : node;
 }
 
-const toPlain = (fields, doc) => Object.fromEntries(fields.map((f) => [f.name, describe(f, doc?.[f.name])]));
+const toPlain = (fields, doc, libs) => Object.fromEntries(fields.map((f) => [f.name, describe(f, doc?.[f.name], libs)]));
 
 /**
  * YAML du modèle ; `doc` : document d'exemple dont les valeurs deviennent les `example` des champs.
  * Un champ sans sous-champs s'écrit sur une ligne (`{ type: string, required: true, example: Ada }`).
+ * `libraries` (lib/libraries.js) : une bibliothèque référencée s'écrit par son nom.
  */
-export function fieldsToYaml(fields, doc) {
+export function fieldsToYaml(fields, doc, libraries = new Map()) {
   if (!fields.length) return `${yamlHelp()}\n{}\n`;
-  const yaml = new Document(toPlain(fields, isPlainObject(doc) ? doc : undefined));
+  const yaml = new Document(toPlain(fields, isPlainObject(doc) ? doc : undefined, libraries));
   const flowLeaves = (map) => {
     for (const pair of map.items) {
       if (!(pair.value instanceof YAMLMap)) continue;
@@ -153,8 +157,9 @@ const typeName = (v) => (typeof v === 'string' ? (ALIASES[plain(v)] ?? v.toLower
  * un champ qui n'en a pas reçoit une valeur type si `defaults` (les données de calcul d'une source doivent être
  * complètes), sinon il est omis (cible : seuls les exemples donnés sont gardés). Lève une erreur explicite (avec le chemin du champ) si le modèle
  * est invalide ou si un exemple ne respecte pas le type ou le format de son champ.
+ * `libraries` : bibliothèques du schéma, désignées par leur nom dans le YAML.
  */
-export function yamlToFields(text, oldFields = [], { defaults = true } = {}) {
+export function yamlToFields(text, oldFields = [], { defaults = true, libraries = new Map() } = {}) {
   let root;
   try {
     root = parse(text) ?? {};
@@ -163,10 +168,10 @@ export function yamlToFields(text, oldFields = [], { defaults = true } = {}) {
   }
   if (!isPlainObject(root)) throw new Error(t('Le modèle doit être une liste de champs « nom: description ».', 'The model must be a list of fields “name: description”.'));
   root = normalizeFields(root);
-  const fields = readFields(root, oldFields, '');
+  const fields = readFields(root, oldFields, '', libraries);
   const explicit = new Set();
   const full = buildSample(root, fields, explicit);
-  const wrong = checkDocument(fields, full).find((p) => p.level === 'error' && explicit.has(p.fieldId));
+  const wrong = checkDocument(fields, full, libraries).find((p) => p.level === 'error' && explicit.has(p.fieldId));
   if (wrong) throw new Error(`${t('Exemple non conforme', 'Invalid example')} — ${wrong.path} : ${describeProblem(wrong)}`);
   const sample = defaults ? full : buildSample(root, fields, new Set(), false);
   return { fields, sample, hasExamples: explicit.size > 0 };
@@ -205,11 +210,11 @@ function buildSample(specs, fields, explicit, defaults = true) {
   return doc;
 }
 
-function readFields(obj, olds, path) {
-  return Object.entries(obj).map(([name, spec]) => readField(name, spec, olds.find((f) => f.name === name), path ? `${path}.${name}` : name));
+function readFields(obj, olds, path, libs) {
+  return Object.entries(obj).map(([name, spec]) => readField(name, spec, olds.find((f) => f.name === name), path ? `${path}.${name}` : name, libs));
 }
 
-function readField(name, raw, old, path) {
+function readField(name, raw, old, path, libs) {
   const fail = (message) => {
     throw new Error(`${path} : ${message}`);
   };
@@ -242,6 +247,19 @@ function readField(name, raw, old, path) {
   for (const k of formatKeys(field)) {
     const v = spec[k.key];
     if (v === undefined || v === null) continue;
+    if (k.kind === 'library') {
+      // Par son nom (ou son id) ; l'id est gardé si plusieurs bibliothèques portent ce nom et que l'ancien champ en désignait une.
+      const named = [...libs.values()].filter((l) => l.label === String(v) || l.id === String(v));
+      const lib = named.find((l) => l.id === old?.format?.library) ?? named[0];
+      // Bibliothèque supprimée depuis : l'ancien id est gardé tel quel (le contrôle le signale).
+      if (!lib && String(v) === old?.format?.library) {
+        format[k.key] = old.format.library;
+        continue;
+      }
+      if (!lib) fail(t(`${word(k.key)} : aucun nœud Bibliothèque « ${v} » (${[...libs.values()].map((l) => l.label).join(', ') || 'aucune bibliothèque dans le schéma'})`, `${k.key}: no Library node “${v}” (${[...libs.values()].map((l) => l.label).join(', ') || 'no library in the schema'})`));
+      format[k.key] = lib.id;
+      continue;
+    }
     if (k.kind === 'text') {
       if (typeof v !== 'string') fail(t(`${word(k.key)} doit être un texte`, `${k.key} must be a text`));
       try {
@@ -267,7 +285,7 @@ function readField(name, raw, old, path) {
   if (isContainer(field)) {
     if (spec.fields !== undefined && spec.fields !== null && !isPlainObject(spec.fields)) fail(t('champs doit lister les sous-champs « nom: description »', 'fields must list the sub-fields “name: description”'));
     const oldChildren = old && isContainer(old) ? old.children ?? [] : [];
-    field.children = readFields(spec.fields ?? {}, oldChildren, field.type === 'array' ? `${path}[]` : path);
+    field.children = readFields(spec.fields ?? {}, oldChildren, field.type === 'array' ? `${path}[]` : path, libs);
   }
   return field;
 }

@@ -2,6 +2,7 @@ import { findChain, isContainer, pathLabel } from './fields';
 import { getSocket, outputType } from './graph';
 import { isSet } from './formats';
 import { t } from './i18n';
+import { LIBRARY_OUTPUT, LIBRARY_TABLE, librariesOf, missingFrom } from './libraries';
 import { inputsOf, inputSocket, TRANSFORMS } from './transforms';
 import { baseOf, isList, socketTitle, typeMismatch } from './types';
 
@@ -27,7 +28,7 @@ const base = (f) => (f.type === 'array' ? f.item ?? 'string' : f.type);
 const linkedInputsOf = (incoming, nodeId) =>
   [...incoming.keys()].filter((k) => k.startsWith(`${nodeId}:`)).map((k) => k.slice(nodeId.length + 1));
 
-function makeSocketInfo(byId, incoming) {
+function makeSocketInfo(byId, incoming, libraries) {
   const memo = new Map();
 
   function infoOf(nodeId, handle, depth = 0) {
@@ -44,6 +45,11 @@ function makeSocketInfo(byId, incoming) {
         const required = sourceRequired(chain);
         info = { label, base: base(f), array: f.type === 'array', required, format: f.format ?? {}, optionalFrom: required ? undefined : label };
       }
+    } else if (node.type === 'library') {
+      // Chaque valeur fournie fait partie de la bibliothèque, par définition.
+      if (handle === LIBRARY_OUTPUT) info = { label: node.data.label, base: node.data.item ?? 'string', array: true, required: true, format: { library: node.id } };
+      // Table de correspondance : `table` désigne la bibliothèque, pour les garanties du nœud Transcoder.
+      if (handle === LIBRARY_TABLE) info = { label: node.data.label, base: 'object', array: false, required: true, format: {}, table: node.id };
     } else if (node.type === 'transform') {
       const def = TRANSFORMS[node.data.kind];
       const output = def?.outputs.find((o) => o.id === handle);
@@ -60,14 +66,15 @@ function makeSocketInfo(byId, incoming) {
           return inputs[id];
         };
         const ids = inputsOf(def, node, linkedInputsOf(incoming, nodeId)).map((i) => i.id);
-        const g = def.guarantee(input, { ...Object.fromEntries((def.params ?? []).map((p) => [p.id, p.default])), ...node.data.params }, ids);
+        const params = { ...Object.fromEntries((def.params ?? []).map((p) => [p.id, p.default])), ...node.data.params };
+        const g = def.guarantee(input, params, ids, { libraries });
         const used = Object.values(inputs);
         // Une liste branchée sur une entrée simple : le nœud est appliqué à chaque élément.
         const array = isList(output.type) || used.some((i) => i.info?.array);
         const optional = g.required === false ? used.find((i) => i.info?.required === false)?.info : undefined;
         info = {
           label: def.label,
-          base: baseOf(output.type),
+          base: g.base ?? baseOf(output.type),
           array,
           required: g.required,
           format: g.format ?? {},
@@ -85,7 +92,7 @@ function makeSocketInfo(byId, incoming) {
  * Contraintes de format de la cible que la valeur reçue ne garantit pas : une borne doit être
  * au moins aussi stricte, un motif identique.
  */
-function formatGaps(src, dst) {
+function formatGaps(src, dst, libraries) {
   const want = dst.format ?? {};
   const dstBase = base(dst);
   // Un entier convient là où un nombre est attendu ; l'inverse perd les décimales.
@@ -111,6 +118,18 @@ function formatGaps(src, dst) {
   atMost('max', t('valeur', 'value'));
   atLeast('minDate', t('date', 'date'));
   atMost('maxDate', 'date');
+  // Bibliothèque : la même, ou une dont toutes les valeurs font partie de celle de la cible.
+  if (isSet(want.library) && have.library !== want.library) {
+    const wanted = libraries.get(want.library);
+    // Ce que garantit la valeur reçue : une bibliothèque, ou un ensemble de valeurs (ex. les correspondances d'un Transcoder).
+    const given = isSet(have.library) ? libraries.get(have.library) : have.allowed;
+    const extra = wanted && given ? missingFrom(given, wanted) : null;
+    // Bibliothèque supprimée : signalé à part.
+    if (wanted && (!extra || extra.length)) {
+      const sample = extra?.length ? ` (${t('ex.', 'e.g.')} ${extra.slice(0, 3).map((v) => JSON.stringify(v)).join(', ')})` : '';
+      gaps.push(t(`valeurs de « ${wanted.label} » non garanties${sample}`, `values of “${wanted.label}” not guaranteed${sample}`));
+    }
+  }
   return gaps;
 }
 
@@ -141,7 +160,8 @@ export function linkMismatch(byId, e, incoming) {
 export function validateTargets(nodes, edges) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const incoming = new Map(edges.map((e) => [`${e.target}:${e.targetHandle}`, e]));
-  const infoOf = makeSocketInfo(byId, incoming);
+  const libraries = librariesOf(nodes);
+  const infoOf = makeSocketInfo(byId, incoming, libraries);
   const linkedInputs = (nodeId) => linkedInputsOf(incoming, nodeId);
   const byNode = new Map();
   const list = [];
@@ -166,15 +186,20 @@ export function validateTargets(nodes, edges) {
         if (mismatch) add(f, chain, mismatch.level, mismatch.message);
         const info = e && infoOf(e.source, e.sourceHandle ?? '');
         if (info) {
-          if (f.required && info.required === false) {
+          if (f.required && info.required === false && !info.optionalFrom) {
+            // La transformation elle-même peut ne rien donner (ex. Transcoder sans valeur « Si absente »).
+            add(f, chain, 'warning', t(`Obligatoire, mais ${info.label} peut ne rien donner`, `Required, but ${info.label} may give nothing`));
+          } else if (f.required && info.required === false) {
             const via = info.optionalFrom && info.optionalFrom !== info.label ? ` (via ${info.label})` : '';
             const from = `${info.optionalFrom ?? info.label}${via}`;
             add(f, chain, 'warning', t(`Obligatoire, mais la source ${from} est optionnelle`, `Required, but the source ${from} is optional`));
           }
-          const gaps = formatGaps(info, f);
+          const gaps = formatGaps(info, f, libraries);
           if (gaps.length) add(f, chain, 'warning', t(`Format non garanti par ${info.label} : ${gaps.join(', ')}`, `Format not guaranteed by ${info.label}: ${gaps.join(', ')}`));
         }
         // Un conteneur optionnel laissé vide n'impose rien à ses sous-champs.
+        if (isSet(f.format?.library) && !libraries.has(f.format.library))
+          add(f, chain, 'warning', t('Bibliothèque de valeurs supprimée : valeurs non contrôlées', 'Value library deleted: values not checked'));
         if (isContainer(f) && (f.required || isMapped(f))) walk(f.children ?? [], chain);
       }
     };

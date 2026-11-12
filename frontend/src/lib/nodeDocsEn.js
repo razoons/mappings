@@ -153,6 +153,16 @@ export const NODE_DOCS_EN = {
       'Put it before an Integer target field fed by a decimal number: the conversion becomes explicit and is no longer reported.',
     ],
   },
+  transcode: {
+    summary: 'Translates a value from one reference list to another (FRA → FR) with the mapping table of a library.',
+    details: [
+      'Table: the Table output of a library whose “Mapping table” box is checked. The same library can feed several Transcode nodes.',
+      'Value missing from the table (or without a mapping): the output is “If missing”, or nothing if it is empty. Plug the original value into it to keep it as is.',
+      'On a list, each item is translated.',
+      'The output has the type of the Mapping column.',
+      'Guarantees: if the value comes from a field linked to the same library (or whose values all have a mapping), the output is one of the mappings; otherwise it can also be “If missing”. A target linked to a library that contains all these values is therefore not reported.',
+    ],
+  },
   to_bool: {
     summary: 'Converts a value to a boolean.',
     details: ['True texts: true, 1, oui, yes, vrai, y, o, x (case-insensitive). Everything else is false.', 'Number: true if it is not 0.'],
@@ -195,6 +205,18 @@ export const NODE_DOCS_EN = {
       'Without a link on the array, the first source list linked to one of its sub-fields drives the iteration.',
       'An object linked to a source object copies it; the linked sub-fields replace their values in it.',
       'Checks: ⛔ required not mapped; ⛔ incompatible types; ⚠ type implicitly converted; ⚠ required fed by an optional source; ⚠ format not guaranteed. Details in the Checks panel.',
+    ],
+  },
+  library: {
+    label: 'Library',
+    summary: 'List of allowed values (texts, integers, numbers or dates), shared by the fields that refer to it.',
+    details: [
+      'A source or target field refers to it in its rules (⚙ › Allowed values): its value — or each item of a list — must belong to the library. Several fields, in different nodes, can share the same library; editing it updates them all. In YAML: “library: Countries”.',
+      'Input: one value per line of the node (Enter to add), or all at once with ≡ (one per line). Duplicates are ignored. Changing the type converts the values and removes those that do not fit.',
+      'Checks: ⛔ a value outside the library in a data file, an example or a target’s result; ⚠ a target field fed by a source that does not guarantee these values (the source must refer to the same library, or to a library whose values all belong to it); ⚠ a deleted library.',
+      'The Values output gives the list, to plug into a list transformation (Find, Test items…) or into a target list.',
+      'Mapping table (checkbox): each value receives a mapping in another reference list (FRA → FR), with its own type. The Table output feeds the Transcode node. In bulk (≡): “value ; mapping” per line, or a paste of two spreadsheet columns.',
+      'For a source, the example of a field with a library is picked from a drop-down list.',
     ],
   },
   group: {

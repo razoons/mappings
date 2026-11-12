@@ -52,6 +52,7 @@ export const isNumeric = (t) => t === 'number' || t === 'integer';
 export const HEADER_COLORS = {
   source: '#2b6e4c',
   target: '#8c3b2c',
+  library: '#6b5a2e',
   group: '#5b6170',
   Entrée: '#83314a',
   Structure: '#7a4a6a',

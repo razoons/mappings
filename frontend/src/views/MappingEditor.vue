@@ -158,8 +158,9 @@ import SourceNode from '../components/nodes/SourceNode.vue';
 import TargetNode from '../components/nodes/TargetNode.vue';
 import TransformNode from '../components/nodes/TransformNode.vue';
 import GroupNode from '../components/nodes/GroupNode.vue';
+import LibraryNode from '../components/nodes/LibraryNode.vue';
 import TypedEdge from '../components/nodes/TypedEdge.vue';
-import { DATA_FILES_KEY, EDGE_INSERT_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
+import { DATA_FILES_KEY, EDGE_INSERT_KEY, LIBRARIES_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
 import { checkDocument, describeProblem } from '../lib/conformity';
 import { demoGraph } from '../lib/demo';
 import { count, t } from '../lib/i18n';
@@ -167,6 +168,7 @@ import { fieldFromSocket, migrateFields, parseDocument, newField, setTreeCollaps
 import { autoLayout } from '../lib/layout';
 import { fitGroup, groupAround, groupAt, groupsFirst, isGroup, newGroup, removeKeepingChildren, reparent } from '../lib/groups';
 import { createsCycle, evaluateGraph, getSocket } from '../lib/graph';
+import { librariesOf, LIBRARY_OUTPUT, LIBRARY_TABLE } from '../lib/libraries';
 import { validateTargets } from '../lib/rules';
 import { initialParams, inputsOf, TRANSFORMS } from '../lib/transforms';
 import { canConnect, isList, typeMismatch, uid } from '../lib/types';
@@ -183,6 +185,7 @@ const nodeTypes = {
   source: markRaw(SourceNode),
   target: markRaw(TargetNode),
   transform: markRaw(TransformNode),
+  library: markRaw(LibraryNode),
   group: markRaw(GroupNode),
 };
 const edgeTypes = { typed: markRaw(TypedEdge) };
@@ -483,7 +486,7 @@ function checkDataFiles() {
     const issues = new Map();
     const problems = file.error
       ? [{ level: 'error', fieldId: null, path: '', message: file.error, count: 1 }]
-      : checkDocument(node.data.fields, file.doc);
+      : checkDocument(node.data.fields, file.doc, libraries.value);
     for (const p of problems) {
       const issue = { level: p.level, message: `${t('Fichier', 'File')} : ${p.path ? `${p.path} — ` : ''}${describeProblem(p)}` };
       const key = p.fieldId ?? '';
@@ -494,6 +497,10 @@ function checkDataFiles() {
   }
   return { byNode, list };
 }
+
+/** Bibliothèques de valeurs du schéma (nœuds Bibliothèque), pour les règles et les contrôles des champs. */
+const libraries = computed(() => librariesOf(nodes.value));
+provide(LIBRARIES_KEY, libraries);
 
 const results = computed(() => {
   const docs = new Map([...dataFiles].filter(([, f]) => f.doc).map(([id, f]) => [id, f.doc]));
@@ -606,7 +613,7 @@ function addNode(kind, screen, link) {
     return;
   }
   if (link?.side === 'target') position.x -= 260;
-  const id = uid(kind === 'source' || kind === 'target' ? kind : 'n');
+  const id = uid(kind === 'source' || kind === 'target' || kind === 'library' ? kind : 'n');
   let node;
   let handle;
 
@@ -619,6 +626,11 @@ function addNode(kind, screen, link) {
         ? { id, type: 'source', position, data: { label: t('Nouvelle source', 'New source'), fields: [field], sample: '{}' } }
         : { id, type: 'target', position, data: { label: t('Nouvelle cible', 'New target'), fields: [field] } };
     if (matches) handle = field.id;
+  } else if (kind === 'library') {
+    // Tirée depuis une entrée objet (la Table d'un Transcoder) : une table de correspondance ; sinon sa liste de valeurs.
+    const table = link?.side === 'target' && link.socket.type === 'object';
+    node = { id, type: 'library', position, data: { label: t('Nouvelle bibliothèque', 'New library'), item: 'string', values: [], ...(table && { mapped: true, outItem: 'string', targets: [] }) } };
+    if (link?.side === 'target') handle = table ? LIBRARY_TABLE : LIBRARY_OUTPUT;
   } else {
     const def = TRANSFORMS[kind];
     node = { id, type: 'transform', position, data: { kind, params: initialParams(TRANSFORMS[kind]), values: {} } };

@@ -41,7 +41,7 @@ import { t } from '../lib/i18n';
 import { CATEGORIES, categoryLabel, TRANSFORMS } from '../lib/transforms';
 import { HEADER_COLORS } from '../lib/types';
 
-/** Menu d'ajout de nœud (Shift+A) ; `pick` émet `source`, `target`, `group` ou une clé de TRANSFORMS. */
+/** Menu d'ajout de nœud (Shift+A) ; `pick` émet `source`, `target`, `library`, `group` ou une clé de TRANSFORMS. */
 const props = defineProps({
   /** Position écran `{ x, y }` ; nul = fermé. `only` : liste des nœuds proposés (sinon tous). */
   at: { type: Object, default: null },
@@ -52,6 +52,7 @@ const emit = defineEmits(['pick', 'close']);
 const ITEMS = computed(() => [
   { kind: 'source', label: t('Source de données', 'Data source'), category: t('Données', 'Data'), color: HEADER_COLORS.source },
   { kind: 'target', label: t('Cible de données', 'Data target'), category: t('Données', 'Data'), color: HEADER_COLORS.target },
+  { kind: 'library', label: t('Bibliothèque de valeurs', 'Value library'), category: t('Données', 'Data'), color: HEADER_COLORS.library },
   { kind: 'group', label: t('Groupe', 'Group'), category: t('Organisation', 'Layout'), color: HEADER_COLORS.group },
   ...CATEGORIES.flatMap((category) =>
     Object.entries(TRANSFORMS)

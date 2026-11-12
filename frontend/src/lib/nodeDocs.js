@@ -188,6 +188,16 @@ export const NODE_DOCS = {
     summary: 'Convertit un nombre en entier : tronqué (partie entière), arrondi, plancher ou plafond.',
     details: ['Tronquer et Plancher diffèrent pour les négatifs : -2.7 → -2 (tronqué), -3 (plancher).', 'À placer devant un champ cible Entier alimenté par un nombre décimal : la conversion devient explicite et n’est plus signalée.'],
   },
+  transcode: {
+    summary: 'Traduit une valeur d’un référentiel à un autre (FRA → FR) avec la table de correspondance d’une bibliothèque.',
+    details: [
+      'Table : la sortie Table d’une bibliothèque dont la case « Table de correspondance » est cochée. Une même bibliothèque peut alimenter plusieurs Transcoder.',
+      'Valeur absente de la table (ou sans correspondance) : la sortie vaut « Si absente », ou rien si elle est vide. Branchez-y la valeur d’origine pour la garder telle quelle.',
+      'Sur une liste, chaque élément est traduit.',
+      'La sortie a le type de la colonne Correspondance.',
+      'Garanties : si la valeur vient d’un champ lié à la même bibliothèque (ou dont toutes les valeurs ont une correspondance), la sortie fait partie des correspondances ; sinon elle peut aussi valoir « Si absente ». Une cible liée à une bibliothèque qui contient toutes ces valeurs n’est donc pas signalée.',
+    ],
+  },
   to_bool: {
     summary: 'Convertit une valeur en booléen.',
     details: ['Textes vrais : true, 1, oui, yes, vrai, y, o, x (sans tenir compte de la casse). Tout le reste est faux.', 'Nombre : vrai s’il est différent de 0.'],
@@ -238,6 +248,20 @@ export const BASE_NODES = [
       'Sans lien sur le tableau, la première liste source reliée à un de ses sous-champs dicte le parcours.',
       'Un objet relié à un objet source le recopie ; les sous-champs reliés y remplacent leurs valeurs.',
       'Contrôles : ⛔ obligatoire non mappé ; ⛔ types incompatibles ; ⚠ type converti implicitement ; ⚠ obligatoire alimenté par une source optionnelle ; ⚠ format non garanti. Détail dans le panneau Contrôles.',
+    ],
+  },
+  {
+    kind: 'library',
+    label: 'Bibliothèque',
+    color: 'library',
+    summary: 'Liste de valeurs autorisées (textes, entiers, nombres ou dates), partagée par les champs qui s’y réfèrent.',
+    details: [
+      'Un champ de source ou de cible s’y réfère dans ses règles (⚙ › Valeurs autorisées) : sa valeur — ou chaque élément d’une liste — doit faire partie de la bibliothèque. Plusieurs champs, dans des nœuds différents, peuvent partager la même bibliothèque ; la modifier les met tous à jour. En YAML : « bibliothèque: Pays ».',
+      'Saisie : une valeur par ligne du nœud (Entrée pour ajouter), ou toutes à la fois avec ≡ (une par ligne). Les doublons sont ignorés. Changer le type convertit les valeurs et retire celles qui ne s’y prêtent pas.',
+      'Contrôles : ⛔ une valeur hors bibliothèque dans un fichier de données, un exemple ou le résultat d’une cible ; ⚠ un champ cible alimenté par une source qui ne garantit pas ces valeurs (la source doit se référer à la même bibliothèque, ou à une bibliothèque dont toutes les valeurs y figurent) ; ⚠ une bibliothèque supprimée.',
+      'La sortie Valeurs donne la liste, à brancher sur une transformation de liste (Trouver, Tester les éléments…) ou sur une liste cible.',
+      'Table de correspondance (case à cocher) : chaque valeur reçoit une correspondance dans un autre référentiel (FRA → FR), avec son propre type. La sortie Table alimente le nœud Transcoder. En bloc (≡) : « valeur ; correspondance » par ligne, ou un copier-coller de deux colonnes de tableur.',
+      'Pour une source, l’exemple d’un champ qui a une bibliothèque se choisit dans une liste déroulante.',
     ],
   },
   {

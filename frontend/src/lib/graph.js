@@ -1,4 +1,6 @@
 import { allFields, findChain, sourceSocketType, targetSocketType } from './fields';
+import { t } from './i18n';
+import { LIBRARY_OUTPUT, LIBRARY_TABLE, tableOf } from './libraries';
 import { bindsOf, isPlainObject, tagList } from './lists';
 import { inputsOf, inputSocket, paramsWithDefaults, TRANSFORMS, variadicId } from './transforms';
 import { baseOf, coerce, isList, isNumeric, listOf } from './types';
@@ -12,6 +14,12 @@ export function getSocket(node, handleId, side) {
     if (!chain) return undefined;
     const field = chain.at(-1);
     return { name: field.name, type: node.type === 'source' ? sourceSocketType(chain) : targetSocketType(field) };
+  }
+  if (node.type === 'library') {
+    if (side !== 'source') return undefined;
+    if (handleId === LIBRARY_OUTPUT) return { name: t('Valeurs', 'Values'), type: listOf(node.data.item ?? 'string') };
+    if (handleId === LIBRARY_TABLE && node.data.mapped) return { name: t('Table', 'Table'), type: 'object' };
+    return undefined;
   }
   const def = TRANSFORMS[node.data.kind];
   const s = side === 'source' ? def?.outputs.find((s) => s.id === handleId) : inputSocket(def, handleId);
@@ -27,6 +35,12 @@ export function outputType(getNode, incomingOf, nodeId, handle, depth = 0) {
   const node = getNode(nodeId);
   const declared = getSocket(node, handle, 'source')?.type;
   const def = node?.type === 'transform' ? TRANSFORMS[node.data.kind] : null;
+  // Transcoder : la sortie a le type de la colonne Correspondance de la table reliée.
+  if (def?.tableInput) {
+    const e = incomingOf(nodeId, def.tableInput);
+    const table = e && getNode(e.source);
+    return table?.type === 'library' && e.sourceHandle === LIBRARY_TABLE ? (table.data.outItem ?? 'string') : declared;
+  }
   const pass = def?.passes?.[handle];
   if (!pass || depth > 50) return declared;
   const override = pass.unless && incomingOf(nodeId, pass.unless);
@@ -114,8 +128,14 @@ export function evaluateGraph(nodes, edges, dataFiles = new Map()) {
     const node = byId.get(nodeId);
     if (node?.type === 'source') return readSource(node, handle, scope);
     if (node?.type === 'transform') return outputsOf(node, scope)[handle];
+    if (node?.type === 'library') return libraryOutputs(node)[handle];
     return undefined;
   }
+
+  const libraryOutputs = (node) => ({
+    [LIBRARY_OUTPUT]: coerce(node.data.values ?? [], listOf(node.data.item ?? 'string')),
+    ...(node.data.mapped && { [LIBRARY_TABLE]: tableOf(node.data) }),
+  });
 
   function sampleOf(node) {
     if (dataFiles.has(node.id)) return dataFiles.get(node.id);
@@ -282,6 +302,7 @@ export function evaluateGraph(nodes, edges, dataFiles = new Map()) {
   const targets = new Map();
   for (const n of nodes) {
     if (n.type === 'transform') outputs.set(n.id, outputsOf(n, ROOT_SCOPE));
+    else if (n.type === 'library') outputs.set(n.id, libraryOutputs(n));
     else if (n.type === 'source')
       outputs.set(n.id, Object.fromEntries(allFields(n.data.fields).map((f) => [f.id, readSource(n, f.id, ROOT_SCOPE)])));
     else if (n.type === 'target') {

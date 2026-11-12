@@ -1,5 +1,6 @@
 import { bindsOf, isPlainObject, pickItems, tagList } from './lists';
 import { bilingual, t } from './i18n';
+import { missingFrom, tableKey, valueSet } from './libraries';
 import { coerce } from './types';
 
 /**
@@ -13,10 +14,14 @@ import { coerce } from './types';
  *   `ctx.connected(inputId)` dit si elle est reliée et `ctx.current` donne l'élément de l'itération englobante ;
  * - `variadic: { type, min }` (facultatif) : entrées en nombre libre A, B, C… ; il y en a toujours une de libre
  *   après la dernière utilisée (reliée ou saisie), et au moins `min` (voir `inputsOf`) ;
- * - `guarantee(input, params, inputIds)` (facultatif) : ce que le nœud garantit sur sa sortie, `{ required, format }`,
+ * - `guarantee(input, params, inputIds, { libraries })` (facultatif) : ce que le nœud garantit sur sa sortie,
+ *   `{ required, format, base? }` (`base` : type réel de la sortie, si elle est déclarée « Tout » ; `format.allowed` :
+ *   ensemble des valeurs possibles, voir lib/libraries.js),
  *   pour le contrôle des champs cibles. `input(id)` donne `{ connected, info, value }` : `info` décrit ce que
  *   garantit l'amont (`{ required, format }`, ou `null` si inconnu), `value` la valeur saisie d'une entrée libre.
- *   Sans `guarantee`, le contrôle fait confiance au nœud.
+ *   Sans `guarantee`, le contrôle fait confiance au nœud ;
+ * - `tableInput` (facultatif) : entrée qui reçoit la table d'une bibliothèque ; la sortie prend le type de sa
+ *   colonne Correspondance (voir outputType dans graph.js).
  */
 
 const out = (type, label = 'Résultat') => [{ id: 'result', label, type }];
@@ -636,6 +641,43 @@ export const TRANSFORMS = {
     compute: ({ value }) => ({ result: value }),
   },
 
+  transcode: {
+    label: 'Transcoder',
+    category: 'Conversion',
+    // La table d'abord : un lien tiré depuis la sortie Table d'une bibliothèque s'y raccorde.
+    inputs: [
+      { id: 'table', label: 'Table', type: 'object' },
+      { id: 'value', label: 'Valeur', type: 'any' },
+      { id: 'fallback', label: 'Si absente', type: 'any', default: '' },
+    ],
+    outputs: out('any'),
+    tableInput: 'table',
+    compute: ({ table, value, fallback }) => {
+      const hit = isPlainObject(table) ? table[tableKey(value)] : undefined;
+      return { result: hit !== undefined ? hit : fallback === '' ? null : fallback };
+    },
+    guarantee: (input, _p, _ids, { libraries }) => {
+      const table = input('table');
+      const lib = table.connected && table.info?.table ? libraries.get(table.info.table) : undefined;
+      if (!lib?.mapped) return {};
+      const value = input('value');
+      const fallback = input('fallback');
+      // Valeurs possibles en entrée : celles d'une bibliothèque, d'un ensemble garanti, ou la valeur saisie.
+      const given = value.connected
+        ? (value.info?.format?.library && libraries.get(value.info.format.library)) || value.info?.format?.allowed
+        : valueSet('', lib.item, value.value === '' ? [] : [value.value]);
+      // Toutes ont une correspondance : la valeur par défaut ne sert jamais.
+      const covered = !!given && missingFrom(given, lib.mappedValues).length === 0;
+      const typedFallback = !fallback.connected && fallback.value !== '';
+      let allowed;
+      if (covered) allowed = lib.targetValues;
+      else if (!fallback.connected) allowed = valueSet(lib.targetValues.label, lib.outItem, [...lib.targetValues.values, ...(typedFallback ? [fallback.value] : [])]);
+      // Présente : celle reçue si toutes ont une correspondance, sinon il faut une valeur par défaut.
+      const required = covered ? (value.connected ? value.info?.required : true) : fallback.connected ? fallback.info?.required : typedFallback;
+      return { required, base: lib.outItem, format: allowed ? { allowed } : {} };
+    },
+  },
+
   // ── Date ────────────────────────────────────────────────
   date_format: {
     label: 'Formater date',
@@ -811,6 +853,7 @@ const EN = {
   to_number: { label: 'To number', sockets: { value: 'Value', result: 'Result' } },
   to_integer: { label: 'To integer', sockets: { value: 'Value', result: 'Result' }, params: { mode: 'Mode' } },
   to_bool: { label: 'To boolean', sockets: { value: 'Value', result: 'Result' } },
+  transcode: { label: 'Transcode', sockets: { table: 'Table', value: 'Value', fallback: 'If missing', result: 'Result' } },
   date_format: { label: 'Format date', sockets: { date: 'Date', result: 'Result' }, params: { format: 'Format' } },
   date_part: { label: 'Date part', sockets: { date: 'Date', result: 'Number', name: 'Name' }, params: { part: 'Part', days: 'Days', months: 'Months' } },
   age: { label: 'Age (years)', sockets: { date: 'Date', ref: 'Reference', result: 'Years' } },
