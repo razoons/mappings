@@ -1,7 +1,8 @@
 /*
  * Démo : une pizzeria qui livre à domicile (« La Bonne Pâte »).
  * Deux sources — la commande passée sur le site et le fichier fidélité des clients — alimentent le bon de livraison
- * remis au livreur. Le client est retrouvé dans le fichier fidélité grâce à son email.
+ * remis au livreur. Le client est retrouvé dans le fichier fidélité grâce à son email. La bibliothèque « Carte »
+ * liste les codes produits autorisés et sert aussi de table de transcodage code → libellé affiché sur le bon.
  */
 
 const order = {
@@ -65,7 +66,7 @@ const nodes = [
           required: true,
           format: { minItems: 1 },
           children: [
-            { id: 'i_product', name: 'product', type: 'string', required: true },
+            { id: 'i_product', name: 'product', type: 'string', required: true, format: { library: 'menu' } },
             { id: 'i_size', name: 'size', type: 'string' },
             { id: 'i_qty', name: 'qty', type: 'integer', required: true, format: { min: 1 } },
             { id: 'i_price', name: 'unitPrice', type: 'number', required: true, format: { min: 0 } },
@@ -99,6 +100,21 @@ const nodes = [
     },
   },
 
+  // Carte : codes produits autorisés, et leur libellé (table de transcodage)
+  {
+    id: 'menu',
+    type: 'library',
+    position: { x: 0, y: 200 },
+    data: {
+      label: 'Carte',
+      item: 'string',
+      values: ['margherita', 'regina', 'quatre-fromages', 'calzone', 'tiramisu'],
+      mapped: true,
+      outItem: 'string',
+      targets: ['Pizza Margherita', 'Pizza Regina', 'Pizza 4 fromages', 'Calzone', 'Tiramisu maison'],
+    },
+  },
+
   // Référence du bon : « LBP-W-20481 »
   transform('ref', 590, 0, { kind: 'concat', params: { sep: '-' }, values: { a: 'LBP' } }),
   // Livraison : jour en toutes lettres, date, adresse
@@ -123,8 +139,8 @@ const nodes = [
     kind: 'switch',
     values: { yes: 'Merci pour votre fidélité, un dessert vous est offert !', no: 'Bon appétit !' },
   }),
-  // Articles : libellé, montant par ligne, totaux
-  transform('product', 590, 980, { kind: 'case', params: { mode: 'Capitaliser' } }),
+  // Articles : libellé (transcodé via la carte), montant par ligne, totaux
+  transform('product', 590, 980, { kind: 'transcode' }),
   transform('label', 910, 910, { kind: 'concat' }),
   transform('amount', 590, 1444, { kind: 'math', params: { op: 'Multiplication' } }),
   transform('sum', 910, 1254, { kind: 'list_aggregate' }),
@@ -234,7 +250,8 @@ const edges = [
   link('message', 'result', 'slip', 't_message'),
   // articles
   link('web', 'w_items', 'slip', 't_items'),
-  link('web', 'i_product', 'product', 'text'),
+  link('menu', 'table', 'product', 'table'),
+  link('web', 'i_product', 'product', 'value'),
   link('product', 'result', 'label', 'a'),
   link('web', 'i_size', 'label', 'b'),
   link('label', 'result', 'slip', 't_label'),
