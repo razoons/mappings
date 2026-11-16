@@ -21,6 +21,8 @@ const LEGACY_KEY = 'mapping-current';
 export const COLLECTION_FORMAT = 'schemap-collection';
 /** Valeur de `format` d'un fichier de modèles exporté. */
 export const MODELS_FORMAT = 'schemap-models';
+/** Valeur de `format` d'une sauvegarde complète (toutes les collections et toute la bibliothèque). */
+export const WORKSPACE_FORMAT = 'schemap-workspace';
 export const LIBRARY_ID = 'library';
 
 const untitled = () => t('Sans titre', 'Untitled');
@@ -94,7 +96,7 @@ export function locate(id, list = roots(), parent = null, path = []) {
 export const find = (id) => locate(id)?.item ?? null;
 export const activeMapping = () => find(workspace.activeId);
 
-function* leavesIn(list, type) {
+export function* leavesIn(list, type) {
   for (const item of list) {
     if (item.type === type) yield item;
     else if (isContainer(item)) yield* leavesIn(item.items, type);
@@ -275,6 +277,7 @@ function libraryItemsUsedBy(items) {
     for (const n of m.graph.nodes) {
       if (n.data?.modelId) ids.add(n.data.modelId);
       if (n.data?.listId) ids.add(n.data.listId);
+      walkFields(n.data?.fields ?? []); // listes désignées par un champ, même sans nœud dans le flux
     }
   }
   for (const id of [...ids]) {
@@ -310,6 +313,35 @@ export function mappingFile(id) {
   return JSON.stringify({ version: 1, name: item.name, ...item.graph, ...(models.length && { models }) }, null, 2);
 }
 
+/** Sauvegarde complète : toutes les collections, toute la bibliothèque et le mapping ouvert. */
+export function workspaceFile() {
+  const { collections, library, activeId } = JSON.parse(JSON.stringify(workspace));
+  return JSON.stringify({ format: WORKSPACE_FORMAT, version: 1, savedAt: new Date().toISOString(), collections, library, activeId }, null, 2);
+}
+
+/**
+ * Restaure une sauvegarde complète (`readFile` → `{ workspace }`). `replace` : tout ce qui est dans le navigateur
+ * est remplacé ; sinon ses collections s'ajoutent à la liste et sa bibliothèque dans un dossier `folderName`
+ * (sans les éléments déjà présents, même id). Renvoie `{ collections, library }` : le nombre de collections et
+ * d'éléments de la bibliothèque ajoutés.
+ */
+export function restoreWorkspace(saved, { replace = false, folderName = '' } = {}) {
+  if (replace) {
+    workspace.collections.splice(0, workspace.collections.length, ...saved.collections);
+    workspace.library = { ...makeLibrary(), ...saved.library, id: LIBRARY_ID, type: 'library' };
+    workspace.activeId = find(saved.activeId)?.type === 'mapping' ? saved.activeId : null;
+    if (!workspace.activeId) ensureActive();
+    return { collections: saved.collections.length, library: [...leavesIn(workspace.library.items, 'model')].length + [...leavesIn(workspace.library.items, 'valuelist')].length };
+  }
+  // Ajout : de nouveaux ids pour les collections, dossiers et mappings (les éléments de la bibliothèque gardent
+  // les leurs, auxquels se réfèrent les nœuds).
+  const fresh = (item) =>
+    item.type === 'mapping' ? { ...item, id: uid('map') } : isContainer(item) ? { ...item, id: uid(item.type === 'collection' ? 'col' : 'dir'), items: item.items.map(fresh) } : item;
+  for (const c of saved.collections) workspace.collections.push(fresh(c));
+  const library = !saved.library.items.length ? 0 : addImportedLibrary(makeFolder(folderName, saved.library.items.map((i) => (isContainer(i) ? { ...i, id: uid('dir') } : i))), { inFolder: true });
+  return { collections: saved.collections.length, library };
+}
+
 const isGraph = (g) => Array.isArray(g?.nodes) && Array.isArray(g?.edges);
 const isLibraryItem = (m) => typeof m?.id === 'string' && (Array.isArray(m?.fields) || (m?.type === 'valuelist' && Array.isArray(m?.values)));
 
@@ -343,6 +375,10 @@ function readItem(raw) {
 export function readFile(text, fileName = '') {
   const data = JSON.parse(text);
   const base = fileName.replace(/\.json$/i, '');
+  if (data?.format === WORKSPACE_FORMAT) {
+    if (!Array.isArray(data.collections) || !Array.isArray(data.library?.items)) throw new Error(t('sauvegarde incomplète', 'incomplete backup'));
+    return { workspace: { collections: data.collections, library: data.library, activeId: data.activeId ?? null, savedAt: data.savedAt ?? null } };
+  }
   const models = (Array.isArray(data?.models) ? data.models : []).filter(isLibraryItem).map(readLibraryItem);
   if (isGraph(data)) return { mapping: makeMapping(data.name || base || untitled(), { nodes: data.nodes, edges: data.edges }), models };
   if (data?.format === MODELS_FORMAT) return { library: makeFolder(data.name || base || t('Bibliothèque importée', 'Imported library'), (data.items ?? []).map(readItem).filter(Boolean)), models: [] };
@@ -353,20 +389,25 @@ export function readFile(text, fileName = '') {
 }
 
 /**
- * Range les éléments importés absents de la bibliothèque (par leur id) dans un dossier `folderName` ; ceux déjà
- * présents sont gardés tels quels. Renvoie le nombre d'éléments ajoutés.
+ * Range les éléments importés absents de la bibliothèque (par leur id) à sa racine ; ceux déjà présents sont
+ * gardés tels quels. Renvoie le nombre d'éléments ajoutés.
  */
-export function addImportedModels(models, folderName) {
+export function addImportedModels(models) {
   const fresh = models.filter((m) => !find(m.id));
-  if (fresh.length) addToLibrary({ ...makeFolder(folderName, fresh), open: false });
+  fresh.forEach((m) => addToLibrary(m));
   return fresh.length;
 }
 
-/** Ajoute un dossier de la bibliothèque importé ; les éléments déjà présents (même id) en sont retirés. Renvoie le nombre ajouté. */
-export function addImportedLibrary(folder) {
+/**
+ * Ajoute les éléments d'un export de la bibliothèque à sa racine (ses propres dossiers sont gardés) ; avec
+ * `inFolder`, dans le dossier `folder` lui-même. Les éléments déjà présents (même id) sont écartés. Renvoie le
+ * nombre ajouté.
+ */
+export function addImportedLibrary(folder, { inFolder = false } = {}) {
   const keep = (items) =>
     items.filter((i) => isContainer(i) || !find(i.id)).map((i) => (isContainer(i) ? { ...i, items: keep(i.items) } : i));
   const cleaned = { ...folder, items: keep(folder.items) };
-  addToLibrary(cleaned);
+  if (inFolder) addToLibrary(cleaned);
+  else cleaned.items.forEach((i) => addToLibrary(i));
   return [...leavesIn(cleaned.items, 'model')].length + [...leavesIn(cleaned.items, 'valuelist')].length;
 }

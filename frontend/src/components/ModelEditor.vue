@@ -120,6 +120,15 @@ watch(
   { immediate: true },
 );
 
+// Renommé ailleurs (panneau de la bibliothèque) : le titre du nœud suit, sauf s'il a été changé ici entre-temps.
+watch(
+  () => item.value?.name,
+  (name, old) => {
+    const d = draft.value;
+    if (d && name && d.label.trim() === old) d.label = name;
+  },
+);
+
 function save() {
   if (!dirty.value) return;
   const name = draft.value.label.trim() || item.value.name;

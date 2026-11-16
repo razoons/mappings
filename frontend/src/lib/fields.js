@@ -109,6 +109,7 @@ export function applyTypeKey(f, key) {
   if (type === 'array') next.item = item;
   if (isContainer(next)) next.children = f.children ?? [];
   if (f.required) next.required = true;
+  if (f.description) next.description = f.description;
   const format = cleanFormat(next, f.format);
   if (format) next.format = format;
   return next;
@@ -241,6 +242,7 @@ export function syncFields(old, obj) {
     if (v == null || (Array.isArray(v) && v.length === 0)) return prev;
     const next = { ...inferred, id: prev.id, collapsed: prev.collapsed };
     if (prev.required) next.required = true;
+    if (prev.description) next.description = prev.description;
     // Une chaîne peut être un texte ou une date : on garde le choix fait par l’utilisateur.
     const textual = (t) => t === 'string' || t === 'date';
     if (textual(next.type) && textual(prev.type)) next.type = prev.type;

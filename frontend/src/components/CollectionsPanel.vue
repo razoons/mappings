@@ -27,7 +27,7 @@
           <v-btn icon="mdi-playlist-plus" size="small" variant="text" :title="t('Nouvelle liste de valeurs (énumération, transcodage)', 'New value list (enumeration, transcoding)')" @click="newList(null)" />
           <v-btn icon="mdi-folder-plus-outline" size="small" variant="text" :title="t('Nouveau dossier', 'New folder')" @click="startRename(addFolder(LIBRARY_ID).id)" />
         </template>
-        <v-btn icon="mdi-import" size="small" variant="text" :title="t('Importer un fichier .json : mapping, collection ou export de la bibliothèque', 'Import a .json file: mapping, collection or library export')" @click="$emit('import')" />
+        <v-btn icon="mdi-import" size="small" variant="text" :title="t('Importer un fichier .json : mapping, collection, export de la bibliothèque ou sauvegarde complète', 'Import a .json file: mapping, collection, library export or full backup')" @click="$emit('import')" />
       </div>
       <v-alert v-if="storage.error" type="warning" density="compact" variant="tonal" class="mx-3 mt-2 text-caption">
         {{ t('Les données ne peuvent plus être enregistrées dans le navigateur (espace plein ?). Exportez-les pour ne rien perdre.', 'Data can no longer be saved in the browser (storage full?). Export it so nothing is lost.') }}
@@ -73,11 +73,10 @@ import {
   makeMapping,
   move,
   remove,
-  rename,
   storage,
   workspace,
 } from '../services/collections';
-import { createModel, deleteLibraryFolder, deleteModel, MODEL_DRAG_TYPE, usageCounts, usageOf } from '../services/models';
+import { createModel, deleteLibraryFolder, deleteModel, MODEL_DRAG_TYPE, renameItem, usageCounts, usageOf } from '../services/models';
 import { createList, deleteList, listUsage } from '../services/valueLists';
 import { askConfirm } from '../services/dialogs';
 
@@ -113,7 +112,7 @@ function startRename(id) {
 }
 function commitRename(id, name) {
   if (renaming.value !== id) return;
-  rename(id, name);
+  renameItem(id, name);
   renaming.value = null;
 }
 

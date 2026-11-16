@@ -2,7 +2,7 @@ import { allFields, pathLabel, findChain } from '../lib/fields';
 import { t } from '../lib/i18n';
 import { LIBRARY_TABLE, tableKey } from '../lib/libraries';
 import { uid } from '../lib/types';
-import { addToLibrary, allMappings, find, remove } from './collections';
+import { addToLibrary, allMappings, find, leavesIn, remove, workspace } from './collections';
 import { canonical, hooks } from './models';
 
 /**
@@ -10,7 +10,8 @@ import { canonical, hooks } from './models';
  * Liste de valeurs relié à une liste de la bibliothèque porte `data.listId` et garde une copie de son contenu.
  * Comme pour les modèles, une modification faite dans un flux reste locale (« modifiée ici ») tant qu'elle n'est
  * pas enregistrée dans la liste ou sous une nouvelle liste. Un champ d'un modèle peut désigner une liste partagée
- * par son id (`format.library`) : il est contrôlé dans tout flux qui contient un nœud relié à cette liste.
+ * par son id (`format.library`) : il est contrôlé dans tout flux, que la liste y ait un nœud ou non (le nœud
+ * n'est utile que pour en tirer les valeurs ou la table de correspondance, ex. pour un transcodage).
  *
  * Liste : `{ id, type: 'valuelist', name, item, values, mapped, outItem, targets }` (voir lib/libraries.js).
  */
@@ -35,6 +36,17 @@ export function sameList(a, b) {
 }
 
 export const makeList = (name, data) => ({ id: uid('lst'), type: 'valuelist', name, ...listContent(data) });
+
+/**
+ * Listes de la bibliothèque, sous la forme de nœuds Liste de valeurs (non affichés) à passer à `librariesOf` : un
+ * champ qui désigne une liste partagée est contrôlé même si le flux n'a pas de nœud relié à cette liste.
+ * `present` : ids des listes déjà représentées par un nœud du flux (le nœud, peut-être modifié ici, l'emporte).
+ */
+export function libraryListNodes(present = new Set()) {
+  return [...leavesIn(workspace.library.items, 'valuelist')]
+    .filter((l) => !present.has(l.id))
+    .map((l) => ({ id: l.id, type: 'library', data: { label: l.name, ...listContent(l), listId: l.id } }));
+}
 
 /** Liste de la bibliothèque reliée à un nœud (`null` s'il n'en a pas ou si elle a été supprimée). */
 export const listOf = (data) => {

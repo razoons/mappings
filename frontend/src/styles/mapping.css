@@ -21,6 +21,7 @@
   --danger: #ff6b6b;
   --warning: #ffb84d;
   --warn: #ffc857;
+  --issue-mix: 24%;
   --edge-highlight: #ffffff;
   --socket-border: #111;
 }
@@ -47,6 +48,7 @@
   --danger: #d63c3c;
   --warning: #b86e00;
   --warn: #b7791f;
+  --issue-mix: 12%;
   --edge-highlight: #111111;
   --socket-border: #3a3a3a;
 }
@@ -833,11 +835,13 @@ kbd {
 }
 .field-row.issue-error,
 .in-row.issue-error {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  background: color-mix(in srgb, var(--danger) var(--issue-mix), transparent);
+  box-shadow: inset 3px 0 0 var(--danger);
 }
 .field-row.issue-warning,
 .in-row.issue-warning {
-  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  background: color-mix(in srgb, var(--warning) var(--issue-mix), transparent);
+  box-shadow: inset 3px 0 0 var(--warning);
 }
 .issue-mark {
   margin-right: 3px;
@@ -1058,6 +1062,10 @@ kbd {
   white-space: nowrap;
   min-width: 0;
 }
+.model-link .model-folder {
+  color: var(--muted);
+  font-weight: 400;
+}
 .model-link .model-state {
   color: var(--warning);
   white-space: nowrap;
@@ -1083,4 +1091,21 @@ kbd {
 }
 .node-header .icon-btn.mdi {
   font-size: 14px;
+}
+
+/* Fichier de travail, dans la barre d'outils */
+.doc-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--muted);
+}
+.doc-name .doc-modified {
+  color: var(--warning);
 }

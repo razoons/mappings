@@ -6,6 +6,14 @@
       :title="collectionsOpen ? t('Masquer les collections', 'Hide the collections') : t('Afficher les collections', 'Show the collections')"
       @click="collectionsOpen = !collectionsOpen"
     />
+    <v-btn prepend-icon="mdi-folder-open-outline" :title="t('Ouvrir un fichier sauvegardé (Ctrl O) ; un mapping ou une collection est ajouté', 'Open a saved file (Ctrl O); a mapping or a collection is added')" @click="openDocument">{{ t('Ouvrir', 'Open') }}</v-btn>
+    <v-btn prepend-icon="mdi-content-save-outline" :title="saveTitle" @click="saveDocument">{{ t('Sauvegarder', 'Save') }}</v-btn>
+    <v-btn icon="mdi-content-save-edit-outline" :title="t('Sauvegarder sous… : choisir l’emplacement et le nom (Ctrl Maj S)', 'Save as…: choose the location and the name (Ctrl Shift S)')" @click="saveDocumentAs()" />
+    <span class="doc-name" :title="doc.modified ? t('Modifié depuis la dernière sauvegarde', 'Changed since the last save') : t('Sauvegardé', 'Saved')">
+      <v-icon icon="mdi-file-document-outline" size="16" />
+      {{ doc.name ?? t('Non sauvegardé', 'Not saved') }}<span v-if="doc.modified" class="doc-modified"> ●</span>
+    </span>
+    <v-divider vertical inset class="mx-2" />
     <template v-if="!editingModelId">
       <v-btn prepend-icon="mdi-file-outline" :title="t('Nouveau mapping, ajouté à côté de celui-ci dans la collection', 'New mapping, added next to this one in the collection')" @click="newMapping">{{ t('Nouveau', 'New') }}</v-btn>
       <v-btn prepend-icon="mdi-school-outline" :title="t('Ajouter le mapping de démonstration à la collection', 'Add the demo mapping to the collection')" @click="loadDemo">{{ t('Démo', 'Demo') }}</v-btn>
@@ -156,7 +164,7 @@
 </template>
 
 <script setup>
-import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue';
+import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch, watchEffect } from 'vue';
 import { useTheme } from 'vuetify';
 import { Panel, VueFlow, useVueFlow } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
@@ -178,7 +186,7 @@ import LibraryNode from '../components/nodes/LibraryNode.vue';
 import TypedEdge from '../components/nodes/TypedEdge.vue';
 import { DATA_FILES_KEY, EDGE_INSERT_KEY, LIBRARIES_KEY, LIST_LINK_KEY, MODEL_LINK_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
 import { askChoice, askConfirm, askText } from '../services/dialogs';
-import { applyList, createList, listContent, listImpactOf, listOf, revertListNode, sameList } from '../services/valueLists';
+import { applyList, createList, libraryListNodes, listContent, listImpactOf, listOf, revertListNode, sameList } from '../services/valueLists';
 import {
   applyModel,
   createModel,
@@ -187,6 +195,7 @@ import {
   impactOf,
   MODEL_DRAG_TYPE,
   modelOf,
+  renameItem,
   revertNode,
   sameFields,
   sampleForSource,
@@ -203,7 +212,8 @@ import { librariesOf, LIBRARY_OUTPUT, LIBRARY_TABLE } from '../lib/libraries';
 import { validateTargets } from '../lib/rules';
 import { initialParams, inputsOf, TRANSFORMS } from '../lib/transforms';
 import { canConnect, isList, typeMismatch, uid } from '../lib/types';
-import { exportFile, openFile } from '../services/files';
+import { canWriteBack, exportFile, openFile, saveFileAs, writeToHandle } from '../services/files';
+import { doc, markSaved } from '../services/document';
 import { schemaImage } from '../services/image';
 import {
   activeCollection,
@@ -222,8 +232,10 @@ import {
   leafCount,
   mappingFile,
   readFile,
+  restoreWorkspace,
   saveNow,
   workspace,
+  workspaceFile,
 } from '../services/collections';
 
 const FLOW_ID = 'mapping';
@@ -418,10 +430,13 @@ modelHooks.flush = () => saveGraph();
 modelHooks.reload = () => openActive({ fit: false });
 
 // Changement de mapping dans la collection : le précédent est rangé tel qu'affiché, puis le nouveau est chargé.
+// Après une restauration « tout remplacer », le schéma affiché appartient à l'ancien contenu : il n'est pas rangé.
+let discardDisplayed = false;
 watch(
   () => workspace.activeId,
   (id, previous) => {
-    const before = find(previous);
+    const before = !discardDisplayed && find(previous);
+    discardDisplayed = false;
     if (before) saveGraph(before);
     else clearTimeout(saveTimer);
     dataFiles.clear();
@@ -485,7 +500,129 @@ async function exportItem(id) {
     notify(`${t('Export impossible', 'Export failed')} : ${e.message}`, 'error');
   }
 }
-const exportMapping = () => exportItem(workspace.activeId);
+
+// ── Fichier de travail : Ouvrir, Sauvegarder, Sauvegarder sous ───────────
+
+const DEFAULT_FILE = 'schemap.json';
+const saveTitle = computed(() =>
+  doc.name
+    ? t(`Sauvegarder dans « ${doc.name} » : collections et bibliothèque (Ctrl S)`, `Save to “${doc.name}”: collections and library (Ctrl S)`)
+    : t('Sauvegarder les collections et la bibliothèque dans un fichier (Ctrl S)', 'Save the collections and the library to a file (Ctrl S)'),
+);
+watchEffect(() => {
+  document.title = `${doc.name ?? t('Non sauvegardé', 'Not saved')}${doc.modified ? ' ●' : ''} — ScheMap`;
+});
+
+/** Le contenu à sauvegarder : le schéma affiché est d'abord rangé, même modifié à l'instant. */
+function documentText() {
+  saveGraph();
+  return workspaceFile();
+}
+
+/** Sauvegarder : réécrit le fichier ouvert ; sinon le crée, sous son nom (l'emplacement est alors demandé). */
+async function saveDocument() {
+  if (!doc.handle) return saveDocumentAs({ ask: false });
+  try {
+    await writeToHandle(doc.handle, documentText());
+    markSaved(doc.name, doc.handle);
+    notify(`${t('Sauvegardé', 'Saved')} : ${doc.name}`, 'success');
+  } catch (e) {
+    notify(`${t('Sauvegarde impossible', 'Save failed')} : ${e.message}`, 'error');
+  }
+}
+
+/**
+ * Sauvegarder sous : l'emplacement et le nom sont choisis dans l'explorateur (le nom actuel est proposé). Sans
+ * explorateur (navigateur autre que Chrome / Edge), le fichier est téléchargé : le nom est demandé ici, sauf pour
+ * « Sauvegarder » (`ask` : `false`) qui reprend le nom actuel.
+ */
+async function saveDocumentAs({ ask = true } = {}) {
+  let name = doc.name ?? DEFAULT_FILE;
+  if (!canWriteBack && ask) {
+    name = await askText({ title: t('Sauvegarder sous', 'Save as'), label: t('Nom du fichier', 'File name'), initial: name, okLabel: t('Sauvegarder', 'Save') });
+    if (!name) return;
+    if (!/\.json$/i.test(name)) name += '.json';
+  }
+  try {
+    const saved = await saveFileAs(documentText(), name);
+    if (!saved) return;
+    markSaved(saved.name, saved.handle);
+    notify(`${t('Sauvegardé', 'Saved')} : ${saved.name}`, 'success');
+  } catch (e) {
+    notify(`${t('Sauvegarde impossible', 'Save failed')} : ${e.message}`, 'error');
+  }
+}
+
+/**
+ * Ouvrir : un fichier sauvegardé remplace les collections et la bibliothèque (avec accord si le travail n'est pas
+ * sauvegardé), et devient le fichier de travail. Un mapping, une collection ou un export de la bibliothèque
+ * s'ajoute, comme avec l'import du panneau.
+ */
+async function openDocument() {
+  if (editingModelId.value && !(await leaveModel())) return;
+  try {
+    const file = await openFile();
+    if (!file) return;
+    const content = readFile(file.text, file.name);
+    if (!content.workspace) return addImported(content);
+    if (
+      doc.modified &&
+      !(await askConfirm({
+        title: t('Travail non sauvegardé', 'Unsaved work'),
+        text: t(
+          `Ouvrir « ${file.name} » remplace les collections et la bibliothèque actuelles, modifiées depuis la dernière sauvegarde. Continuer ?`,
+          `Opening “${file.name}” replaces the current collections and library, changed since the last save. Continue?`,
+        ),
+        okLabel: t('Ouvrir', 'Open'),
+        danger: true,
+      }))
+    )
+      return;
+    await applyWorkspace(content.workspace, { replace: true });
+    // Le schéma rechargé est rangé tel qu'affiché (après le délai d'écriture) : l'empreinte est prise ensuite.
+    await new Promise((r) => setTimeout(r, 400));
+    saveGraph();
+    markSaved(file.name, file.handle);
+    notify(`${t('Ouvert', 'Opened')} : ${file.name}`, 'success');
+  } catch (e) {
+    notify(`${t('Ouverture impossible', 'Cannot open')} : ${e.message}`, 'error');
+  }
+}
+
+/** Charge une sauvegarde complète (tout remplacer, ou l'ajouter) et affiche le mapping ouvert. */
+async function applyWorkspace(saved, options) {
+  editingModelId.value = null;
+  saveGraph();
+  discardDisplayed = !!options.replace;
+  const n = restoreWorkspace(saved, options);
+  openActive();
+  await nextTick();
+  discardDisplayed = false;
+  dataFiles.clear();
+  return n;
+}
+
+/** Restaure une sauvegarde complète importée depuis le panneau : tout remplacer, ou l'ajouter à ce qui existe. */
+async function restore(saved) {
+  const when = saved.savedAt ? new Date(saved.savedAt).toLocaleString() : null;
+  const choice = await askChoice({
+    title: t('Restaurer une sauvegarde complète', 'Restore a full backup'),
+    text: t(
+      `Sauvegarde${when ? ` du ${when}` : ''} : ${count(saved.collections.length, 'collection', 'collection')}. « Tout remplacer » efface les collections et la bibliothèque actuelles ; « Ajouter » les garde et y ajoute celles de la sauvegarde.`,
+      `Backup${when ? ` of ${when}` : ''}: ${count(saved.collections.length, 'collection', 'collection')}. “Replace everything” erases the current collections and library; “Add” keeps them and adds those of the backup.`,
+    ),
+    choices: [
+      { value: 'add', label: t('Ajouter', 'Add') },
+      { value: 'replace', label: t('Tout remplacer', 'Replace everything'), color: 'warning' },
+    ],
+  });
+  if (!choice) return;
+  if (editingModelId.value && !(await leaveModel())) return;
+  const replace = choice === 'replace';
+  const n = await applyWorkspace(saved, { replace, folderName: t(`Sauvegarde${when ? ` du ${when}` : ''}`, `Backup${when ? ` of ${when}` : ''}`) });
+  const what = `${count(n.collections, 'collection', 'collection')}, ${count(n.library, 'élément de bibliothèque', 'library item', 'éléments de bibliothèque', 'library items')}`;
+  notify(replace ? t(`Sauvegarde restaurée (${what}).`, `Backup restored (${what}).`) : t(`Sauvegarde ajoutée (${what}).`, `Backup added (${what}).`), 'success');
+}
 
 /** Attend que le schéma affiché soit dessiné (nœuds mesurés), au plus une seconde et demie. */
 function rendered() {
@@ -521,8 +658,9 @@ async function exportImage(id = workspace.activeId) {
  * Ajoute ce qu'un fichier importé contient : un mapping, à côté du mapping ouvert ; une collection,
  * à la liste des collections (son premier mapping est ouvert).
  */
-async function addImported({ collection, mapping, library, models = [] }) {
+async function addImported({ collection, mapping, library, workspace: saved, models = [] }) {
   collectionsOpen.value = true;
+  if (saved) return restore(saved);
   // Une collection du même nom existe déjà : la remplacer, garder les deux, ou ne rien importer.
   let replaced = null;
   const existing = collection && collectionNamed(collection.name);
@@ -544,11 +682,10 @@ async function addImported({ collection, mapping, library, models = [] }) {
   }
   if (library) {
     const n = addImportedLibrary(library);
-    return notify(t(`${count(n, 'élément ajouté', 'item added', 'éléments ajoutés', 'items added')} à la bibliothèque (dossier « ${library.name} »).`, `${count(n, 'item', 'item')} added to the library (folder “${library.name}”).`), 'success');
+    return notify(t(`${count(n, 'élément ajouté', 'item added', 'éléments ajoutés', 'items added')} à la bibliothèque.`, `${count(n, 'item', 'item')} added to the library.`), 'success');
   }
-  // Modèles joints aux flux : ajoutés à la bibliothèque s'ils n'y sont pas déjà.
-  const name = collection?.name ?? mapping.name;
-  const added = addImportedModels(models, t(`Importés — ${name}`, `Imported — ${name}`));
+  // Modèles joints aux flux : ajoutés à la racine de la bibliothèque s'ils n'y sont pas déjà.
+  const added = addImportedModels(models);
   const extra = added ? t(` et ${count(added, 'élément', 'item')} dans la bibliothèque`, ` and ${count(added, 'item', 'item')} in the library`) : '';
   if (mapping) {
     insertMapping(mapping);
@@ -780,19 +917,10 @@ function flowPosition(screen, fx, fy) {
 /** Nœud Liste de valeurs relié à une liste de la bibliothèque. */
 const listNode = (list, position) => ({ id: uid('library'), type: 'library', position, data: { label: list.name, ...listContent(list), listId: list.id } });
 
-/** Listes de la bibliothèque désignées par les champs d'un modèle et absentes du flux : ajoutées à côté du nœud. */
-function missingListNodes(fields, near) {
-  const present = new Set(nodes.value.map((n) => n.data?.listId).filter(Boolean));
-  const ids = new Set(allFields(fields).map((f) => f.format?.library).filter((id) => id && !present.has(id)));
-  return [...ids]
-    .map(find)
-    .filter((l) => l?.type === 'valuelist')
-    .map((l, i) => listNode(l, { x: near.x - 300, y: near.y + i * 160 }));
-}
-
 /**
- * Ajoute un élément de la bibliothèque au flux ouvert : un modèle comme source ou comme cible (avec les listes de
- * valeurs que désignent ses champs, si le flux ne les a pas), une liste comme nœud Liste de valeurs. `screen` :
+ * Ajoute un élément de la bibliothèque au flux ouvert : un modèle comme source ou comme cible, une liste comme nœud
+ * Liste de valeurs. Les listes que désignent les champs d'un modèle ne sont pas ajoutées : elles sont contrôlées
+ * depuis la bibliothèque ; un nœud n'est utile que pour un transcodage (sa sortie Table) ou ses valeurs. `screen` :
  * point de l'écran où le placer (là où il a été lâché).
  */
 async function useModel(itemId, kind, screen = null) {
@@ -810,13 +938,11 @@ async function useModel(itemId, kind, screen = null) {
   }
   const position = flowPosition(screen, kind === 'source' ? 0.15 : 0.6, 0.25);
   const data = { label: item.name, fields: JSON.parse(JSON.stringify(item.fields)), modelId: itemId, ...(kind === 'source' && { sample: sampleForSource(item) }) };
-  const lists = missingListNodes(item.fields, position);
-  addNodes([{ id: uid(kind), type: kind, position, data }, ...lists]);
-  const extra = lists.length ? t(` (et ${count(lists.length, 'liste de valeurs', 'value list', 'listes de valeurs', 'value lists')} qu’il utilise)`, ` (and ${count(lists.length, 'value list', 'value list')} it uses)`) : '';
+  addNodes([{ id: uid(kind), type: kind, position, data }]);
   notify(
     kind === 'source'
-      ? t(`Modèle « ${item.name} » ajouté au mapping comme source${extra}.`, `Model “${item.name}” added to the mapping as a source${extra}.`)
-      : t(`Modèle « ${item.name} » ajouté au mapping comme cible${extra}.`, `Model “${item.name}” added to the mapping as a target${extra}.`),
+      ? t(`Modèle « ${item.name} » ajouté au mapping comme source.`, `Model “${item.name}” added to the mapping as a source.`)
+      : t(`Modèle « ${item.name} » ajouté au mapping comme cible.`, `Model “${item.name}” added to the mapping as a target.`),
     'success',
   );
 }
@@ -934,7 +1060,7 @@ async function commitLibraryEdit(id, payload) {
     }
     if (choice !== 'apply') return null;
   }
-  if (payload.name) item.name = payload.name;
+  if (payload.name && payload.name !== item.name) renameItem(id, payload.name);
   if (isList) applyList(id, content);
   else applyModel(id, content.fields, { sample: content.sample });
   notify(kind.texts.saved(item.name), 'success');
@@ -983,12 +1109,14 @@ function checkDataFiles() {
 }
 
 /** Bibliothèques de valeurs du schéma (nœuds Bibliothèque), pour les règles et les contrôles des champs. */
-const libraries = computed(() => librariesOf(nodes.value));
+/** Listes de la bibliothèque sans nœud dans le flux : les champs qui les désignent sont contrôlés quand même. */
+const sharedLists = computed(() => libraryListNodes(new Set(nodes.value.map((n) => n.type === 'library' && n.data.listId).filter(Boolean))));
+const libraries = computed(() => librariesOf([...nodes.value, ...sharedLists.value]));
 provide(LIBRARIES_KEY, libraries);
 
 const results = computed(() => {
   const docs = new Map([...dataFiles].filter(([, f]) => f.doc).map(([id, f]) => [id, f.doc]));
-  const targets = validateTargets(nodes.value, edges.value);
+  const targets = validateTargets(nodes.value, edges.value, sharedLists.value);
   const files = checkDataFiles();
   return {
     ...evaluateGraph(nodes.value, edges.value, docs),
@@ -1144,9 +1272,15 @@ function onKeydown(e) {
   const ctrl = e.ctrlKey || e.metaKey;
   // Éditeur de modèles ouvert : les raccourcis du flux ne s'appliquent pas (Ctrl S enregistre le modèle).
   if (editingModelId.value) {
-    if (ctrl && key === 's') {
+    if (ctrl && key === 's' && !e.shiftKey) {
       e.preventDefault();
       modelEditorRef.value?.save();
+    } else if (ctrl && key === 's') {
+      e.preventDefault();
+      saveDocumentAs();
+    } else if (ctrl && key === 'o') {
+      e.preventDefault();
+      openDocument();
     } else if (e.key === '?' && !isEditable(e.target)) {
       shortcutsOpen.value = true;
     }
@@ -1154,8 +1288,9 @@ function onKeydown(e) {
   }
   if (ctrl && (key === 's' || key === 'o')) {
     e.preventDefault();
-    if (key === 's') exportMapping();
-    else open();
+    if (key === 'o') openDocument();
+    else if (e.shiftKey) saveDocumentAs();
+    else saveDocument();
     return;
   }
   if (placing.value && key === 'escape') return endPlacing(false);

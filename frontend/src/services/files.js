@@ -22,17 +22,21 @@ function pickWithInput() {
   });
 }
 
-/** `{ name, text }` du fichier choisi (`data` : un fichier de données plutôt qu'un mapping). */
+/**
+ * `{ name, text, handle }` du fichier choisi (`data` : un fichier de données plutôt qu'un mapping) ; `handle` permet
+ * d'y réécrire plus tard (`null` hors Chrome / Edge).
+ */
 export async function openFile({ data = false } = {}) {
   try {
     let file;
+    let handle = null;
     if (hasPicker) {
-      const [handle] = await window.showOpenFilePicker(data ? { id: 'data', types: DATA_TYPES } : { id: PICKER_ID, types: TYPES });
+      [handle] = await window.showOpenFilePicker(data ? { id: 'data', types: DATA_TYPES } : { id: PICKER_ID, types: TYPES });
       file = await handle.getFile();
     } else {
       file = await pickWithInput();
     }
-    return file && { name: file.name, text: await file.text() };
+    return file && { name: file.name, text: await file.text(), handle };
   } catch (e) {
     if (cancelled(e)) return null;
     throw e;
@@ -62,6 +66,42 @@ export async function exportFile(content, suggestedName, { data = false, image =
     a.click();
     URL.revokeObjectURL(a.href);
     return suggestedName;
+  } catch (e) {
+    if (cancelled(e)) return null;
+    throw e;
+  }
+}
+
+/** Le navigateur sait-il réécrire un fichier déjà choisi (Chrome, Edge) ? */
+export const canWriteBack = hasPicker;
+
+/** Réécrit `text` dans le fichier `handle` (avec l'accord de l'utilisateur si le navigateur le redemande). */
+export async function writeToHandle(handle, text) {
+  const mode = { mode: 'readwrite' };
+  if ((await handle.queryPermission?.(mode)) !== 'granted' && (await handle.requestPermission?.(mode)) !== 'granted') {
+    throw new Error('permission refusée');
+  }
+  const writable = await handle.createWritable();
+  await writable.write(text);
+  await writable.close();
+}
+
+/**
+ * Enregistre `text` dans un fichier dont l'emplacement et le nom sont choisis dans l'explorateur (nom proposé :
+ * `suggestedName`). Rend `{ name, handle }`, ou `null` si l'on annule. Hors Chrome / Edge : téléchargement sous
+ * `suggestedName` (`handle` : `null`).
+ */
+export async function saveFileAs(text, suggestedName) {
+  if (!hasPicker) {
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([text], { type: 'application/json' })), download: suggestedName });
+    a.click();
+    URL.revokeObjectURL(a.href);
+    return { name: suggestedName, handle: null };
+  }
+  try {
+    const handle = await window.showSaveFilePicker({ id: PICKER_ID, suggestedName, types: TYPES });
+    await writeToHandle(handle, text);
+    return { name: handle.name, handle };
   } catch (e) {
     if (cancelled(e)) return null;
     throw e;

@@ -2,7 +2,9 @@
   <div v-if="link.linkedId(data)" class="model-link nodrag" :class="{ diverged, missing: !item }">
     <template v-if="item">
       <v-icon :icon="ICONS[kind]" size="14" />
-      <span class="model-name" :title="texts.title">{{ item.name }}</span>
+      <span class="model-name" :title="`${texts.title} : ${fullName}`"
+        ><span v-for="(folder, i) in folders" :key="i" class="model-folder">{{ folder }} › </span>{{ item.name }}</span
+      >
       <span v-if="diverged" class="model-state">{{ texts.changed }}</span>
       <span v-else-if="others" class="model-state muted">{{ t(`+ ${others} autre${others > 1 ? 's' : ''} mapping${others > 1 ? 's' : ''}`, `+ ${others} other mapping${others > 1 ? 's' : ''}`) }}</span>
       <span class="spacer" />
@@ -25,6 +27,7 @@
 <script setup>
 import { computed, inject } from 'vue';
 import { t } from '../../lib/i18n';
+import { LIBRARY_ID, locate } from '../../services/collections';
 import { LIST_LINK_KEY, MODEL_LINK_KEY } from './shared';
 
 /**
@@ -42,6 +45,13 @@ const ICONS = { model: 'mdi-database-outline', list: 'mdi-format-list-bulleted' 
 const link = inject(props.kind === 'list' ? LIST_LINK_KEY : MODEL_LINK_KEY);
 const item = computed(() => link.itemOf(props.data));
 const diverged = computed(() => !!item.value && link.diverged(props.data));
+/** Dossiers de la bibliothèque qui contiennent l'élément (« MDM › Site client »), sans la racine. */
+const folders = computed(() => {
+  if (!item.value) return [];
+  const path = locate(item.value.id)?.path ?? [];
+  return path.filter((p) => p.id !== LIBRARY_ID).map((p) => p.name);
+});
+const fullName = computed(() => [...folders.value, item.value?.name].join(' › '));
 /** Autres flux qui utilisent cet élément. */
 const others = computed(() => (item.value ? link.otherFlows(item.value.id) : 0));
 

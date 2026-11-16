@@ -4,14 +4,27 @@
       <button
         v-bind="menu"
         class="rules-btn nodrag"
-        :class="{ set: !!summary }"
-        :title="summary ? `Format : ${summary}` : t('Règles du champ (obligatoire, format)', 'Field rules (required, format)')"
-      >{{ summary || '⚙' }}</button>
+        :class="{ set: !!summary || !!field.description }"
+        :title="buttonTitle"
+      >{{ summary || (field.description ? '💬' : '⚙') }}</button>
     </template>
 
-    <v-card class="rules-card" width="260" density="compact">
+    <v-card class="rules-card" width="300" density="compact">
       <v-card-title class="text-subtitle-2">{{ t('Règles', 'Rules') }} — {{ field.name }}</v-card-title>
       <v-card-text>
+        <v-textarea
+          :model-value="field.description ?? ''"
+          :disabled="locked"
+          :label="t('Description', 'Description')"
+          :placeholder="t('Ce que contient le champ', 'What the field holds')"
+          rows="2"
+          auto-grow
+          density="compact"
+          variant="outlined"
+          hide-details
+          class="mb-1"
+          @change="emit('update', { description: $event.target.value })"
+        />
         <v-checkbox
           :model-value="!!field.required"
           :disabled="locked"
@@ -84,6 +97,12 @@ const keys = computed(() => formatKeys(props.field));
 const format = computed(() => props.field.format ?? {});
 const libraries = useLibraries();
 const summary = computed(() => formatSummary(props.field, libraries.value));
+const buttonTitle = computed(() => {
+  const parts = [];
+  if (props.field.description) parts.push(props.field.description);
+  if (summary.value) parts.push(`Format : ${summary.value}`);
+  return parts.length ? parts.join('\n') : t('Règles du champ (description, obligatoire, format)', 'Field rules (description, required, format)');
+});
 
 /** Bibliothèques proposées : celles du type du champ (une bibliothèque d'entiers convient à un nombre), plus celle déjà choisie. */
 const libraryItems = computed(() => {

@@ -2,7 +2,7 @@ import { allFields, findChain, pathLabel, reshapeSample, typeKey, TYPE_OPTIONS }
 import { t } from '../lib/i18n';
 import { isPlainObject } from '../lib/lists';
 import { uid } from '../lib/types';
-import { addToLibrary, allMappings, find, locate, remove, workspace } from './collections';
+import { addToLibrary, allMappings, find, locate, remove, rename, workspace } from './collections';
 
 /**
  * Modèles de données partagés : un nœud source ou cible relié à un modèle de la bibliothèque porte `data.modelId`
@@ -234,3 +234,19 @@ export function deleteLibraryFolder(folderId) {
 export const sampleForSource = (model) => model.sample ?? JSON.stringify(reshapeSample([], {}, model.fields), null, 2);
 
 export { workspace };
+
+/**
+ * Renomme un élément. Pour un modèle ou une liste de valeurs de la bibliothèque, les nœuds qui y sont reliés,
+ * dans tous les flux, prennent le nouveau nom comme titre.
+ */
+export function renameItem(id, name) {
+  const item = find(id);
+  const next = name.trim();
+  if (!item || !next) return;
+  if (item.type !== 'model' && item.type !== 'valuelist') return rename(id, next);
+  hooks.flush();
+  rename(id, next);
+  const key = item.type === 'model' ? 'modelId' : 'listId';
+  for (const { mapping } of allMappings()) for (const node of mapping.graph.nodes) if (node.data?.[key] === id) node.data.label = next;
+  hooks.reload();
+}

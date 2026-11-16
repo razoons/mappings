@@ -119,6 +119,8 @@ export function useFieldEditor(nodeId, getData, { reshape = true } = {}) {
       updateNodeData(nodeId, { fields: mapField(getData().fields, id, (f) => {
         const next = { ...f, ...rules };
         if (!next.required) delete next.required;
+        if (typeof next.description === 'string') next.description = next.description.trim();
+        if (!next.description) delete next.description;
         const format = cleanFormat(next);
         if (format) next.format = format;
         else delete next.format;

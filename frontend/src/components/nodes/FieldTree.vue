@@ -31,7 +31,7 @@
         @click="ops.toggle(f.id)"
       >{{ f.collapsed ? '▸' : '▾' }}</button>
       <span v-else class="toggle" />
-      <input class="nodrag" :disabled="locked" :value="f.name" @input="ops.rename(f.id, $event.target.value)" />
+      <input class="nodrag" :disabled="locked" :value="f.name" :title="f.description || undefined" @input="ops.rename(f.id, $event.target.value)" />
       <button
         class="required-btn nodrag"
         :class="{ on: f.required }"

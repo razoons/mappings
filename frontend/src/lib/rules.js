@@ -157,10 +157,10 @@ export function linkMismatch(byId, e, incoming) {
  * Les garanties traversent les transformations qui les déclarent (`guarantee`, ex. « Extraire » borne
  * la longueur) ; une transformation sans garanties lève les avertissements : c'est elle qui adapte la valeur.
  */
-export function validateTargets(nodes, edges) {
+export function validateTargets(nodes, edges, sharedLists = []) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const incoming = new Map(edges.map((e) => [`${e.target}:${e.targetHandle}`, e]));
-  const libraries = librariesOf(nodes);
+  const libraries = librariesOf([...nodes, ...sharedLists]);
   const infoOf = makeSocketInfo(byId, incoming, libraries);
   const linkedInputs = (nodeId) => linkedInputsOf(incoming, nodeId);
   const byNode = new Map();
@@ -199,7 +199,7 @@ export function validateTargets(nodes, edges) {
         }
         // Un conteneur optionnel laissé vide n'impose rien à ses sous-champs.
         if (isSet(f.format?.library) && !libraries.has(f.format.library))
-          add(f, chain, 'warning', t('Liste de valeurs absente (supprimée, ou pas dans ce mapping) : valeurs non contrôlées', 'Value list missing (deleted, or not in this mapping): values not checked'));
+          add(f, chain, 'warning', t('Liste de valeurs absente (supprimée de la bibliothèque) : valeurs non contrôlées', 'Value list missing (deleted from the library): values not checked'));
         if (isContainer(f) && (f.required || isMapped(f))) walk(f.children ?? [], chain);
       }
     };

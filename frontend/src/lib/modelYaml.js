@@ -8,7 +8,8 @@ import { isPlainObject } from './lists';
 import { uid } from './types';
 
 /**
- * Modèle de données en YAML : un champ par clé, décrit par son type, `required`, son format et son exemple.
+ * Modèle de données en YAML : un champ par clé, décrit par son type, `required`, sa `description`, son format et
+ * son exemple.
  *
  *   client:
  *     type: object
@@ -39,6 +40,7 @@ const ITEM_TYPES = TYPES.filter((t) => t !== 'array');
 const KEYS_FR = {
   type: 'type',
   required: 'obligatoire',
+  description: 'description',
   example: 'exemple',
   fields: 'champs',
   items: 'éléments',
@@ -83,6 +85,7 @@ export const yamlHelp = () =>
     `# Modèle de données : un champ par clé.
 #   type        : texte, nombre, entier, booléen, date, objet, liste (forme courte : « nom: texte »)
 #   obligatoire : oui pour un champ obligatoire
+#   description : ce que contient le champ (texte libre)
 #   format      : longueurMin, longueurMax, motif (texte) ; min, max (nombre, entier) ;
 #                 dateMin, dateMax (date, ex. 2026-01-31) ; élémentsMin, élémentsMax (liste) ;
 #                 listeValeurs : nom d'une liste de valeurs (valeurs autorisées)
@@ -95,6 +98,7 @@ export const yamlHelp = () =>
     `# Data model: one field per key.
 #   type     : string, number, integer, boolean, date, object, array (short form: “name: string”)
 #   required : true for a required field
+#   description : what the field holds (free text)
 #   format   : minLength, maxLength, pattern (text); min, max (number, integer);
 #              minDate, maxDate (date, e.g. 2026-01-31); minItems, maxItems (list);
 #              library: name of a value list (allowed values)
@@ -112,6 +116,7 @@ function describe(f, value, libs) {
   const node = { [word('type')]: typeWord(f.type) };
   if (f.type === 'array') node[word('items')] = typeWord(f.item ?? 'string');
   if (f.required) node[word('required')] = lang.value === 'fr' ? 'oui' : true;
+  if (f.description) node[word('description')] = f.description;
   for (const [k, v] of Object.entries(f.format ?? {})) node[word(k)] = k === 'library' ? (libs.get(v)?.label ?? v) : v;
   if (f.type === 'object') {
     node[word('fields')] = toPlain(f.children ?? [], isPlainObject(value) ? value : undefined, libs);
@@ -233,7 +238,7 @@ function readField(name, raw, old, path, libs) {
     field.item = item;
   }
 
-  const allowed = new Set(['type', 'required', ...formatKeys(field).map((k) => k.key)]);
+  const allowed = new Set(['type', 'required', 'description', ...formatKeys(field).map((k) => k.key)]);
   if (field.type === 'array') allowed.add('items');
   if (isContainer(field)) allowed.add('fields');
   // Un objet n'a pas d'exemple propre : ce sont ceux de ses sous-champs.
@@ -244,6 +249,10 @@ function readField(name, raw, old, path, libs) {
 
   if (spec.required !== undefined && typeof spec.required !== 'boolean') fail(t('obligatoire vaut oui ou non', 'required must be true or false'));
   if (spec.required) field.required = true;
+  if (spec.description !== undefined && spec.description !== null) {
+    if (typeof spec.description !== 'string') fail(t('description doit être un texte', 'description must be a text'));
+    if (spec.description.trim()) field.description = spec.description.trim();
+  }
 
   const format = {};
   for (const k of formatKeys(field)) {
