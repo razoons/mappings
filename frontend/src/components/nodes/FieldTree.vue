@@ -89,10 +89,10 @@
       <button class="icon-btn danger nodrag" :title="t('Supprimer', 'Delete')" @click="ops.remove(f.id)">×</button>
     </span>
 
-    <Handle :id="f.id" :type="side" :position="position" v-bind="socketAttrs(socketType(chain))" />
+    <Handle v-if="sockets" :id="f.id" :type="side" :position="position" v-bind="socketAttrs(socketType(chain))" />
     <!-- Sockets des descendants repliés : invisibles, leurs liens convergent sur cette ligne. -->
     <Handle
-      v-for="h in hidden"
+      v-for="h in sockets ? hidden : []"
       :id="h.id"
       :key="h.id"
       :type="side"
@@ -138,6 +138,8 @@ const props = defineProps({
   /** Côté cible : problèmes de validation par champ. */
   issues: { type: Map, default: null },
   locked: Boolean,
+  /** Sockets de liaison (absents dans l'éditeur de modèles : un modèle n'est relié à rien). */
+  sockets: { type: Boolean, default: true },
 });
 
 // Les données d'exemple d'une source suivent la structure ; celles d'une cible (exemples donnés) restent telles quelles.

@@ -9,6 +9,7 @@
       </span>
       <button class="icon-btn nodrag result-btn" :title="t('Voir le résultat (JSON produit et sa conformité au modèle)', 'Show the result (JSON produced and its conformity to the model)')" @click="showResult = true">{{ t('Résultat', 'Result') }}</button>
       <button class="icon-btn nodrag" :title="t('Modèle de données (YAML : type, obligatoire, format de chaque champ)', 'Data model (YAML: type, required, format of each field)')" @click="editing = true">{ }</button>
+      <button v-if="modelLink && !data.modelId && !readOnly" class="icon-btn nodrag mdi mdi-database-plus-outline" :title="t('Enregistrer ce modèle dans la bibliothèque, pour le réutiliser dans d’autres flux', 'Save this model to the library, to reuse it in other flows')" @click="modelLink.create(id)" />
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
@@ -22,6 +23,7 @@
         />
       </template>
     </div>
+    <ModelLink v-if="modelLink" :node-id="id" :data="data" :read-only="readOnly" />
     <div v-if="!data.collapsed" class="node-body">
       <FieldTree :node-id="id" :data="data" side="target" :locked="readOnly" :values="previewOf(id)" :connected="connected" :issues="issues" />
     </div>
@@ -58,11 +60,12 @@ import ResultDialog from '../ResultDialog.vue';
 import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
 import FieldTree from './FieldTree.vue';
+import ModelLink from './ModelLink.vue';
 import { allFields } from '../../lib/fields';
 import { t } from '../../lib/i18n';
 import { countIssues } from '../../lib/rules';
 import { HEADER_COLORS } from '../../lib/types';
-import { DATA_FILES_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults } from './shared';
+import { DATA_FILES_KEY, MODEL_LINK_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults } from './shared';
 
 defineOptions({ inheritAttrs: false });
 
@@ -75,6 +78,8 @@ const props = defineProps({
 const { updateNodeData, edges, nodes } = useVueFlow();
 const { previewOf, issuesOf, resultOf } = useResults();
 const files = inject(DATA_FILES_KEY);
+// Absent hors de l'éditeur (aperçus de la documentation).
+const modelLink = inject(MODEL_LINK_KEY, null);
 const showResult = ref(false);
 /** Fichiers de données chargés sur les sources (« Boutique : commandes.json »). */
 const loadedFiles = computed(() =>

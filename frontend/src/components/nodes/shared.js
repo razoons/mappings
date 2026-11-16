@@ -31,6 +31,12 @@ export const useLibraries = () => inject(LIBRARIES_KEY, computed(() => new Map()
 /** Fichiers de données des sources (`get`, `load`, `clear` par id de nœud), fournis par l'éditeur. */
 export const DATA_FILES_KEY = Symbol('dataFiles');
 
+/**
+ * Lien d'un nœud source ou cible avec la bibliothèque de modèles, fourni par l'éditeur : `create`, `save`, `saveAs`,
+ * `revert`, `unlink` (par id de nœud) et `otherFlows(modelId)` (nombre d'autres flux qui utilisent le modèle).
+ */
+export const MODEL_LINK_KEY = Symbol('modelLink');
+
 /** Verrou de tout le schéma (ref booléenne), fourni par l'éditeur. */
 export const SCHEMA_LOCK_KEY = Symbol('schemaLock');
 

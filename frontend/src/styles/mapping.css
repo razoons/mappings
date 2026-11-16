@@ -1032,3 +1032,55 @@ kbd {
 .vue-flow__edgeupdater {
   cursor: grab;
 }
+
+/* Bandeau d'un nœud relié à un modèle de la bibliothèque */
+.model-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px 3px 10px;
+  border-bottom: 1px solid var(--divider);
+  font-size: 11px;
+  color: var(--muted);
+  background: color-mix(in srgb, #5b8def 10%, transparent);
+}
+.model-link.diverged {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+}
+.model-link.missing {
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+.model-link .model-name {
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.model-link .model-state {
+  color: var(--warning);
+  white-space: nowrap;
+}
+.model-link .model-state.muted {
+  color: var(--muted);
+}
+.model-link .spacer {
+  flex: 1;
+}
+.model-link .link-btn {
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  color: var(--text);
+}
+.model-link .link-btn:hover {
+  background: var(--hover-overlay);
+}
+.model-link.diverged .link-btn:first-of-type {
+  color: var(--warning);
+  font-weight: 600;
+}
+.node-header .icon-btn.mdi {
+  font-size: 14px;
+}

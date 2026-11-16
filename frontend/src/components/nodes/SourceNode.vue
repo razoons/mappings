@@ -13,6 +13,7 @@
       <span v-if="sampleError" class="warn" :title="`${t('Modèle de données JSON invalide', 'Invalid JSON data model')} : ${sampleError}`">⚠</span>
       <button class="icon-btn nodrag" :title="t('Charger un fichier de données (ou le déposer sur le nœud)', 'Load a data file (or drop it on the node)')" @click="pickFile">⤒</button>
       <button class="icon-btn nodrag" :title="t('Modèle de données (YAML : type, obligatoire, format de chaque champ)', 'Data model (YAML: type, required, format of each field)')" @click="editing = true">{ }</button>
+      <button v-if="modelLink && !data.modelId && !readOnly" class="icon-btn nodrag mdi mdi-database-plus-outline" :title="t('Enregistrer ce modèle dans la bibliothèque, pour le réutiliser dans d’autres flux', 'Save this model to the library, to reuse it in other flows')" @click="modelLink.create(id)" />
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
@@ -26,6 +27,7 @@
         />
       </template>
     </div>
+    <ModelLink v-if="modelLink" :node-id="id" :data="data" :read-only="readOnly" />
     <div v-if="file" class="data-file" :class="fileStatus.level">
       <span class="data-file-icon">{{ fileStatus.icon }}</span>
       <span class="data-file-name" :title="file.name">{{ file.name }}</span>
@@ -60,11 +62,12 @@ import TextDialog from '../TextDialog.vue';
 import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
 import FieldTree from './FieldTree.vue';
+import ModelLink from './ModelLink.vue';
 import { allFields } from '../../lib/fields';
 import { count, t } from '../../lib/i18n';
 import { HEADER_COLORS } from '../../lib/types';
 import { openFile } from '../../services/files';
-import { DATA_FILES_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults } from './shared';
+import { DATA_FILES_KEY, MODEL_LINK_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults } from './shared';
 
 defineOptions({ inheritAttrs: false });
 
@@ -77,6 +80,8 @@ const props = defineProps({
 const { updateNodeData } = useVueFlow();
 const { outputsOf, issuesOf } = useResults();
 const files = inject(DATA_FILES_KEY);
+// Absent hors de l'éditeur (aperçus de la documentation).
+const modelLink = inject(MODEL_LINK_KEY, null);
 const ops = useFieldEditor(props.id, () => props.data);
 const editing = ref(false);
 const model = useModelEditor(() => props.data, ops, { source: true });

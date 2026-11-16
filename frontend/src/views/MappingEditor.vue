@@ -1,38 +1,34 @@
 <template>
   <v-app-bar density="compact" flat border>
-    <v-text-field
-      v-model="current.name"
-      class="ml-3 flex-grow-0"
-      width="220"
-      density="compact"
-      variant="solo-filled"
-      flat
-      hide-details
-      :placeholder="t('Sans titre', 'Untitled')"
-      :title="t('Nom du mapping (nom proposé à l’export et dans les liens de partage)', 'Mapping name (suggested when exporting and in share links)')"
+    <v-btn
+      class="ml-1"
+      :icon="collectionsOpen ? 'mdi-dock-left' : 'mdi-folder-multiple-outline'"
+      :title="collectionsOpen ? t('Masquer les collections', 'Hide the collections') : t('Afficher les collections', 'Show the collections')"
+      @click="collectionsOpen = !collectionsOpen"
     />
-    <v-divider vertical inset class="mx-2" />
-    <v-btn prepend-icon="mdi-file-outline" :disabled="schemaLocked" @click="newMapping">{{ t('Nouveau', 'New') }}</v-btn>
-    <v-btn prepend-icon="mdi-folder-open-outline" :title="t('Ouvrir un fichier (Ctrl O)', 'Open a file (Ctrl O)')" :disabled="schemaLocked" @click="open">
-      {{ t('Ouvrir', 'Open') }}
+    <template v-if="!editingModelId">
+      <v-text-field
+        v-model="current.name"
+        class="ml-1 flex-grow-0"
+        width="220"
+        density="compact"
+        variant="solo-filled"
+        flat
+        hide-details
+        :placeholder="t('Sans titre', 'Untitled')"
+        :title="t('Nom du flux (dans la collection, à l’export et dans les liens de partage)', 'Flow name (in the collection, when exporting and in share links)')"
+      />
+      <v-divider vertical inset class="mx-2" />
+      <v-btn prepend-icon="mdi-file-outline" :title="t('Nouveau flux, ajouté à côté de celui-ci dans la collection', 'New flow, added next to this one in the collection')" @click="newMapping">{{ t('Nouveau', 'New') }}</v-btn>
+      <v-btn prepend-icon="mdi-school-outline" :title="t('Ajouter le flux de démonstration à la collection', 'Add the demo flow to the collection')" @click="loadDemo">{{ t('Démo', 'Demo') }}</v-btn>
+      <v-divider vertical inset class="mx-2" />
+      <v-btn icon="mdi-arrow-collapse-vertical" :title="t('Tout replier', 'Collapse all')" @click="collapseAll(true)" />
+      <v-btn icon="mdi-arrow-expand-vertical" :title="t('Tout déplier', 'Expand all')" @click="collapseAll(false)" />
+      <v-btn icon="mdi-graph-outline" :title="t('Réorganiser le schéma (colonnes dans le sens des liens)', 'Rearrange the schema (columns following the links)')" :disabled="schemaLocked" @click="arrangeSchema" />
+    </template>
+    <v-btn v-else class="ml-2 text-none" prepend-icon="mdi-arrow-left" :title="t('Revenir au flux ouvert', 'Back to the open flow')" @click="closeModelEditor()">
+      {{ t('Retour au flux', 'Back to the flow') }} « {{ current.name }} »
     </v-btn>
-    <v-menu>
-      <template #activator="{ props: menu }">
-        <v-btn v-bind="menu" prepend-icon="mdi-export" append-icon="mdi-menu-down">{{ t('Exporter', 'Export') }}</v-btn>
-      </template>
-      <v-list density="compact">
-        <v-list-item prepend-icon="mdi-code-json" title="Mapping (.json)" :subtitle="t('Pour le rouvrir ou le partager', 'To reopen or share it')" @click="exportMapping">
-          <template #append><kbd>Ctrl S</kbd></template>
-        </v-list-item>
-        <v-list-item prepend-icon="mdi-image-outline" :title="t('Image du schéma (.png)', 'Schema image (.png)')" :subtitle="t('Tout le schéma, sur le fond du thème', 'The whole schema, on the theme background')" @click="exportImage" />
-      </v-list>
-    </v-menu>
-    <v-btn prepend-icon="mdi-share-variant" :title="t('Copier un lien qui ouvre ce schéma', 'Copy a link that opens this schema')" @click="shareMapping">{{ t('Partager', 'Share') }}</v-btn>
-    <v-btn prepend-icon="mdi-school-outline" :disabled="schemaLocked" @click="loadDemo">{{ t('Démo', 'Demo') }}</v-btn>
-    <v-divider vertical inset class="mx-2" />
-    <v-btn icon="mdi-arrow-collapse-vertical" :title="t('Tout replier', 'Collapse all')" @click="collapseAll(true)" />
-    <v-btn icon="mdi-arrow-expand-vertical" :title="t('Tout déplier', 'Expand all')" @click="collapseAll(false)" />
-    <v-btn icon="mdi-graph-outline" :title="t('Réorganiser le schéma (colonnes dans le sens des liens)', 'Rearrange the schema (columns following the links)')" :disabled="schemaLocked" @click="arrangeSchema" />
     <v-spacer />
     <v-btn prepend-icon="mdi-help-circle-outline" href="/noeuds" :title="t('Documentation des nœuds', 'Node documentation')">{{ t('Nœuds', 'Nodes') }}</v-btn>
     <v-btn prepend-icon="mdi-email-outline" href="/aide" :title="t('Aide et contact', 'Help and contact')">{{ t('Aide', 'Help') }}</v-btn>
@@ -40,8 +36,22 @@
     <v-btn :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'" :title="t('Changer de thème', 'Switch theme')" @click="toggleTheme" />
   </v-app-bar>
 
+  <CollectionsPanel
+    v-model="collectionsOpen"
+    @export="exportItem"
+    @image="exportImage"
+    @share="shareItem"
+    @import="open"
+    :editing-model-id="editingModelId"
+    @edit-model="editModel"
+    @use-model="useModel"
+    @open-flow="openFlow"
+  />
+  <ImpactDialog :request="impactRequest" />
+
   <v-main>
-    <div class="editor" @mousemove="mouse = { x: $event.clientX, y: $event.clientY }">
+    <ModelEditor v-if="editingModelId" ref="modelEditorRef" :model-id="editingModelId" @save="saveEditedModel" @close="closeModelEditor()" />
+    <div v-show="!editingModelId" class="editor" @mousemove="mouse = { x: $event.clientX, y: $event.clientY }" @dragover="onModelDragOver" @drop="onModelDrop">
       <VueFlow
         :id="FLOW_ID"
         :node-types="nodeTypes"
@@ -103,6 +113,19 @@
 
     <AddMenu :at="addMenu" @pick="pick" @close="addMenu = null" />
 
+    <!-- Modèle lâché sur le schéma : l'ajouter comme source ou comme cible. -->
+    <v-menu
+      :model-value="!!modelDrop"
+      :target="modelDrop ? [modelDrop.x, modelDrop.y] : undefined"
+      @update:model-value="!$event && (modelDrop = null)"
+    >
+      <v-list density="compact" min-width="240">
+        <v-list-subheader>{{ t('Ajouter', 'Add') }} « {{ modelDrop && find(modelDrop.id)?.name }} »</v-list-subheader>
+        <v-list-item prepend-icon="mdi-arrow-right-bold-box-outline" :title="t('Comme source', 'As a source')" @click="dropModelAs('source')" />
+        <v-list-item prepend-icon="mdi-arrow-left-bold-box-outline" :title="t('Comme cible', 'As a target')" @click="dropModelAs('target')" />
+      </v-list>
+    </v-menu>
+
     <v-menu
       :model-value="!!nodeMenu"
       :target="nodeMenu ? [nodeMenu.x, nodeMenu.y] : undefined"
@@ -154,13 +177,29 @@ import LegendGrid from '../components/LegendGrid.vue';
 import LangSwitch from '../components/LangSwitch.vue';
 import LockIcon from '../components/LockIcon.vue';
 import ChecksPanel from '../components/ChecksPanel.vue';
+import CollectionsPanel from '../components/CollectionsPanel.vue';
+import ImpactDialog from '../components/ImpactDialog.vue';
+import ModelEditor from '../components/ModelEditor.vue';
 import SourceNode from '../components/nodes/SourceNode.vue';
 import TargetNode from '../components/nodes/TargetNode.vue';
 import TransformNode from '../components/nodes/TransformNode.vue';
 import GroupNode from '../components/nodes/GroupNode.vue';
 import LibraryNode from '../components/nodes/LibraryNode.vue';
 import TypedEdge from '../components/nodes/TypedEdge.vue';
-import { DATA_FILES_KEY, EDGE_INSERT_KEY, LIBRARIES_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
+import { DATA_FILES_KEY, EDGE_INSERT_KEY, LIBRARIES_KEY, MODEL_LINK_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
+import {
+  applyModel,
+  createModel,
+  folderOf,
+  hooks as modelHooks,
+  impactOf,
+  MODEL_DRAG_TYPE,
+  modelOf,
+  revertNode,
+  sameFields,
+  sampleForSource,
+  stripFields,
+} from '../services/models';
 import { checkDocument, describeProblem } from '../lib/conformity';
 import { demoGraph } from '../lib/demo';
 import { count, t } from '../lib/i18n';
@@ -175,11 +214,33 @@ import { canConnect, isList, typeMismatch, uid } from '../lib/types';
 import { exportFile, openFile } from '../services/files';
 import { schemaImage } from '../services/image';
 import { clearSharedGraph, shareLink, sharedGraph } from '../services/share';
+import {
+  activeCollection,
+  activeMapping,
+  addCollection,
+  addImportedLibrary,
+  addImportedModels,
+  allMappings,
+  collectionFile,
+  find,
+  firstMapping,
+  insertMapping,
+  makeMapping,
+  leafCount,
+  mappingFile,
+  readFile,
+  saveNow,
+  workspace,
+} from '../services/collections';
 
 const FLOW_ID = 'mapping';
-const STORAGE_KEY = 'mapping-current';
 const THEME_KEY = 'mapping-theme';
 const SCHEMA_LOCKED_KEY = 'mapping-schema-locked';
+const COLLECTIONS_OPEN_KEY = 'mapping-collections-open';
+
+/** Panneau des collections affiché (mémorisé dans le navigateur). */
+const collectionsOpen = ref(localStorage.getItem(COLLECTIONS_OPEN_KEY) !== '0');
+watch(collectionsOpen, (open) => localStorage.setItem(COLLECTIONS_OPEN_KEY, open ? '1' : '0'));
 
 const nodeTypes = {
   source: markRaw(SourceNode),
@@ -269,8 +330,19 @@ watch(
 
 // ── Chargement et export ────────────────────────────────────
 
-/** Nom du mapping (champ de la barre d'outils) : nom de fichier proposé à l'export, repris par les liens de partage. */
-const current = reactive({ name: t('Sans titre', 'Untitled') });
+/**
+ * Mapping ouvert : son nom (champ de la barre d'outils) est celui de l'élément de la collection, proposé aussi à
+ * l'export et repris par les liens de partage.
+ */
+const current = reactive({
+  get name() {
+    return activeMapping()?.name ?? '';
+  },
+  set name(value) {
+    const mapping = activeMapping();
+    if (mapping) mapping.name = value;
+  },
+});
 const legendOpen = ref(false);
 const snack = reactive({ show: false, text: '', color: undefined, action: null });
 /** Message en bas de l'écran ; `action` : bouton `{ label, run }` (ex. annuler). */
@@ -298,12 +370,13 @@ const rebuild = (fn) => setNodes(groupsFirst(fn(plainNodes())));
 const measuredSizes = () => new Map(nodes.value.map((n) => [n.id, { w: n.dimensions.width, h: n.dimensions.height }]));
 
 let fitPending = false;
-function load(graph) {
+/** Affiche `graph` ; `fit` : cadre ensuite la vue sur tout le schéma. */
+function load(graph, { fit = true } = {}) {
   const copy = JSON.parse(JSON.stringify(graph));
   for (const n of copy.nodes) if (n.data?.fields) n.data.fields = migrateFields(n.data.fields);
   setNodes(groupsFirst(copy.nodes));
   setEdges(copy.edges.map((e) => ({ ...e, type: 'typed' })));
-  fitPending = true;
+  fitPending = fit;
 }
 onNodesInitialized(() => {
   if (!fitPending) return;
@@ -311,28 +384,55 @@ onNodesInitialized(() => {
   fitView({ padding: 0.15 });
 });
 
-/** Reprend le mapping enregistré dans le navigateur ; sans sauvegarde, l’éditeur reste vide. */
-function restore() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (saved?.graph) {
-      current.name = saved.name;
-      return load(saved.graph);
-    }
-  } catch {
-    /* sauvegarde corrompue : on repart d’un mapping vide */
-  }
-}
+/** Copie du schéma affiché, détachée de l'éditeur, pour la ranger dans la collection. */
+const snapshot = () => JSON.parse(JSON.stringify(serialize()));
 
-// Brouillon local, écrit après chaque modification (avec un léger délai pendant les déplacements).
+/** Range le schéma affiché dans son élément de la collection (enregistrée ensuite dans le navigateur). */
 let saveTimer;
+function saveGraph(mapping = activeMapping()) {
+  clearTimeout(saveTimer);
+  if (mapping) mapping.graph = snapshot();
+}
+// Écrit après chaque modification (avec un léger délai pendant les déplacements).
 watch(
-  [nodes, edges, current],
+  [nodes, edges],
   () => {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, graph: serialize() })), 300);
+    saveTimer = setTimeout(saveGraph, 300);
   },
   { deep: true },
+);
+// En quittant la page, rien d'encore en attente ne doit se perdre.
+const flushOnUnload = () => {
+  saveGraph();
+  saveNow();
+};
+onMounted(() => window.addEventListener('beforeunload', flushOnUnload));
+onBeforeUnmount(() => window.removeEventListener('beforeunload', flushOnUnload));
+
+/** Affiche le flux ouvert de la collection, avec un historique d'annulation neuf. */
+function openActive({ fit = true } = {}) {
+  clearTimeout(historyTimer);
+  Object.assign(history, { past: [], future: [], present: null, settling: false });
+  load(activeMapping()?.graph ?? { nodes: [], edges: [] }, { fit });
+}
+
+// Les modèles de la bibliothèque modifient les flux enregistrés : le flux affiché y est d'abord rangé, puis rechargé.
+modelHooks.flush = () => saveGraph();
+modelHooks.reload = () => openActive({ fit: false });
+
+// Changement de mapping dans la collection : le précédent est rangé tel qu'affiché, puis le nouveau est chargé.
+watch(
+  () => workspace.activeId,
+  (id, previous) => {
+    const before = find(previous);
+    if (before) saveGraph(before);
+    else clearTimeout(saveTimer);
+    dataFiles.clear();
+    nodeMenu.value = null;
+    addMenu.value = null;
+    openActive();
+  },
 );
 
 // ── Historique (Ctrl+Z / Ctrl+Y) ────────────────────────────
@@ -373,20 +473,46 @@ function travel(from, to) {
 const undo = () => travel(history.past, history.future);
 const redo = () => travel(history.future, history.past);
 
-/** Exporte le mapping dans un fichier JSON dont l'emplacement est choisi dans l'explorateur. */
-async function exportMapping() {
+/**
+ * Exporte un élément de la collection dans un fichier JSON dont l'emplacement est choisi dans l'explorateur :
+ * un mapping seul, ou une collection (un dossier s'exporte comme une collection).
+ */
+async function exportItem(id) {
+  saveGraph(); // le schéma affiché, même modifié à l'instant
+  const item = find(id);
+  if (!item) return;
   try {
-    const text = JSON.stringify({ version: 1, name: current.name, ...serialize() }, null, 2);
-    const name = await exportFile(text, `${current.name || 'mapping'}.json`);
+    const text = item.type === 'mapping' ? mappingFile(id) : collectionFile(id);
+    const name = await exportFile(text, `${item.name || (item.type === 'mapping' ? 'mapping' : 'collection')}.json`);
     if (name) notify(`${t('Exporté', 'Exported')} : ${name}`, 'success');
   } catch (e) {
     notify(`${t('Export impossible', 'Export failed')} : ${e.message}`, 'error');
   }
 }
+const exportMapping = () => exportItem(workspace.activeId);
 
-/** Image PNG de tout le schéma, enregistrée à l'emplacement choisi. */
-async function exportImage() {
+/** Attend que le schéma affiché soit dessiné (nœuds mesurés), au plus une seconde et demie. */
+function rendered() {
+  return new Promise((resolve) => {
+    const done = () => requestAnimationFrame(() => requestAnimationFrame(resolve));
+    const timer = setTimeout(done, 1500);
+    const { off } = onNodesInitialized(() => {
+      clearTimeout(timer);
+      off();
+      done();
+    });
+  });
+}
+
+/** Image PNG de tout le schéma du mapping `id` (ouvert d'abord s'il ne l'est pas), enregistrée à l'emplacement choisi. */
+async function exportImage(id = workspace.activeId) {
   try {
+    if (id !== workspace.activeId) {
+      const wait = rendered();
+      workspace.activeId = id;
+      await wait;
+    }
+    if (!nodes.value.length) return notify(t('Ce mapping est vide : aucune image à exporter.', 'This mapping is empty: no image to export.'), 'warning');
     const blob = await schemaImage(nodes.value, vueFlowRef.value);
     const name = await exportFile(blob, `${current.name || 'schema'}.png`, { image: true });
     if (name) notify(`${t('Image exportée', 'Image exported')} : ${name}`, 'success');
@@ -395,67 +521,308 @@ async function exportImage() {
   }
 }
 
-/** Copie un lien qui contient tout le schéma (les fichiers de données chargés n'en font pas partie). */
-async function shareMapping() {
+/**
+ * Copie un lien qui contient tout l'élément `id` : un mapping, ou une collection (un dossier est partagé comme une
+ * collection). Les fichiers de données chargés n'en font pas partie.
+ */
+async function shareItem(id) {
+  saveGraph(); // le schéma affiché, même modifié à l'instant
+  const item = find(id);
+  if (!item) return;
   try {
-    const link = await shareLink({ version: 1, name: current.name, ...serialize() });
+    const content = JSON.parse(item.type === 'mapping' ? mappingFile(id) : collectionFile(id));
+    const link = await shareLink(content);
     await navigator.clipboard.writeText(link);
-    notify(t('Lien copié', 'Link copied'), 'success');
+    const size = link.length > 30000 ? t(` — ${Math.round(link.length / 1000)} 000 caractères : certains outils pourraient le couper`, ` — ${Math.round(link.length / 1000)},000 characters: some tools might cut it`) : '';
+    notify(`${t('Lien copié', 'Link copied')}${size}`, size ? 'warning' : 'success');
   } catch (e) {
     notify(`${t('Partage impossible', 'Sharing failed')} : ${e.message}`, 'error');
   }
 }
 
-/** Ouvre le schéma contenu dans le lien de partage, s'il y en a un ; le mapping en cours n'est remplacé qu'avec accord. */
-async function openShared() {
-  let graph;
-  try {
-    graph = await sharedGraph();
-  } catch {
-    clearSharedGraph();
-    return notify(t('Lien de partage illisible (incomplet ou abîmé) : le mapping en cours est conservé.', 'Unreadable share link (incomplete or damaged): the current mapping is kept.'), 'error');
+/**
+ * Ajoute ce qu'un fichier ou un lien de partage contient : un mapping, à côté du mapping ouvert ; une collection,
+ * à la liste des collections (son premier mapping est ouvert).
+ */
+function addImported({ collection, mapping, library, models = [] }) {
+  collectionsOpen.value = true;
+  if (library) {
+    const n = addImportedLibrary(library);
+    return notify(t(`${count(n, 'modèle ajouté', 'model added', 'modèles ajoutés', 'models added')} à la bibliothèque (dossier « ${library.name} »).`, `${count(n, 'model', 'model')} added to the library (folder “${library.name}”).`), 'success');
   }
-  if (!graph) return;
-  clearSharedGraph();
-  if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return notify(t('Le lien ne contient pas un mapping.', 'The link does not contain a mapping.'), 'error');
-  const name = graph.name || t('Sans titre', 'Untitled');
-  const question = t(
-    `Ouvrir le schéma partagé « ${name} » ? Il remplace le mapping en cours (exportez-le d'abord si besoin).`,
-    `Open the shared schema « ${name} »? It replaces the current mapping (export it first if needed).`,
-  );
-  if (nodes.value.length && !confirm(question)) return;
-  current.name = name;
-  load(graph);
-  notify(t(`Schéma partagé « ${name} » ouvert.`, `Shared schema « ${name} » opened.`), 'success');
+  // Modèles joints aux flux : ajoutés à la bibliothèque s'ils n'y sont pas déjà.
+  const name = collection?.name ?? mapping.name;
+  const added = addImportedModels(models, t(`Importés — ${name}`, `Imported — ${name}`));
+  const extra = added ? t(` et ${count(added, 'modèle', 'model')} dans la bibliothèque`, ` and ${count(added, 'model', 'model')} in the library`) : '';
+  if (mapping) {
+    insertMapping(mapping);
+    return notify(t(`Flux « ${mapping.name} » ajouté à la collection « ${activeCollection().name} »${extra}.`, `Flow « ${mapping.name} » added to the collection « ${activeCollection().name} »${extra}.`), 'success');
+  }
+  addCollection(collection);
+  const first = firstMapping(collection.items);
+  if (first) workspace.activeId = first.id;
+  const n = count(leafCount(collection), 'flux', 'flow', 'flux', 'flows');
+  notify(t(`Collection « ${collection.name} » ajoutée (${n})${extra}.`, `Collection « ${collection.name} » added (${n})${extra}.`), 'success');
 }
 
+/** Ouvre le mapping ou la collection contenu dans le lien de partage, s'il y en a un. */
+async function openShared() {
+  let content;
+  try {
+    content = await sharedGraph();
+  } catch {
+    clearSharedGraph();
+    return notify(t('Lien de partage illisible (incomplet ou abîmé) : rien n’a été ajouté.', 'Unreadable share link (incomplete or damaged): nothing was added.'), 'error');
+  }
+  if (!content) return;
+  clearSharedGraph();
+  try {
+    addImported(readFile(JSON.stringify(content)));
+  } catch {
+    notify(t('Le lien ne contient ni un flux ni une collection.', 'The link contains neither a flow nor a collection.'), 'error');
+  }
+}
+
+/** Importe un fichier choisi dans l'explorateur (mapping ou collection). */
 async function open() {
-  if (schemaLocked.value) return;
   try {
     const file = await openFile();
     if (!file) return;
-    const graph = JSON.parse(file.text);
-    if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) throw new Error(t('ce n’est pas un fichier de mapping', 'this is not a mapping file'));
-    current.name = graph.name ?? file.name.replace(/\.json$/i, '');
-    load(graph);
+    addImported(readFile(file.text, file.name));
   } catch (e) {
     notify(`${t('Ouverture impossible', 'Cannot open')} : ${e.message}`, 'error');
   }
 }
 
+/** Nouveau mapping vide, rangé à côté du mapping ouvert. */
 function newMapping() {
-  if (nodes.value.length && !confirm(t('Tout effacer ?', 'Clear everything?'))) return;
-  current.name = t('Sans titre', 'Untitled');
-  load({ nodes: [], edges: [] });
+  insertMapping(makeMapping());
 }
 
 function loadDemo() {
-  current.name = t('Démo', 'Demo');
-  load(demoGraph());
+  insertMapping(makeMapping(t('Démo', 'Demo'), demoGraph()));
 }
 
-restore();
+openActive();
 openShared();
+
+// ── Modèles de la bibliothèque ──────────────────────────────
+
+/** Avertissement d'impact en cours (voir ImpactDialog) ; `askImpact` rend le choix : `apply`, `saveAs` ou `null`. */
+const impactRequest = ref(null);
+const askImpact = (request) =>
+  new Promise((resolve) => {
+    impactRequest.value = {
+      ...request,
+      resolve: (choice) => {
+        impactRequest.value = null;
+        resolve(choice);
+      },
+    };
+  });
+
+const askName = (question, initial) => prompt(question, initial)?.trim() || null;
+const sampleOfNode = (node) => (node.type === 'source' ? node.data.sample : undefined);
+
+/** Nombre d'autres flux (que celui ouvert) qui utilisent chaque modèle. */
+const otherUsage = computed(() => {
+  const counts = new Map();
+  for (const { mapping } of allMappings()) {
+    if (mapping.id === workspace.activeId) continue;
+    for (const id of new Set(mapping.graph.nodes.map((n) => n.data?.modelId).filter(Boolean))) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
+});
+
+/** Crée dans la bibliothèque un modèle à partir d'une source ou d'une cible du flux, et l'y relie. */
+function createModelFromNode(nodeId) {
+  const node = findNode(nodeId);
+  if (!node) return;
+  const name = askName(t('Nom du modèle dans la bibliothèque :', 'Model name in the library:'), node.data.label);
+  if (!name) return;
+  const model = createModel(name, node.data.fields, sampleOfNode(node));
+  updateNodeData(nodeId, { modelId: model.id });
+  notify(t(`Modèle « ${name} » ajouté à la bibliothèque (onglet Modèles).`, `Model “${name}” added to the library (Models tab).`), 'success');
+}
+
+/** Enregistre les champs d'un nœud sous un nouveau modèle (rangé à côté de son modèle d'origine), et l'y relie. */
+function saveNodeAsModel(nodeId) {
+  const node = findNode(nodeId);
+  if (!node) return;
+  const origin = modelOf(node.data);
+  const name = askName(t('Nom du nouveau modèle :', 'Name of the new model:'), origin ? `${origin.name} (${node.data.label})` : node.data.label);
+  if (!name) return;
+  const model = createModel(name, node.data.fields, sampleOfNode(node), origin ? folderOf(origin.id) : null);
+  updateNodeData(nodeId, { modelId: model.id });
+  notify(t(`Nouveau modèle « ${name} » créé ; « ${origin?.name ?? ''} » n’a pas changé.`, `New model “${name}” created; “${origin?.name ?? ''}” did not change.`), 'success');
+}
+
+/** Enregistre dans le modèle les modifications faites sur un nœud ; avertit d'abord si d'autres flux l'utilisent. */
+async function saveNodeToModel(nodeId) {
+  const node = findNode(nodeId);
+  const model = modelOf(node?.data);
+  if (!model) return;
+  const from = { mappingId: workspace.activeId, nodeId };
+  const fields = stripFields(node.data.fields);
+  const { changes, flows } = impactOf(model.id, fields, from);
+  if (flows.length) {
+    const choice = await askImpact({
+      title: t(`Modifier le modèle « ${model.name} » ?`, `Change the model “${model.name}”?`),
+      intro: t(
+        'Ce modèle est aussi utilisé ailleurs : la modification s’appliquera à tous ces flux, sauf là où le modèle a été modifié localement. Pour ne rien changer ailleurs, enregistrez sous un nouveau modèle.',
+        'This model is also used elsewhere: the change will apply to all these flows, except where the model was changed locally. To change nothing elsewhere, save as a new model.',
+      ),
+      changes,
+      flows,
+      allowSaveAs: true,
+      applyLabel: t('Appliquer à tous les flux', 'Apply to all flows'),
+    });
+    if (choice === 'saveAs') return saveNodeAsModel(nodeId);
+    if (choice !== 'apply') return;
+  }
+  applyModel(model.id, fields, { sample: sampleOfNode(node), from });
+  notify(t(`Modèle « ${model.name} » enregistré.`, `Model “${model.name}” saved.`), 'success');
+}
+
+provide(MODEL_LINK_KEY, {
+  create: createModelFromNode,
+  save: saveNodeToModel,
+  saveAs: saveNodeAsModel,
+  revert: (nodeId) => revertNode(workspace.activeId, nodeId),
+  unlink: (nodeId) => updateNodeData(nodeId, { modelId: undefined }),
+  otherFlows: (modelId) => otherUsage.value.get(modelId) ?? 0,
+});
+
+/**
+ * Ajoute un modèle de la bibliothèque au flux ouvert, comme source ou comme cible ; `screen` : point de l'écran
+ * où le placer (là où il a été lâché), sinon à gauche (source) ou à droite (cible) de la vue.
+ */
+function useModel(modelId, kind, screen = null) {
+  const model = find(modelId);
+  if (!model) return;
+  // Le nœud s'ajoute au flux : celui-ci revient à l'écran.
+  if (editingModelId.value) {
+    if (!leaveModel()) return;
+    editingModelId.value = null;
+  }
+  if (schemaLocked.value) return notify(t('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour ajouter un nœud.', 'Schema locked: unlock it (padlock at the bottom left) to add a node.'), 'warning');
+  const rect = vueFlowRef.value.getBoundingClientRect();
+  const position = project(
+    screen ? { x: screen.x - rect.left, y: screen.y - rect.top } : { x: rect.width * (kind === 'source' ? 0.15 : 0.6), y: rect.height * 0.25 },
+  );
+  const data = { label: model.name, fields: JSON.parse(JSON.stringify(model.fields)), modelId, ...(kind === 'source' && { sample: sampleForSource(model) }) };
+  addNodes([{ id: uid(kind), type: kind, position, data }]);
+  notify(
+    kind === 'source'
+      ? t(`Modèle « ${model.name} » ajouté au flux comme source.`, `Model “${model.name}” added to the flow as a source.`)
+      : t(`Modèle « ${model.name} » ajouté au flux comme cible.`, `Model “${model.name}” added to the flow as a target.`),
+    'success',
+  );
+}
+
+/** Modèle glissé depuis le panneau et lâché sur le schéma : `{ id, x, y }` (écran), en attente du choix source / cible. */
+const modelDrop = ref(null);
+const isModelDrag = (e) => [...(e.dataTransfer?.types ?? [])].includes(MODEL_DRAG_TYPE);
+
+function onModelDragOver(e) {
+  if (!isModelDrag(e)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+}
+
+function onModelDrop(e) {
+  if (!isModelDrag(e)) return;
+  e.preventDefault();
+  const id = e.dataTransfer.getData(MODEL_DRAG_TYPE);
+  if (schemaLocked.value) return notify(t('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour ajouter un nœud.', 'Schema locked: unlock it (padlock at the bottom left) to add a node.'), 'warning');
+  if (id) modelDrop.value = { id, x: e.clientX, y: e.clientY };
+}
+
+function dropModelAs(kind) {
+  const { id, x, y } = modelDrop.value;
+  modelDrop.value = null;
+  useModel(id, kind, { x, y });
+}
+
+// ── Éditeur de modèles ──────────────────────────────────────
+// Un modèle s'ouvre à la place du flux, dans son propre canevas (ModelEditor) ; le flux reste en mémoire.
+
+/** Modèle ouvert dans l'éditeur de modèles (`null` : le flux est affiché). */
+const editingModelId = ref(null);
+const modelEditorRef = ref(null);
+
+/** Quitter le modèle ouvert : avec accord s'il a des modifications non enregistrées. */
+const leaveModel = () =>
+  !modelEditorRef.value?.dirty ||
+  confirm(t('Le modèle a des modifications non enregistrées. Les abandonner ?', 'The model has unsaved changes. Discard them?'));
+
+function editModel(id) {
+  if (id === editingModelId.value || !leaveModel()) return;
+  saveGraph();
+  nodeMenu.value = null;
+  addMenu.value = null;
+  editingModelId.value = id;
+}
+
+function closeModelEditor() {
+  if (!leaveModel()) return;
+  editingModelId.value = null;
+}
+
+/** Ouvre un flux de la collection (et ferme l'éditeur de modèles s'il était ouvert). */
+function openFlow(id) {
+  if (editingModelId.value && !leaveModel()) return;
+  editingModelId.value = null;
+  workspace.activeId = id;
+}
+
+// Modèle supprimé pendant qu'il est ouvert : retour au flux.
+watch(
+  () => editingModelId.value && !find(editingModelId.value),
+  (gone) => gone && (editingModelId.value = null),
+);
+
+async function saveEditedModel({ name, fields, sample }) {
+  const id = editingModelId.value;
+  const result = await commitModelEdit(id, fields, sample, name);
+  if (result === 'applied') modelEditorRef.value?.reload();
+  else if (result?.created) editingModelId.value = result.created; // la variante créée s'ouvre à sa place
+}
+
+/**
+ * Enregistre une modification faite dans la bibliothèque ; si la structure change et que des flux utilisent le
+ * modèle, avertit d'abord. Rend `applied`, `{ created }` (enregistré sous un nouveau modèle) ou `null` (annulé).
+ */
+async function commitModelEdit(id, fields, sample, name) {
+  const model = find(id);
+  if (!model) return null;
+  const { changes, flows } = impactOf(id, fields);
+  if (flows.length && !sameFields(fields, model.fields)) {
+    const choice = await askImpact({
+      title: t(`Modifier le modèle « ${model.name} » ?`, `Change the model “${model.name}”?`),
+      intro: t(
+        'Ce modèle est utilisé par des flux : la modification s’y appliquera, sauf là où le modèle a été modifié localement.',
+        'This model is used by flows: the change will apply to them, except where the model was changed locally.',
+      ),
+      changes,
+      flows,
+      allowSaveAs: true,
+      applyLabel: t('Appliquer', 'Apply'),
+    });
+    if (choice === 'saveAs') {
+      const newName = askName(t('Nom du nouveau modèle :', 'Name of the new model:'), `${name ?? model.name} ${t('(variante)', '(variant)')}`);
+      if (!newName) return null;
+      const created = createModel(newName, fields, sample, folderOf(id));
+      notify(t(`Nouveau modèle « ${newName} » créé ; « ${model.name} » n’a pas changé.`, `New model “${newName}” created; “${model.name}” did not change.`), 'success');
+      return { created: created.id };
+    }
+    if (choice !== 'apply') return null;
+  }
+  if (name) model.name = name;
+  applyModel(id, fields, { sample });
+  notify(t(`Modèle « ${model.name} » enregistré.`, `Model “${model.name}” saved.`), 'success');
+  return 'applied';
+}
 
 // ── Évaluation ──────────────────────────────────────────────
 
@@ -658,6 +1025,14 @@ const isEditable = (el) => el instanceof HTMLElement && (el.isContentEditable ||
 function onKeydown(e) {
   const key = e.key.toLowerCase();
   const ctrl = e.ctrlKey || e.metaKey;
+  // Éditeur de modèles ouvert : les raccourcis du flux ne s'appliquent pas (Ctrl S enregistre le modèle).
+  if (editingModelId.value) {
+    if (ctrl && key === 's') {
+      e.preventDefault();
+      modelEditorRef.value?.save();
+    }
+    return;
+  }
   if (ctrl && (key === 's' || key === 'o')) {
     e.preventDefault();
     if (key === 's') exportMapping();
