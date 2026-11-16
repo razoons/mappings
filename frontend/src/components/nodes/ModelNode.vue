@@ -16,8 +16,8 @@
       :title="`${t('Modèle de données', 'Data model')} — ${data.label}`"
       :description="
         t(
-          'Pour chaque champ : son type, s’il est obligatoire (required), son format et un exemple. Les champs retrouvés par leur nom gardent leurs liens dans les flux. Pour partir d’un document réel, collez-le en JSON puis « Importer un exemple JSON ». Rien n’est enregistré dans la bibliothèque avant « Enregistrer le modèle ».',
-          'For each field: its type, whether it is required, its format and an example. Fields found by name keep their links in the flows. To start from a real document, paste it as JSON then “Import a JSON example”. Nothing is saved to the library before “Save the model”.',
+          'Pour chaque champ : son type, s’il est obligatoire (required), son format et un exemple. Les champs retrouvés par leur nom gardent leurs liens dans les mappings. Pour partir d’un document réel, collez-le en JSON puis « Importer un exemple JSON ». Rien n’est enregistré dans la bibliothèque avant « Enregistrer le modèle ».',
+          'For each field: its type, whether it is required, its format and an example. Fields found by name keep their links in the mappings. To start from a real document, paste it as JSON then “Import a JSON example”. Nothing is saved to the library before “Save the model”.',
         )
       "
       :initial="model.initial()"

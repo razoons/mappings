@@ -9,7 +9,7 @@
         <p class="text-body-2 mb-3">{{ request.intro }}</p>
 
         <template v-if="changes.length">
-          <div class="text-subtitle-2 mb-1">{{ t('Champs supprimés ou modifiés', 'Deleted or changed fields') }}</div>
+          <div class="text-subtitle-2 mb-1">{{ t('Ce qui est supprimé ou modifié', 'What is deleted or changed') }}</div>
           <ul class="impact-list mb-3">
             <li v-for="c in changes" :key="c.path">
               <code>{{ c.path }}</code> — <span :class="c.kind === 'removed' ? 'text-error' : 'text-warning'">{{ c.details.join(', ') }}</span>
@@ -17,13 +17,13 @@
           </ul>
         </template>
 
-        <div class="text-subtitle-2 mb-1">{{ count(request.flows.length, 'utilisation dans les flux', 'use in flows', 'utilisations dans les flux', 'uses in flows') }}</div>
+        <div class="text-subtitle-2 mb-1">{{ count(request.flows.length, 'utilisation dans les mappings', 'use in mappings', 'utilisations dans les mappings', 'uses in mappings') }}</div>
         <v-table density="compact" class="impact-table">
           <thead>
             <tr>
-              <th>{{ t('Flux', 'Flow') }}</th>
+              <th>{{ t('Mapping', 'Mapping') }}</th>
               <th>{{ t('Nœud', 'Node') }}</th>
-              <th>{{ t('Champs reliés touchés', 'Linked fields affected') }}</th>
+              <th>{{ t('Ce qui en dépend et est touché', 'Dependents affected') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -46,7 +46,7 @@
       <v-card-actions class="flex-wrap">
         <v-btn @click="choose(null)">{{ t('Annuler', 'Cancel') }}</v-btn>
         <v-spacer />
-        <v-btn v-if="request.allowSaveAs" variant="text" @click="choose('saveAs')">{{ t('Enregistrer sous un nouveau modèle', 'Save as a new model') }}</v-btn>
+        <v-btn v-if="request.allowSaveAs" variant="text" @click="choose('saveAs')">{{ request.saveAsLabel ?? t('Enregistrer sous un nouveau modèle', 'Save as a new model') }}</v-btn>
         <v-btn color="warning" variant="flat" @click="choose('apply')">{{ request.applyLabel }}</v-btn>
       </v-card-actions>
     </v-card>

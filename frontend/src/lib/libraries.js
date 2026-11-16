@@ -118,7 +118,7 @@ export function librariesOf(nodes) {
   const map = new Map();
   for (const n of nodes) {
     if (n.type !== 'library') continue;
-    const label = n.data.label || t('Bibliothèque', 'Library');
+    const label = n.data.label || t('Liste de valeurs', 'Value list');
     const item = n.data.item ?? 'string';
     const lib = valueSet(label, item, n.data.values ?? [], n.id);
     if (n.data.mapped) {
@@ -132,12 +132,23 @@ export function librariesOf(nodes) {
       });
     }
     map.set(n.id, lib);
+    // Liste reliée à la bibliothèque : un champ peut aussi la désigner par l'id de la liste partagée (champ d'un modèle).
+    if (n.data.listId) {
+      lib.listId = n.data.listId;
+      if (!map.has(n.data.listId)) map.set(n.data.listId, lib);
+    }
   }
   return map;
 }
+
+/** Listes distinctes d'une Map de `librariesOf` (sans les doubles entrées par id de liste partagée). */
+export const distinctLibraries = (map) => [...new Set(map.values())];
+
+/** Identifiant à enregistrer dans un champ qui se réfère à `lib` : celui de la liste partagée s'il y en a une. */
+export const libraryRef = (lib) => lib.listId ?? lib.id;
 
 /** Valeurs de `a` absentes de `b` (pour savoir si un ensemble de valeurs en garantit un autre). */
 export const missingFrom = (a, b) => a.values.filter((v) => !b.has(v));
 
 /** Nom affiché d'une bibliothèque référencée (« bibliothèque supprimée » si elle n'existe plus). */
-export const libraryName = (libraries, id) => libraries?.get(id)?.label ?? t('bibliothèque supprimée', 'deleted library');
+export const libraryName = (libraries, id) => libraries?.get(id)?.label ?? t('liste de valeurs absente', 'missing value list');

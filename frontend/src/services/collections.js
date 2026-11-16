@@ -33,7 +33,6 @@ const makeLibrary = (items = []) => ({ id: LIBRARY_ID, type: 'library', name: t(
 
 /** Élément qui en contient d'autres (collection, dossier, bibliothèque). */
 export const isContainer = (item) => Array.isArray(item.items);
-const isLeaf = (item) => item.type === 'mapping' || item.type === 'model';
 
 function initial() {
   try {
@@ -50,7 +49,7 @@ function initial() {
     /* pas d'ancien brouillon utilisable */
   }
   first ??= makeMapping();
-  return { collections: [makeCollection(t('Mes flux', 'My flows'), [first])], library: makeLibrary(), activeId: first.id };
+  return { collections: [makeCollection(t('Mes mappings', 'My mappings'), [first])], library: makeLibrary(), activeId: first.id };
 }
 
 /** Collections, bibliothèque de modèles et flux ouvert dans l'éditeur (`activeId`). */
@@ -103,7 +102,7 @@ function* leavesIn(list, type) {
 }
 export const firstMapping = (list = workspace.collections) => leavesIn(list, 'mapping').next().value ?? null;
 /** Nombre de flux (ou de modèles, dans la bibliothèque) d'un conteneur. */
-export const leafCount = (item) => [...leavesIn(item.items, 'mapping')].length + [...leavesIn(item.items, 'model')].length;
+export const leafCount = (item) => ['mapping', 'model', 'valuelist'].reduce((n, type) => n + [...leavesIn(item.items, type)].length, 0);
 
 /** Tous les flux : `{ mapping, path }` (`path` : noms de la collection et des dossiers). */
 export function* allMappings(list = workspace.collections, path = []) {
@@ -166,6 +165,23 @@ export function addCollection(collection = makeCollection()) {
   return collection;
 }
 
+const sameName = (a, b) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
+
+/** Collection existante qui porte ce nom (sans tenir compte de la casse ni des espaces autour), ou `null`. */
+export const collectionNamed = (name) => workspace.collections.find((c) => sameName(c.name, name)) ?? null;
+
+/**
+ * Remplace la collection `oldId` par `collection`, à la même place. Si le mapping ouvert en faisait partie, le
+ * premier mapping de la nouvelle est ouvert (ou un nouveau mapping s'il n'y en a aucun).
+ */
+export function replaceCollection(oldId, collection) {
+  const index = workspace.collections.findIndex((c) => c.id === oldId);
+  if (index < 0) return addCollection(collection);
+  workspace.collections.splice(index, 1, collection);
+  if (!find(workspace.activeId)) ensureActive();
+  return collection;
+}
+
 export function rename(id, name) {
   const item = find(id);
   if (item && name.trim()) item.name = name.trim();
@@ -186,7 +202,7 @@ export function remove(id) {
   if (!find(workspace.activeId)) ensureActive();
 }
 
-const PREFIXES = { mapping: 'map', model: 'mdl', folder: 'dir', collection: 'col' };
+const PREFIXES = { mapping: 'map', model: 'mdl', valuelist: 'lst', folder: 'dir', collection: 'col' };
 
 /** Copie profonde avec de nouveaux identifiants. */
 function withFreshIds(item) {
@@ -242,71 +258,103 @@ export function move(id, targetId, where) {
 
 // ── Export / import ─────────────────────────────────────────
 
-const exportedModel = (m) => ({ id: m.id, name: m.name, fields: m.fields, ...(m.sample !== undefined && { sample: m.sample }) });
+/** Élément de la bibliothèque, tel qu'exporté : modèle `{ id, name, fields, sample? }` ou liste de valeurs. */
+const exportedLibraryItem = (m) =>
+  m.type === 'valuelist'
+    ? { type: 'valuelist', id: m.id, name: m.name, item: m.item, values: m.values, mapped: !!m.mapped, outItem: m.outItem, targets: m.targets }
+    : { type: 'model', id: m.id, name: m.name, fields: m.fields, ...(m.sample !== undefined && { sample: m.sample }) };
 
-/** Modèles de la bibliothèque utilisés par les flux de `items` (pour les joindre à un export). */
-function modelsUsedBy(items) {
+/**
+ * Éléments de la bibliothèque utilisés par les flux de `items` (pour les joindre à un export) : modèles reliés aux
+ * sources et cibles, listes de valeurs reliées aux nœuds Liste de valeurs ou désignées par un champ d'un modèle.
+ */
+function libraryItemsUsedBy(items) {
   const ids = new Set();
-  for (const m of leavesIn(items, 'mapping')) for (const n of m.graph.nodes) if (n.data?.modelId) ids.add(n.data.modelId);
-  return [...ids].map(find).filter((m) => m?.type === 'model').map(exportedModel);
+  const walkFields = (fields) => fields.forEach((f) => (f.format?.library && ids.add(f.format.library), walkFields(f.children ?? [])));
+  for (const m of leavesIn(items, 'mapping')) {
+    for (const n of m.graph.nodes) {
+      if (n.data?.modelId) ids.add(n.data.modelId);
+      if (n.data?.listId) ids.add(n.data.listId);
+    }
+  }
+  for (const id of [...ids]) {
+    const model = find(id);
+    if (model?.type === 'model') walkFields(model.fields);
+  }
+  return [...ids].map(find).filter((m) => m?.type === 'model' || m?.type === 'valuelist').map(exportedLibraryItem);
 }
 
 const exported = (item) => {
   if (item.type === 'mapping') return { type: 'mapping', name: item.name, nodes: item.graph.nodes, edges: item.graph.edges };
-  if (item.type === 'model') return { type: 'model', ...exportedModel(item) };
+  if (item.type === 'model' || item.type === 'valuelist') return exportedLibraryItem(item);
   return { type: 'folder', name: item.name, items: item.items.map(exported) };
 };
 
 /**
  * Fichier JSON d'un conteneur : une collection (un dossier de flux s'exporte comme une collection), avec les
- * modèles qu'utilisent ses flux ; ou, dans la bibliothèque, un dossier de modèles.
+ * éléments de la bibliothèque qu'utilisent ses flux (`models`) ; ou, dans la bibliothèque, un dossier.
  */
 export function collectionFile(id) {
   const loc = locate(id);
   const item = loc.item;
   if (inLibrary(loc)) return JSON.stringify({ format: MODELS_FORMAT, version: 1, name: item.name, items: item.items.map(exported) }, null, 2);
-  const models = modelsUsedBy(item.items);
+  const models = libraryItemsUsedBy(item.items);
   return JSON.stringify({ format: COLLECTION_FORMAT, version: 1, name: item.name, items: item.items.map(exported), ...(models.length && { models }) }, null, 2);
 }
 
-/** Fichier JSON d'un seul flux (format historique), avec les modèles qu'il utilise ; ou d'un seul modèle. */
+/** Fichier JSON d'un seul flux (format historique), avec les éléments de la bibliothèque qu'il utilise ; ou d'un seul modèle ou d'une seule liste. */
 export function mappingFile(id) {
   const item = find(id);
-  if (item.type === 'model') return JSON.stringify({ format: MODELS_FORMAT, version: 1, name: item.name, items: [exported(item)] }, null, 2);
-  const models = modelsUsedBy([item]);
+  if (item.type === 'model' || item.type === 'valuelist') return JSON.stringify({ format: MODELS_FORMAT, version: 1, name: item.name, items: [exported(item)] }, null, 2);
+  const models = libraryItemsUsedBy([item]);
   return JSON.stringify({ version: 1, name: item.name, ...item.graph, ...(models.length && { models }) }, null, 2);
 }
 
 const isGraph = (g) => Array.isArray(g?.nodes) && Array.isArray(g?.edges);
-const isModel = (m) => typeof m?.id === 'string' && Array.isArray(m?.fields);
-const readModel = (raw) => ({ id: raw.id, type: 'model', name: raw.name || untitled(), fields: raw.fields, ...(typeof raw.sample === 'string' && { sample: raw.sample }) });
+const isLibraryItem = (m) => typeof m?.id === 'string' && (Array.isArray(m?.fields) || (m?.type === 'valuelist' && Array.isArray(m?.values)));
+
+function readLibraryItem(raw) {
+  if (raw.type === 'valuelist') {
+    return {
+      id: raw.id,
+      type: 'valuelist',
+      name: raw.name || untitled(),
+      item: raw.item ?? 'string',
+      values: raw.values,
+      mapped: !!raw.mapped,
+      outItem: raw.outItem ?? 'string',
+      targets: Array.isArray(raw.targets) ? raw.targets : [],
+    };
+  }
+  return { id: raw.id, type: 'model', name: raw.name || untitled(), fields: raw.fields, ...(typeof raw.sample === 'string' && { sample: raw.sample }) };
+}
 
 function readItem(raw) {
   if (isGraph(raw)) return makeMapping(raw.name || untitled(), { nodes: raw.nodes, edges: raw.edges });
-  if (raw?.type === 'model' && isModel(raw)) return readModel(raw);
+  if ((raw?.type === 'model' || raw?.type === 'valuelist') && isLibraryItem(raw)) return readLibraryItem(raw);
   if (Array.isArray(raw?.items)) return { ...makeFolder(raw.name || t('Dossier', 'Folder'), raw.items.map(readItem).filter(Boolean)), open: false };
   return null; // élément inconnu : ignoré
 }
 
 /**
- * Lit un fichier importé : `{ collection }`, `{ mapping }` ou `{ library }` (dossier de modèles), et `models` : les
- * modèles joints, à ajouter à la bibliothèque s'ils n'y sont pas déjà (même id).
+ * Lit un fichier importé : `{ collection }`, `{ mapping }` ou `{ library }` (dossier de la bibliothèque), et
+ * `models` : les éléments de la bibliothèque joints, à y ajouter s'ils n'y sont pas déjà (même id).
  */
 export function readFile(text, fileName = '') {
   const data = JSON.parse(text);
   const base = fileName.replace(/\.json$/i, '');
-  const models = (Array.isArray(data?.models) ? data.models : []).filter(isModel).map(readModel);
+  const models = (Array.isArray(data?.models) ? data.models : []).filter(isLibraryItem).map(readLibraryItem);
   if (isGraph(data)) return { mapping: makeMapping(data.name || base || untitled(), { nodes: data.nodes, edges: data.edges }), models };
-  if (data?.format === MODELS_FORMAT) return { library: makeFolder(data.name || base || t('Modèles importés', 'Imported models'), (data.items ?? []).map(readItem).filter(Boolean)), models: [] };
+  if (data?.format === MODELS_FORMAT) return { library: makeFolder(data.name || base || t('Bibliothèque importée', 'Imported library'), (data.items ?? []).map(readItem).filter(Boolean)), models: [] };
   if (data?.format === COLLECTION_FORMAT || Array.isArray(data?.items)) {
     return { collection: makeCollection(data.name || base || t('Collection importée', 'Imported collection'), (data.items ?? []).map(readItem).filter(Boolean)), models };
   }
-  throw new Error(t('ce fichier n’est ni un flux, ni une collection, ni des modèles', 'this file is neither a flow, nor a collection, nor models'));
+  throw new Error(t('ce fichier n’est ni un mapping, ni une collection, ni un export de la bibliothèque', 'this file is neither a mapping, nor a collection, nor a library export'));
 }
 
 /**
- * Range les modèles importés absents de la bibliothèque (par leur id) dans un dossier `folderName` ; ceux déjà
- * présents sont gardés tels quels. Renvoie le nombre de modèles ajoutés.
+ * Range les éléments importés absents de la bibliothèque (par leur id) dans un dossier `folderName` ; ceux déjà
+ * présents sont gardés tels quels. Renvoie le nombre d'éléments ajoutés.
  */
 export function addImportedModels(models, folderName) {
   const fresh = models.filter((m) => !find(m.id));
@@ -314,11 +362,11 @@ export function addImportedModels(models, folderName) {
   return fresh.length;
 }
 
-/** Ajoute un dossier de modèles importé ; les modèles déjà présents (même id) en sont retirés. Renvoie le nombre ajouté. */
+/** Ajoute un dossier de la bibliothèque importé ; les éléments déjà présents (même id) en sont retirés. Renvoie le nombre ajouté. */
 export function addImportedLibrary(folder) {
   const keep = (items) =>
-    items.filter((i) => i.type !== 'model' || !find(i.id)).map((i) => (isContainer(i) ? { ...i, items: keep(i.items) } : i));
+    items.filter((i) => isContainer(i) || !find(i.id)).map((i) => (isContainer(i) ? { ...i, items: keep(i.items) } : i));
   const cleaned = { ...folder, items: keep(folder.items) };
   addToLibrary(cleaned);
-  return [...leavesIn(cleaned.items, 'model')].length;
+  return [...leavesIn(cleaned.items, 'model')].length + [...leavesIn(cleaned.items, 'valuelist')].length;
 }

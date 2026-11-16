@@ -52,7 +52,7 @@ const emit = defineEmits(['pick', 'close']);
 const ITEMS = computed(() => [
   { kind: 'source', label: t('Source de données', 'Data source'), category: t('Données', 'Data'), color: HEADER_COLORS.source },
   { kind: 'target', label: t('Cible de données', 'Data target'), category: t('Données', 'Data'), color: HEADER_COLORS.target },
-  { kind: 'library', label: t('Bibliothèque de valeurs', 'Value library'), category: t('Données', 'Data'), color: HEADER_COLORS.library },
+  { kind: 'library', label: t('Liste de valeurs', 'Value list'), category: t('Données', 'Data'), color: HEADER_COLORS.library },
   { kind: 'group', label: t('Groupe', 'Group'), category: t('Organisation', 'Layout'), color: HEADER_COLORS.group },
   ...CATEGORIES.flatMap((category) =>
     Object.entries(TRANSFORMS)

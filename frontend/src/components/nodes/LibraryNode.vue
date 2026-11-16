@@ -2,27 +2,34 @@
   <div class="node node-library" :class="{ selected, collapsed: data.collapsed, locked: readOnly, mapped }">
     <div class="node-header" :style="{ background: HEADER_COLORS.library }">
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
-      <span class="node-kind">{{ t('Bibliothèque', 'Library') }}</span>
+      <span class="node-kind">{{ t('Liste de valeurs', 'Value list') }}</span>
       <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
-      <a class="icon-btn help-link nodrag" href="/noeuds#library" :title="t('Documentation de ce nœud', 'Documentation of this node')">?</a>
+      <a v-if="!standalone" class="icon-btn help-link nodrag" href="/noeuds#library" :title="t('Documentation de ce nœud', 'Documentation of this node')">?</a>
       <button class="icon-btn nodrag" :title="mapped ? t('Éditer toutes les lignes (une par ligne : valeur ; correspondance)', 'Edit all the rows (one per line: value ; mapping)') : t('Éditer toutes les valeurs (une par ligne)', 'Edit all the values (one per line)')" @click="editing = true">≡</button>
-      <LockButton :node-id="id" :locked="data.locked" />
-      <template v-if="data.collapsed">
+      <button
+        v-if="listLink && !standalone && !data.listId && !readOnly"
+        class="icon-btn nodrag mdi mdi-database-plus-outline"
+        :title="t('Enregistrer cette liste dans la bibliothèque, pour la réutiliser dans d’autres mappings et dans les modèles', 'Save this list to the library, to reuse it in other mappings and in models')"
+        @click="listLink.create(id)"
+      />
+      <LockButton v-if="!standalone" :node-id="id" :locked="data.locked" />
+      <template v-if="data.collapsed && !standalone">
         <Handle :id="LIBRARY_OUTPUT" type="source" :position="Position.Right" :connectable="false" class="socket hidden-socket" />
         <Handle v-if="mapped" :id="LIBRARY_TABLE" type="source" :position="Position.Right" :connectable="false" class="socket hidden-socket" />
       </template>
     </div>
 
+    <ModelLink v-if="listLink && !standalone" kind="list" :node-id="id" :data="data" :read-only="readOnly" />
     <div v-if="!data.collapsed" class="node-body">
       <div class="row out-row">
         <span class="out-value">{{ count(rows.length, 'valeur', 'value', 'valeurs', 'values') }}</span>
         <span>{{ t('Valeurs', 'Values') }}</span>
-        <Handle :id="LIBRARY_OUTPUT" type="source" :position="Position.Right" v-bind="socketAttrs(listOf(item))" />
+        <Handle v-if="!standalone" :id="LIBRARY_OUTPUT" type="source" :position="Position.Right" v-bind="socketAttrs(listOf(item))" />
       </div>
       <div v-if="mapped" class="row out-row">
         <span class="out-value">{{ count(mappedCount, 'correspondance', 'mapping') }}</span>
         <span>{{ t('Table', 'Table') }}</span>
-        <Handle :id="LIBRARY_TABLE" type="source" :position="Position.Right" v-bind="socketAttrs('object')" />
+        <Handle v-if="!standalone" :id="LIBRARY_TABLE" type="source" :position="Position.Right" v-bind="socketAttrs('object')" />
       </div>
 
       <div class="row library-types">
@@ -87,7 +94,7 @@
         </template>
       </div>
 
-      <div class="row library-usage" :title="usages.join('\n')">
+      <div v-if="!standalone" class="row library-usage" :title="usages.join('\n')">
         {{ usages.length ? t(`Utilisée par ${count(usages.length, 'champ', 'field')}`, `Used by ${count(usages.length, 'champ', 'field')}`) : t('Utilisée par aucun champ (règles ⚙ d’un champ)', 'Used by no field (rules ⚙ of a field)') }}
       </div>
     </div>
@@ -114,24 +121,31 @@
 </template>
 
 <script setup>
-import { computed, nextTick, reactive, ref } from 'vue';
+import { computed, inject, nextTick, reactive, ref } from 'vue';
 import { Handle, Position, useVueFlow } from '@vue-flow/core';
 import TextDialog from '../TextDialog.vue';
 import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
+import ModelLink from './ModelLink.vue';
 import { pathLabel } from '../../lib/fields';
 import { count, t } from '../../lib/i18n';
 import { fromRows, LIBRARY_OUTPUT, LIBRARY_TABLE, LIBRARY_TYPES, parseLibraryValue, rowsOf } from '../../lib/libraries';
 import { HEADER_COLORS, listOf, socketTitle } from '../../lib/types';
-import { socketAttrs, useReadOnly } from './shared';
+import { LIST_LINK_KEY, socketAttrs, useReadOnly } from './shared';
 
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps({
   id: { type: String, required: true },
+  /** `valuelist` : liste de la bibliothèque, ouverte seule dans l'éditeur de la bibliothèque (ni sockets ni verrou). */
+  type: { type: String, default: 'library' },
   data: { type: Object, required: true },
   selected: Boolean,
 });
+
+const standalone = computed(() => props.type === 'valuelist');
+// Absent hors de l'éditeur de flux (aperçus de la documentation).
+const listLink = inject(LIST_LINK_KEY, null);
 
 const { updateNodeData, updateNodeInternals, nodes, edges, removeEdges } = useVueFlow();
 const readOnly = useReadOnly(() => props.data.locked);
@@ -212,7 +226,7 @@ function usagesIn(node) {
   const walk = (fields, parents) => {
     for (const f of fields) {
       const chain = [...parents, f];
-      if (f.format?.library === props.id) out.push(`${node.data.label}.${pathLabel(chain)}`);
+      if (f.format?.library === props.id || (props.data.listId && f.format?.library === props.data.listId)) out.push(`${node.data.label}.${pathLabel(chain)}`);
       walk(f.children ?? [], chain);
     }
   };

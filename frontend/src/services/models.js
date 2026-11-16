@@ -27,7 +27,7 @@ export const stripFields = (fields) =>
   fields.map(({ collapsed: _, children, ...f }) => (children ? { ...f, children: stripFields(children) } : f));
 
 /** Texte canonique (clés triées) : deux structures identiques donnent le même texte, quel que soit l'ordre des clés. */
-function canonical(value) {
+export function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (isPlainObject(value)) return `{${Object.keys(value).filter((k) => value[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`;
   return JSON.stringify(value);
@@ -59,11 +59,12 @@ export function usageOf(modelId) {
   return list;
 }
 
-/** Nombre de flux qui utilisent chaque modèle. */
+/** Nombre de flux qui utilisent chaque modèle et chaque liste de valeurs de la bibliothèque. */
 export function usageCounts() {
   const counts = new Map();
   for (const { mapping } of allMappings()) {
-    for (const id of new Set(mapping.graph.nodes.map((n) => n.data?.modelId).filter(Boolean))) counts.set(id, (counts.get(id) ?? 0) + 1);
+    const ids = mapping.graph.nodes.flatMap((n) => [n.data?.modelId, n.data?.listId]).filter(Boolean);
+    for (const id of new Set(ids)) counts.set(id, (counts.get(id) ?? 0) + 1);
   }
   return counts;
 }
@@ -212,14 +213,19 @@ export function deleteModel(modelId) {
   hooks.reload();
 }
 
-/** Supprime un dossier de la bibliothèque et tous ses modèles (déliés des flux comme ci-dessus). */
+/** Supprime un dossier de la bibliothèque et tout son contenu (modèles et listes déliés des flux, qui gardent leurs copies). */
 export function deleteLibraryFolder(folderId) {
   hooks.flush();
   const folder = find(folderId);
   const ids = new Set();
-  const walk = (items) => items.forEach((i) => (i.type === 'model' ? ids.add(i.id) : i.items && walk(i.items)));
+  const walk = (items) => items.forEach((i) => (i.items ? walk(i.items) : ids.add(i.id)));
   walk(folder?.items ?? []);
-  for (const id of ids) for (const { nodes } of usageOf(id)) for (const node of nodes) delete node.data.modelId;
+  for (const { mapping } of allMappings()) {
+    for (const node of mapping.graph.nodes) {
+      if (ids.has(node.data?.modelId)) delete node.data.modelId;
+      if (ids.has(node.data?.listId)) delete node.data.listId;
+    }
+  }
   remove(folderId);
   hooks.reload();
 }

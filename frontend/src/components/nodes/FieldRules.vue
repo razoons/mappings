@@ -36,8 +36,8 @@
             :items="libraryItems"
             :disabled="locked"
             :label="k.label"
-            :no-data-text="t('Aucune bibliothèque de ce type : ajoutez un nœud Bibliothèque', 'No library of this type: add a Library node')"
-            :hint="t('La valeur doit faire partie de la bibliothèque', 'The value must belong to the library')"
+            :no-data-text="t('Aucune liste de valeurs de ce type : ajoutez un nœud Liste de valeurs', 'No value list of this type: add a Value list node')"
+            :hint="t('La valeur doit faire partie de la liste', 'The value must belong to the list')"
             persistent-hint
             density="compact"
             variant="outlined"
@@ -70,7 +70,7 @@
 import { computed, ref } from 'vue';
 import { formatKeys, formatSummary } from '../../lib/formats';
 import { t } from '../../lib/i18n';
-import { libraryName } from '../../lib/libraries';
+import { distinctLibraries, libraryName, libraryRef } from '../../lib/libraries';
 import { useLibraries } from './shared';
 
 const props = defineProps({
@@ -89,9 +89,10 @@ const summary = computed(() => formatSummary(props.field, libraries.value));
 const libraryItems = computed(() => {
   const base = props.field.type === 'array' ? (props.field.item ?? 'string') : props.field.type;
   const current = format.value.library;
-  const items = [...libraries.value.values()]
-    .filter((l) => l.id === current || l.item === base || (base === 'number' && l.item === 'integer'))
-    .map((l) => ({ title: `${l.label} (${l.values.length})`, value: l.id }));
+  const items = distinctLibraries(libraries.value)
+    .filter((l) => libraries.value.get(current) === l || l.item === base || (base === 'number' && l.item === 'integer'))
+    // Le choix en cours garde sa référence (id du nœud ou de la liste partagée) ; sinon, celle de la liste partagée.
+    .map((l) => ({ title: `${l.label} (${l.values.length})`, value: libraries.value.get(current) === l ? current : libraryRef(l) }));
   if (current && !libraries.value.has(current)) items.push({ title: libraryName(libraries.value, current), value: current });
   return items;
 });

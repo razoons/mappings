@@ -7,27 +7,15 @@
       @click="collectionsOpen = !collectionsOpen"
     />
     <template v-if="!editingModelId">
-      <v-text-field
-        v-model="current.name"
-        class="ml-1 flex-grow-0"
-        width="220"
-        density="compact"
-        variant="solo-filled"
-        flat
-        hide-details
-        :placeholder="t('Sans titre', 'Untitled')"
-        :title="t('Nom du flux (dans la collection, à l’export et dans les liens de partage)', 'Flow name (in the collection, when exporting and in share links)')"
-      />
-      <v-divider vertical inset class="mx-2" />
-      <v-btn prepend-icon="mdi-file-outline" :title="t('Nouveau flux, ajouté à côté de celui-ci dans la collection', 'New flow, added next to this one in the collection')" @click="newMapping">{{ t('Nouveau', 'New') }}</v-btn>
-      <v-btn prepend-icon="mdi-school-outline" :title="t('Ajouter le flux de démonstration à la collection', 'Add the demo flow to the collection')" @click="loadDemo">{{ t('Démo', 'Demo') }}</v-btn>
+      <v-btn prepend-icon="mdi-file-outline" :title="t('Nouveau mapping, ajouté à côté de celui-ci dans la collection', 'New mapping, added next to this one in the collection')" @click="newMapping">{{ t('Nouveau', 'New') }}</v-btn>
+      <v-btn prepend-icon="mdi-school-outline" :title="t('Ajouter le mapping de démonstration à la collection', 'Add the demo mapping to the collection')" @click="loadDemo">{{ t('Démo', 'Demo') }}</v-btn>
       <v-divider vertical inset class="mx-2" />
       <v-btn icon="mdi-arrow-collapse-vertical" :title="t('Tout replier', 'Collapse all')" @click="collapseAll(true)" />
       <v-btn icon="mdi-arrow-expand-vertical" :title="t('Tout déplier', 'Expand all')" @click="collapseAll(false)" />
       <v-btn icon="mdi-graph-outline" :title="t('Réorganiser le schéma (colonnes dans le sens des liens)', 'Rearrange the schema (columns following the links)')" :disabled="schemaLocked" @click="arrangeSchema" />
     </template>
-    <v-btn v-else class="ml-2 text-none" prepend-icon="mdi-arrow-left" :title="t('Revenir au flux ouvert', 'Back to the open flow')" @click="closeModelEditor()">
-      {{ t('Retour au flux', 'Back to the flow') }} « {{ current.name }} »
+    <v-btn v-else class="ml-2 text-none" prepend-icon="mdi-arrow-left" :title="t('Revenir au mapping ouvert', 'Back to the open mapping')" @click="closeModelEditor()">
+      {{ t('Retour au mapping', 'Back to the mapping') }} « {{ current.name }} »
     </v-btn>
     <v-spacer />
     <v-btn prepend-icon="mdi-help-circle-outline" href="/noeuds" :title="t('Documentation des nœuds', 'Node documentation')">{{ t('Nœuds', 'Nodes') }}</v-btn>
@@ -37,20 +25,22 @@
   </v-app-bar>
 
   <CollectionsPanel
+    ref="panelRef"
     v-model="collectionsOpen"
     @export="exportItem"
     @image="exportImage"
-    @share="shareItem"
     @import="open"
     :editing-model-id="editingModelId"
     @edit-model="editModel"
     @use-model="useModel"
     @open-flow="openFlow"
+    @legend="legendOpen = true"
+    @shortcuts="shortcutsOpen = true"
   />
   <ImpactDialog :request="impactRequest" />
 
   <v-main>
-    <ModelEditor v-if="editingModelId" ref="modelEditorRef" :model-id="editingModelId" @save="saveEditedModel" @close="closeModelEditor()" />
+    <ModelEditor v-if="editingModelId" ref="modelEditorRef" :item-id="editingModelId" @save="saveEditedModel" @close="closeModelEditor()" />
     <div v-show="!editingModelId" class="editor" @mousemove="mouse = { x: $event.clientX, y: $event.clientY }" @dragover="onModelDragOver" @drop="onModelDrop">
       <VueFlow
         :id="FLOW_ID"
@@ -93,18 +83,6 @@
             @click="openAddMenuBelow"
           >
             {{ t('Ajouter', 'Add') }} <kbd>Shift A</kbd>
-          </v-btn>
-          <v-btn
-            class="side-block text-none font-weight-bold"
-            block
-            height="48"
-            rounded="lg"
-            elevation="4"
-            prepend-icon="mdi-map-legend"
-            :title="t('Légende : types, sockets, liens, couleurs', 'Legend: types, sockets, links, colors')"
-            @click="legendOpen = true"
-          >
-            {{ t('Légende', 'Legend') }}
           </v-btn>
           <ChecksPanel :issues="results.issues.list" :has-targets="nodes.some((n) => n.type === 'target')" @focus="focusNode" />
         </Panel>
@@ -157,6 +135,17 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="shortcutsOpen" max-width="760" scrollable>
+      <v-card>
+        <v-card-title class="d-flex align-center">
+          {{ t('Raccourcis', 'Shortcuts') }}
+          <v-spacer />
+          <v-btn icon="mdi-close" variant="text" size="small" :title="t('Fermer', 'Close')" @click="shortcutsOpen = false" />
+        </v-card-title>
+        <v-card-text><ShortcutsGrid /></v-card-text>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snack.show" :color="snack.color" :timeout="snack.action ? 5000 : snack.color === 'error' ? 3500 : 1800">
       {{ snack.text }}
       <template v-if="snack.action" #actions>
@@ -174,6 +163,7 @@ import { Background } from '@vue-flow/background';
 import { ControlButton, Controls } from '@vue-flow/controls';
 import AddMenu from '../components/AddMenu.vue';
 import LegendGrid from '../components/LegendGrid.vue';
+import ShortcutsGrid from '../components/ShortcutsGrid.vue';
 import LangSwitch from '../components/LangSwitch.vue';
 import LockIcon from '../components/LockIcon.vue';
 import ChecksPanel from '../components/ChecksPanel.vue';
@@ -186,7 +176,9 @@ import TransformNode from '../components/nodes/TransformNode.vue';
 import GroupNode from '../components/nodes/GroupNode.vue';
 import LibraryNode from '../components/nodes/LibraryNode.vue';
 import TypedEdge from '../components/nodes/TypedEdge.vue';
-import { DATA_FILES_KEY, EDGE_INSERT_KEY, LIBRARIES_KEY, MODEL_LINK_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
+import { DATA_FILES_KEY, EDGE_INSERT_KEY, LIBRARIES_KEY, LIST_LINK_KEY, MODEL_LINK_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
+import { askChoice, askConfirm, askText } from '../services/dialogs';
+import { applyList, createList, listContent, listImpactOf, listOf, revertListNode, sameList } from '../services/valueLists';
 import {
   applyModel,
   createModel,
@@ -203,7 +195,7 @@ import {
 import { checkDocument, describeProblem } from '../lib/conformity';
 import { demoGraph } from '../lib/demo';
 import { count, t } from '../lib/i18n';
-import { fieldFromSocket, migrateFields, parseDocument, newField, setTreeCollapsed } from '../lib/fields';
+import { allFields, fieldFromSocket, migrateFields, parseDocument, newField, setTreeCollapsed } from '../lib/fields';
 import { autoLayout } from '../lib/layout';
 import { fitGroup, groupAround, groupAt, groupsFirst, isGroup, newGroup, removeKeepingChildren, reparent } from '../lib/groups';
 import { createsCycle, evaluateGraph, getSocket } from '../lib/graph';
@@ -213,7 +205,6 @@ import { initialParams, inputsOf, TRANSFORMS } from '../lib/transforms';
 import { canConnect, isList, typeMismatch, uid } from '../lib/types';
 import { exportFile, openFile } from '../services/files';
 import { schemaImage } from '../services/image';
-import { clearSharedGraph, shareLink, sharedGraph } from '../services/share';
 import {
   activeCollection,
   activeMapping,
@@ -222,6 +213,8 @@ import {
   addImportedModels,
   allMappings,
   collectionFile,
+  collectionNamed,
+  replaceCollection,
   find,
   firstMapping,
   insertMapping,
@@ -344,6 +337,9 @@ const current = reactive({
   },
 });
 const legendOpen = ref(false);
+const shortcutsOpen = ref(false);
+/** Panneau de gauche (pour y lancer le renommage d'un nouveau mapping). */
+const panelRef = ref(null);
 const snack = reactive({ show: false, text: '', color: undefined, action: null });
 /** Message en bas de l'écran ; `action` : bouton `{ label, run }` (ex. annuler). */
 const notify = (text, color, action = null) => Object.assign(snack, { show: true, text, color, action });
@@ -522,65 +518,53 @@ async function exportImage(id = workspace.activeId) {
 }
 
 /**
- * Copie un lien qui contient tout l'élément `id` : un mapping, ou une collection (un dossier est partagé comme une
- * collection). Les fichiers de données chargés n'en font pas partie.
- */
-async function shareItem(id) {
-  saveGraph(); // le schéma affiché, même modifié à l'instant
-  const item = find(id);
-  if (!item) return;
-  try {
-    const content = JSON.parse(item.type === 'mapping' ? mappingFile(id) : collectionFile(id));
-    const link = await shareLink(content);
-    await navigator.clipboard.writeText(link);
-    const size = link.length > 30000 ? t(` — ${Math.round(link.length / 1000)} 000 caractères : certains outils pourraient le couper`, ` — ${Math.round(link.length / 1000)},000 characters: some tools might cut it`) : '';
-    notify(`${t('Lien copié', 'Link copied')}${size}`, size ? 'warning' : 'success');
-  } catch (e) {
-    notify(`${t('Partage impossible', 'Sharing failed')} : ${e.message}`, 'error');
-  }
-}
-
-/**
- * Ajoute ce qu'un fichier ou un lien de partage contient : un mapping, à côté du mapping ouvert ; une collection,
+ * Ajoute ce qu'un fichier importé contient : un mapping, à côté du mapping ouvert ; une collection,
  * à la liste des collections (son premier mapping est ouvert).
  */
-function addImported({ collection, mapping, library, models = [] }) {
+async function addImported({ collection, mapping, library, models = [] }) {
   collectionsOpen.value = true;
+  // Une collection du même nom existe déjà : la remplacer, garder les deux, ou ne rien importer.
+  let replaced = null;
+  const existing = collection && collectionNamed(collection.name);
+  if (existing) {
+    const n = leafCount(existing);
+    const choice = await askChoice({
+      title: t(`La collection « ${existing.name} » existe déjà`, `The collection “${existing.name}” already exists`),
+      text: t(
+        `La remplacer supprime ses ${count(n, 'mapping', 'mapping')} actuels au profit de ceux du fichier. Exportez-la d’abord pour la garder.`,
+        `Replacing it deletes its current ${count(n, 'mapping', 'mapping')} in favor of those of the file. Export it first to keep it.`,
+      ),
+      choices: [
+        { value: 'both', label: t('Garder les deux', 'Keep both') },
+        { value: 'replace', label: t('Remplacer', 'Replace'), color: 'warning' },
+      ],
+    });
+    if (!choice) return;
+    if (choice === 'replace') replaced = existing;
+  }
   if (library) {
     const n = addImportedLibrary(library);
-    return notify(t(`${count(n, 'modèle ajouté', 'model added', 'modèles ajoutés', 'models added')} à la bibliothèque (dossier « ${library.name} »).`, `${count(n, 'model', 'model')} added to the library (folder “${library.name}”).`), 'success');
+    return notify(t(`${count(n, 'élément ajouté', 'item added', 'éléments ajoutés', 'items added')} à la bibliothèque (dossier « ${library.name} »).`, `${count(n, 'item', 'item')} added to the library (folder “${library.name}”).`), 'success');
   }
   // Modèles joints aux flux : ajoutés à la bibliothèque s'ils n'y sont pas déjà.
   const name = collection?.name ?? mapping.name;
   const added = addImportedModels(models, t(`Importés — ${name}`, `Imported — ${name}`));
-  const extra = added ? t(` et ${count(added, 'modèle', 'model')} dans la bibliothèque`, ` and ${count(added, 'model', 'model')} in the library`) : '';
+  const extra = added ? t(` et ${count(added, 'élément', 'item')} dans la bibliothèque`, ` and ${count(added, 'item', 'item')} in the library`) : '';
   if (mapping) {
     insertMapping(mapping);
-    return notify(t(`Flux « ${mapping.name} » ajouté à la collection « ${activeCollection().name} »${extra}.`, `Flow « ${mapping.name} » added to the collection « ${activeCollection().name} »${extra}.`), 'success');
+    return notify(t(`Mapping « ${mapping.name} » ajouté à la collection « ${activeCollection().name} »${extra}.`, `Mapping « ${mapping.name} » added to the collection « ${activeCollection().name} »${extra}.`), 'success');
   }
-  addCollection(collection);
+  if (replaced) replaceCollection(replaced.id, collection);
+  else addCollection(collection);
   const first = firstMapping(collection.items);
   if (first) workspace.activeId = first.id;
-  const n = count(leafCount(collection), 'flux', 'flow', 'flux', 'flows');
-  notify(t(`Collection « ${collection.name} » ajoutée (${n})${extra}.`, `Collection « ${collection.name} » added (${n})${extra}.`), 'success');
-}
-
-/** Ouvre le mapping ou la collection contenu dans le lien de partage, s'il y en a un. */
-async function openShared() {
-  let content;
-  try {
-    content = await sharedGraph();
-  } catch {
-    clearSharedGraph();
-    return notify(t('Lien de partage illisible (incomplet ou abîmé) : rien n’a été ajouté.', 'Unreadable share link (incomplete or damaged): nothing was added.'), 'error');
-  }
-  if (!content) return;
-  clearSharedGraph();
-  try {
-    addImported(readFile(JSON.stringify(content)));
-  } catch {
-    notify(t('Le lien ne contient ni un flux ni une collection.', 'The link contains neither a flow nor a collection.'), 'error');
-  }
+  const n = count(leafCount(collection), 'mapping', 'mapping');
+  notify(
+    replaced
+      ? t(`Collection « ${collection.name} » remplacée (${n})${extra}.`, `Collection « ${collection.name} » replaced (${n})${extra}.`)
+      : t(`Collection « ${collection.name} » ajoutée (${n})${extra}.`, `Collection « ${collection.name} » added (${n})${extra}.`),
+    'success',
+  );
 }
 
 /** Importe un fichier choisi dans l'explorateur (mapping ou collection). */
@@ -588,15 +572,20 @@ async function open() {
   try {
     const file = await openFile();
     if (!file) return;
-    addImported(readFile(file.text, file.name));
+    await addImported(readFile(file.text, file.name));
   } catch (e) {
     notify(`${t('Ouverture impossible', 'Cannot open')} : ${e.message}`, 'error');
   }
 }
 
 /** Nouveau mapping vide, rangé à côté du mapping ouvert. */
-function newMapping() {
-  insertMapping(makeMapping());
+async function newMapping() {
+  if (editingModelId.value && !(await leaveModel())) return;
+  editingModelId.value = null;
+  const mapping = insertMapping(makeMapping());
+  // Son nom se saisit tout de suite, dans le panneau de gauche.
+  collectionsOpen.value = true;
+  panelRef.value?.renameMapping(mapping.id);
 }
 
 function loadDemo() {
@@ -604,9 +593,8 @@ function loadDemo() {
 }
 
 openActive();
-openShared();
 
-// ── Modèles de la bibliothèque ──────────────────────────────
+// ── Bibliothèque : modèles et listes de valeurs ─────────────
 
 /** Avertissement d'impact en cours (voir ImpactDialog) ; `askImpact` rend le choix : `apply`, `saveAs` ou `null`. */
 const impactRequest = ref(null);
@@ -621,101 +609,214 @@ const askImpact = (request) =>
     };
   });
 
-const askName = (question, initial) => prompt(question, initial)?.trim() || null;
 const sampleOfNode = (node) => (node.type === 'source' ? node.data.sample : undefined);
 
-/** Nombre d'autres flux (que celui ouvert) qui utilisent chaque modèle. */
+/** Nombre d'autres flux (que celui ouvert) qui utilisent chaque élément de la bibliothèque. */
 const otherUsage = computed(() => {
   const counts = new Map();
   for (const { mapping } of allMappings()) {
     if (mapping.id === workspace.activeId) continue;
-    for (const id of new Set(mapping.graph.nodes.map((n) => n.data?.modelId).filter(Boolean))) counts.set(id, (counts.get(id) ?? 0) + 1);
+    const ids = mapping.graph.nodes.flatMap((n) => [n.data?.modelId, n.data?.listId]).filter(Boolean);
+    for (const id of new Set(ids)) counts.set(id, (counts.get(id) ?? 0) + 1);
   }
   return counts;
 });
 
-/** Crée dans la bibliothèque un modèle à partir d'une source ou d'une cible du flux, et l'y relie. */
-function createModelFromNode(nodeId) {
-  const node = findNode(nodeId);
-  if (!node) return;
-  const name = askName(t('Nom du modèle dans la bibliothèque :', 'Model name in the library:'), node.data.label);
-  if (!name) return;
-  const model = createModel(name, node.data.fields, sampleOfNode(node));
-  updateNodeData(nodeId, { modelId: model.id });
-  notify(t(`Modèle « ${name} » ajouté à la bibliothèque (onglet Modèles).`, `Model “${name}” added to the library (Models tab).`), 'success');
-}
-
-/** Enregistre les champs d'un nœud sous un nouveau modèle (rangé à côté de son modèle d'origine), et l'y relie. */
-function saveNodeAsModel(nodeId) {
-  const node = findNode(nodeId);
-  if (!node) return;
-  const origin = modelOf(node.data);
-  const name = askName(t('Nom du nouveau modèle :', 'Name of the new model:'), origin ? `${origin.name} (${node.data.label})` : node.data.label);
-  if (!name) return;
-  const model = createModel(name, node.data.fields, sampleOfNode(node), origin ? folderOf(origin.id) : null);
-  updateNodeData(nodeId, { modelId: model.id });
-  notify(t(`Nouveau modèle « ${name} » créé ; « ${origin?.name ?? ''} » n’a pas changé.`, `New model “${name}” created; “${origin?.name ?? ''}” did not change.`), 'success');
-}
-
-/** Enregistre dans le modèle les modifications faites sur un nœud ; avertit d'abord si d'autres flux l'utilisent. */
-async function saveNodeToModel(nodeId) {
-  const node = findNode(nodeId);
-  const model = modelOf(node?.data);
-  if (!model) return;
-  const from = { mappingId: workspace.activeId, nodeId };
-  const fields = stripFields(node.data.fields);
-  const { changes, flows } = impactOf(model.id, fields, from);
-  if (flows.length) {
-    const choice = await askImpact({
-      title: t(`Modifier le modèle « ${model.name} » ?`, `Change the model “${model.name}”?`),
-      intro: t(
-        'Ce modèle est aussi utilisé ailleurs : la modification s’appliquera à tous ces flux, sauf là où le modèle a été modifié localement. Pour ne rien changer ailleurs, enregistrez sous un nouveau modèle.',
-        'This model is also used elsewhere: the change will apply to all these flows, except where the model was changed locally. To change nothing elsewhere, save as a new model.',
-      ),
-      changes,
-      flows,
-      allowSaveAs: true,
-      applyLabel: t('Appliquer à tous les flux', 'Apply to all flows'),
+/**
+ * Champs dont les références aux nœuds Liste de valeurs du flux reliés à la bibliothèque sont remplacées par l'id
+ * de la liste partagée : c'est ainsi qu'un modèle désigne une liste, quel que soit le flux.
+ */
+function sharedRefs(fields) {
+  const listIdOf = new Map(nodes.value.filter((n) => n.type === 'library' && n.data.listId).map((n) => [n.id, n.data.listId]));
+  const walk = (list) =>
+    list.map((f) => {
+      const ref = f.format?.library;
+      const next = listIdOf.has(ref) ? { ...f, format: { ...f.format, library: listIdOf.get(ref) } } : f;
+      return f.children ? { ...next, children: walk(f.children) } : next;
     });
-    if (choice === 'saveAs') return saveNodeAsModel(nodeId);
-    if (choice !== 'apply') return;
-  }
-  applyModel(model.id, fields, { sample: sampleOfNode(node), from });
-  notify(t(`Modèle « ${model.name} » enregistré.`, `Model “${model.name}” saved.`), 'success');
+  return walk(fields);
 }
 
-provide(MODEL_LINK_KEY, {
-  create: createModelFromNode,
-  save: saveNodeToModel,
-  saveAs: saveNodeAsModel,
-  revert: (nodeId) => revertNode(workspace.activeId, nodeId),
-  unlink: (nodeId) => updateNodeData(nodeId, { modelId: undefined }),
-  otherFlows: (modelId) => otherUsage.value.get(modelId) ?? 0,
-});
+/** Une liste vient d'être reliée à la bibliothèque : les champs du flux qui désignaient son nœud désignent la liste. */
+function relinkFieldsToList(nodeId, listId) {
+  for (const n of nodes.value) {
+    if ((n.type !== 'source' && n.type !== 'target') || !allFields(n.data.fields).some((f) => f.format?.library === nodeId)) continue;
+    const walk = (list) =>
+      list.map((f) => {
+        const next = f.format?.library === nodeId ? { ...f, format: { ...f.format, library: listId } } : f;
+        return f.children ? { ...next, children: walk(f.children) } : next;
+      });
+    updateNodeData(n.id, { fields: walk(n.data.fields) });
+  }
+}
+
+/** Les deux sortes d'éléments de la bibliothèque, et comment un nœud du flux s'y relie. */
+const KINDS = {
+  model: {
+    key: 'modelId',
+    itemOf: modelOf,
+    diverged: (data) => !sameFields(sharedRefs(data.fields), modelOf(data).fields),
+    content: (node) => ({ fields: stripFields(sharedRefs(node.data.fields)), sample: sampleOfNode(node) }),
+    create: (name, node, folderId) => createModel(name, sharedRefs(node.data.fields), sampleOfNode(node), folderId),
+    impact: (id, c, from) => impactOf(id, c.fields, from),
+    apply: (id, c, from) => applyModel(id, c.fields, { sample: c.sample, from }),
+    revert: revertNode,
+    texts: {
+      createTitle: t('Enregistrer dans la bibliothèque', 'Save to the library'),
+      nameLabel: t('Nom du modèle', 'Model name'),
+      created: (name) => t(`Modèle « ${name} » ajouté à la bibliothèque.`, `Model “${name}” added to the library.`),
+      saveAsTitle: t('Enregistrer sous un nouveau modèle', 'Save as a new model'),
+      variant: (origin, name) => t(`Nouveau modèle « ${name} » créé ; « ${origin} » n’a pas changé.`, `New model “${name}” created; “${origin}” did not change.`),
+      changeTitle: (name) => t(`Modifier le modèle « ${name} » ?`, `Change the model “${name}”?`),
+      saved: (name) => t(`Modèle « ${name} » enregistré.`, `Model “${name}” saved.`),
+    },
+  },
+  list: {
+    key: 'listId',
+    itemOf: listOf,
+    diverged: (data) => !sameList(data, listOf(data)),
+    content: (node) => listContent(node.data),
+    create: (name, node, folderId) => createList(name, node.data, folderId),
+    impact: (id, c, from) => listImpactOf(id, c, from),
+    apply: (id, c, from) => applyList(id, c, { from }),
+    revert: revertListNode,
+    texts: {
+      createTitle: t('Enregistrer dans la bibliothèque', 'Save to the library'),
+      nameLabel: t('Nom de la liste de valeurs', 'Value list name'),
+      created: (name) => t(`Liste « ${name} » ajoutée à la bibliothèque.`, `List “${name}” added to the library.`),
+      saveAsTitle: t('Enregistrer sous une nouvelle liste', 'Save as a new list'),
+      variant: (origin, name) => t(`Nouvelle liste « ${name} » créée ; « ${origin} » n’a pas changé.`, `New list “${name}” created; “${origin}” did not change.`),
+      changeTitle: (name) => t(`Modifier la liste « ${name} » ?`, `Change the list “${name}”?`),
+      saved: (name) => t(`Liste « ${name} » enregistrée.`, `List “${name}” saved.`),
+    },
+  },
+};
+
+/** Nom proposé pour une variante : celui d'origine suivi de « (variante) », sans répéter le nom du nœud s'il est le même. */
+const variantName = (origin, label) => (origin ? `${origin.name} ${t('(variante)', '(variant)')}` : label);
+
+/** Lien d'un nœud du flux avec la bibliothèque (bandeau ModelLink, bouton « base de données + »), pour une sorte d'élément. */
+function libraryLink(kindName) {
+  const kind = KINDS[kindName];
+
+  async function create(nodeId) {
+    const node = findNode(nodeId);
+    if (!node) return;
+    const name = await askText({ title: kind.texts.createTitle, label: kind.texts.nameLabel, initial: node.data.label, okLabel: t('Enregistrer', 'Save') });
+    if (!name) return;
+    const item = kind.create(name, node, null);
+    updateNodeData(nodeId, { [kind.key]: item.id });
+    if (kindName === 'list') relinkFieldsToList(nodeId, item.id);
+    notify(kind.texts.created(name), 'success');
+  }
+
+  async function saveAs(nodeId) {
+    const node = findNode(nodeId);
+    if (!node) return;
+    const origin = kind.itemOf(node.data);
+    const name = await askText({ title: kind.texts.saveAsTitle, label: kind.texts.nameLabel, initial: variantName(origin, node.data.label), okLabel: t('Créer', 'Create') });
+    if (!name) return;
+    const item = kind.create(name, node, origin ? folderOf(origin.id) : null);
+    updateNodeData(nodeId, { [kind.key]: item.id });
+    // Une variante de liste : les champs du flux qui désignaient ce nœud (ou l'ancienne liste) suivent la nouvelle.
+    if (kindName === 'list') {
+      relinkFieldsToList(nodeId, item.id);
+      if (origin && !nodes.value.some((n) => n.data?.listId === origin.id)) relinkFieldsToList(origin.id, item.id);
+    }
+    notify(kind.texts.variant(origin?.name ?? '', name), 'success');
+  }
+
+  async function save(nodeId) {
+    const node = findNode(nodeId);
+    const item = kind.itemOf(node?.data);
+    if (!item) return;
+    const from = { mappingId: workspace.activeId, nodeId };
+    const content = kind.content(node);
+    const { changes, flows } = kind.impact(item.id, content, from);
+    if (flows.length) {
+      const choice = await askImpact({
+        title: kind.texts.changeTitle(item.name),
+        intro: t(
+          'Cet élément de la bibliothèque est aussi utilisé ailleurs : la modification s’appliquera à tous ces mappings, sauf là où il a été modifié localement. Pour ne rien changer ailleurs, enregistrez-le sous un nouveau nom.',
+          'It is also used elsewhere: the change will apply to all these mappings, except where it was changed locally. To change nothing elsewhere, save as a new item.',
+        ),
+        changes,
+        flows,
+        allowSaveAs: true,
+        saveAsLabel: kind.texts.saveAsTitle,
+        applyLabel: t('Appliquer à tous les mappings', 'Apply to all mappings'),
+      });
+      if (choice === 'saveAs') return saveAs(nodeId);
+      if (choice !== 'apply') return;
+    }
+    kind.apply(item.id, content, from);
+    notify(kind.texts.saved(item.name), 'success');
+  }
+
+  return {
+    linkedId: (data) => data?.[kind.key],
+    itemOf: kind.itemOf,
+    diverged: kind.diverged,
+    create,
+    save,
+    saveAs,
+    revert: (nodeId) => kind.revert(workspace.activeId, nodeId),
+    unlink: (nodeId) => updateNodeData(nodeId, { [kind.key]: undefined }),
+    otherFlows: (id) => otherUsage.value.get(id) ?? 0,
+  };
+}
+
+provide(MODEL_LINK_KEY, libraryLink('model'));
+provide(LIST_LINK_KEY, libraryLink('list'));
+
+const LOCKED_MESSAGE = () => t('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour ajouter un nœud.', 'Schema locked: unlock it (padlock at the bottom left) to add a node.');
+
+/** Position dans le schéma : là où un élément a été lâché (`screen`), sinon une fraction (`fx`, `fy`) de la vue. */
+function flowPosition(screen, fx, fy) {
+  const rect = vueFlowRef.value.getBoundingClientRect();
+  return project(screen ? { x: screen.x - rect.left, y: screen.y - rect.top } : { x: rect.width * fx, y: rect.height * fy });
+}
+
+/** Nœud Liste de valeurs relié à une liste de la bibliothèque. */
+const listNode = (list, position) => ({ id: uid('library'), type: 'library', position, data: { label: list.name, ...listContent(list), listId: list.id } });
+
+/** Listes de la bibliothèque désignées par les champs d'un modèle et absentes du flux : ajoutées à côté du nœud. */
+function missingListNodes(fields, near) {
+  const present = new Set(nodes.value.map((n) => n.data?.listId).filter(Boolean));
+  const ids = new Set(allFields(fields).map((f) => f.format?.library).filter((id) => id && !present.has(id)));
+  return [...ids]
+    .map(find)
+    .filter((l) => l?.type === 'valuelist')
+    .map((l, i) => listNode(l, { x: near.x - 300, y: near.y + i * 160 }));
+}
 
 /**
- * Ajoute un modèle de la bibliothèque au flux ouvert, comme source ou comme cible ; `screen` : point de l'écran
- * où le placer (là où il a été lâché), sinon à gauche (source) ou à droite (cible) de la vue.
+ * Ajoute un élément de la bibliothèque au flux ouvert : un modèle comme source ou comme cible (avec les listes de
+ * valeurs que désignent ses champs, si le flux ne les a pas), une liste comme nœud Liste de valeurs. `screen` :
+ * point de l'écran où le placer (là où il a été lâché).
  */
-function useModel(modelId, kind, screen = null) {
-  const model = find(modelId);
-  if (!model) return;
+async function useModel(itemId, kind, screen = null) {
+  const item = find(itemId);
+  if (!item) return;
   // Le nœud s'ajoute au flux : celui-ci revient à l'écran.
   if (editingModelId.value) {
-    if (!leaveModel()) return;
+    if (!(await leaveModel())) return;
     editingModelId.value = null;
   }
-  if (schemaLocked.value) return notify(t('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour ajouter un nœud.', 'Schema locked: unlock it (padlock at the bottom left) to add a node.'), 'warning');
-  const rect = vueFlowRef.value.getBoundingClientRect();
-  const position = project(
-    screen ? { x: screen.x - rect.left, y: screen.y - rect.top } : { x: rect.width * (kind === 'source' ? 0.15 : 0.6), y: rect.height * 0.25 },
-  );
-  const data = { label: model.name, fields: JSON.parse(JSON.stringify(model.fields)), modelId, ...(kind === 'source' && { sample: sampleForSource(model) }) };
-  addNodes([{ id: uid(kind), type: kind, position, data }]);
+  if (schemaLocked.value) return notify(LOCKED_MESSAGE(), 'warning');
+  if (item.type === 'valuelist') {
+    addNodes([listNode(item, flowPosition(screen, 0.1, 0.6))]);
+    return notify(t(`Liste « ${item.name} » ajoutée au mapping.`, `List “${item.name}” added to the mapping.`), 'success');
+  }
+  const position = flowPosition(screen, kind === 'source' ? 0.15 : 0.6, 0.25);
+  const data = { label: item.name, fields: JSON.parse(JSON.stringify(item.fields)), modelId: itemId, ...(kind === 'source' && { sample: sampleForSource(item) }) };
+  const lists = missingListNodes(item.fields, position);
+  addNodes([{ id: uid(kind), type: kind, position, data }, ...lists]);
+  const extra = lists.length ? t(` (et ${count(lists.length, 'liste de valeurs', 'value list', 'listes de valeurs', 'value lists')} qu’il utilise)`, ` (and ${count(lists.length, 'value list', 'value list')} it uses)`) : '';
   notify(
     kind === 'source'
-      ? t(`Modèle « ${model.name} » ajouté au flux comme source.`, `Model “${model.name}” added to the flow as a source.`)
-      : t(`Modèle « ${model.name} » ajouté au flux comme cible.`, `Model “${model.name}” added to the flow as a target.`),
+      ? t(`Modèle « ${item.name} » ajouté au mapping comme source${extra}.`, `Model “${item.name}” added to the mapping as a source${extra}.`)
+      : t(`Modèle « ${item.name} » ajouté au mapping comme cible${extra}.`, `Model “${item.name}” added to the mapping as a target${extra}.`),
     'success',
   );
 }
@@ -734,8 +835,11 @@ function onModelDrop(e) {
   if (!isModelDrag(e)) return;
   e.preventDefault();
   const id = e.dataTransfer.getData(MODEL_DRAG_TYPE);
-  if (schemaLocked.value) return notify(t('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour ajouter un nœud.', 'Schema locked: unlock it (padlock at the bottom left) to add a node.'), 'warning');
-  if (id) modelDrop.value = { id, x: e.clientX, y: e.clientY };
+  if (!id) return;
+  if (schemaLocked.value) return notify(LOCKED_MESSAGE(), 'warning');
+  // Une liste s'ajoute directement ; pour un modèle, on choisit source ou cible.
+  if (find(id)?.type === 'valuelist') return useModel(id, 'library', { x: e.clientX, y: e.clientY });
+  modelDrop.value = { id, x: e.clientX, y: e.clientY };
 }
 
 function dropModelAs(kind) {
@@ -744,83 +848,96 @@ function dropModelAs(kind) {
   useModel(id, kind, { x, y });
 }
 
-// ── Éditeur de modèles ──────────────────────────────────────
-// Un modèle s'ouvre à la place du flux, dans son propre canevas (ModelEditor) ; le flux reste en mémoire.
+// ── Éditeur de la bibliothèque ──────────────────────────────
+// Un modèle ou une liste s'ouvre à la place du flux, sur son propre canevas (ModelEditor) ; le flux reste en mémoire.
 
-/** Modèle ouvert dans l'éditeur de modèles (`null` : le flux est affiché). */
+/** Élément de la bibliothèque ouvert dans son éditeur (`null` : le flux est affiché). */
 const editingModelId = ref(null);
 const modelEditorRef = ref(null);
 
-/** Quitter le modèle ouvert : avec accord s'il a des modifications non enregistrées. */
-const leaveModel = () =>
+/** Quitter l'élément ouvert : avec accord s'il a des modifications non enregistrées. */
+const leaveModel = async () =>
   !modelEditorRef.value?.dirty ||
-  confirm(t('Le modèle a des modifications non enregistrées. Les abandonner ?', 'The model has unsaved changes. Discard them?'));
+  askConfirm({
+    title: t('Modifications non enregistrées', 'Unsaved changes'),
+    text: t('L’élément de la bibliothèque ouvert a des modifications non enregistrées. Les abandonner ?', 'The open library item has unsaved changes. Discard them?'),
+    okLabel: t('Abandonner', 'Discard'),
+    danger: true,
+  });
 
-function editModel(id) {
-  if (id === editingModelId.value || !leaveModel()) return;
+async function editModel(id) {
+  if (id === editingModelId.value || !(await leaveModel())) return;
   saveGraph();
   nodeMenu.value = null;
   addMenu.value = null;
   editingModelId.value = id;
 }
 
-function closeModelEditor() {
-  if (!leaveModel()) return;
+async function closeModelEditor() {
+  if (!(await leaveModel())) return;
   editingModelId.value = null;
 }
 
-/** Ouvre un flux de la collection (et ferme l'éditeur de modèles s'il était ouvert). */
-function openFlow(id) {
-  if (editingModelId.value && !leaveModel()) return;
+/** Ouvre un flux de la collection (et ferme l'éditeur de la bibliothèque s'il était ouvert). */
+async function openFlow(id) {
+  if (editingModelId.value && !(await leaveModel())) return;
   editingModelId.value = null;
-  workspace.activeId = id;
+  // Sans id : seulement revenir au mapping (un nouveau mapping vient d'être ouvert par le panneau).
+  if (id) workspace.activeId = id;
 }
 
-// Modèle supprimé pendant qu'il est ouvert : retour au flux.
+// Élément supprimé pendant qu'il est ouvert : retour au flux.
 watch(
   () => editingModelId.value && !find(editingModelId.value),
   (gone) => gone && (editingModelId.value = null),
 );
 
-async function saveEditedModel({ name, fields, sample }) {
+async function saveEditedModel(payload) {
   const id = editingModelId.value;
-  const result = await commitModelEdit(id, fields, sample, name);
+  const result = await commitLibraryEdit(id, payload);
   if (result === 'applied') modelEditorRef.value?.reload();
   else if (result?.created) editingModelId.value = result.created; // la variante créée s'ouvre à sa place
 }
 
 /**
- * Enregistre une modification faite dans la bibliothèque ; si la structure change et que des flux utilisent le
- * modèle, avertit d'abord. Rend `applied`, `{ created }` (enregistré sous un nouveau modèle) ou `null` (annulé).
+ * Enregistre une modification faite dans la bibliothèque (`payload` : `{ name, fields, sample }` pour un modèle,
+ * `{ name, list }` pour une liste). Si le contenu change et que des flux l'utilisent, avertit d'abord. Rend
+ * `applied`, `{ created }` (enregistré sous un nouvel élément) ou `null` (annulé).
  */
-async function commitModelEdit(id, fields, sample, name) {
-  const model = find(id);
-  if (!model) return null;
-  const { changes, flows } = impactOf(id, fields);
-  if (flows.length && !sameFields(fields, model.fields)) {
+async function commitLibraryEdit(id, payload) {
+  const item = find(id);
+  if (!item) return null;
+  const isList = item.type === 'valuelist';
+  const kind = KINDS[isList ? 'list' : 'model'];
+  const content = isList ? payload.list : { fields: payload.fields, sample: payload.sample };
+  const changed = isList ? !sameList(content, item) : !sameFields(content.fields, item.fields);
+  const { changes, flows } = kind.impact(id, content, null);
+  if (flows.length && changed) {
     const choice = await askImpact({
-      title: t(`Modifier le modèle « ${model.name} » ?`, `Change the model “${model.name}”?`),
+      title: kind.texts.changeTitle(item.name),
       intro: t(
-        'Ce modèle est utilisé par des flux : la modification s’y appliquera, sauf là où le modèle a été modifié localement.',
-        'This model is used by flows: the change will apply to them, except where the model was changed locally.',
+        'Cet élément de la bibliothèque est utilisé par des mappings : la modification s’y appliquera, sauf là où il a été modifié localement.',
+        'It is used by mappings: the change will apply to them, except where it was changed locally.',
       ),
       changes,
       flows,
       allowSaveAs: true,
+      saveAsLabel: kind.texts.saveAsTitle,
       applyLabel: t('Appliquer', 'Apply'),
     });
     if (choice === 'saveAs') {
-      const newName = askName(t('Nom du nouveau modèle :', 'Name of the new model:'), `${name ?? model.name} ${t('(variante)', '(variant)')}`);
-      if (!newName) return null;
-      const created = createModel(newName, fields, sample, folderOf(id));
-      notify(t(`Nouveau modèle « ${newName} » créé ; « ${model.name} » n’a pas changé.`, `New model “${newName}” created; “${model.name}” did not change.`), 'success');
+      const name = await askText({ title: kind.texts.saveAsTitle, label: kind.texts.nameLabel, initial: variantName(item, payload.name), okLabel: t('Créer', 'Create') });
+      if (!name) return null;
+      const created = isList ? createList(name, content, folderOf(id)) : createModel(name, content.fields, content.sample, folderOf(id));
+      notify(kind.texts.variant(item.name, name), 'success');
       return { created: created.id };
     }
     if (choice !== 'apply') return null;
   }
-  if (name) model.name = name;
-  applyModel(id, fields, { sample });
-  notify(t(`Modèle « ${model.name} » enregistré.`, `Model “${model.name}” saved.`), 'success');
+  if (payload.name) item.name = payload.name;
+  if (isList) applyList(id, content);
+  else applyModel(id, content.fields, { sample: content.sample });
+  notify(kind.texts.saved(item.name), 'success');
   return 'applied';
 }
 
@@ -996,7 +1113,7 @@ function addNode(kind, screen, link) {
   } else if (kind === 'library') {
     // Tirée depuis une entrée objet (la Table d'un Transcoder) : une table de correspondance ; sinon sa liste de valeurs.
     const table = link?.side === 'target' && link.socket.type === 'object';
-    node = { id, type: 'library', position, data: { label: t('Nouvelle bibliothèque', 'New library'), item: 'string', values: [], ...(table && { mapped: true, outItem: 'string', targets: [] }) } };
+    node = { id, type: 'library', position, data: { label: t('Nouvelle liste de valeurs', 'New value list'), item: 'string', values: [], ...(table && { mapped: true, outItem: 'string', targets: [] }) } };
     if (link?.side === 'target') handle = table ? LIBRARY_TABLE : LIBRARY_OUTPUT;
   } else {
     const def = TRANSFORMS[kind];
@@ -1030,6 +1147,8 @@ function onKeydown(e) {
     if (ctrl && key === 's') {
       e.preventDefault();
       modelEditorRef.value?.save();
+    } else if (e.key === '?' && !isEditable(e.target)) {
+      shortcutsOpen.value = true;
     }
     return;
   }
@@ -1041,6 +1160,11 @@ function onKeydown(e) {
   }
   if (placing.value && key === 'escape') return endPlacing(false);
   if (isEditable(e.target)) return;
+  if (e.key === '?') {
+    e.preventDefault();
+    shortcutsOpen.value = true;
+    return;
+  }
   if (schemaLocked.value) {
     if (ctrl && (key === 'z' || key === 'y')) {
       e.preventDefault();

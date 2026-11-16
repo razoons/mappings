@@ -64,8 +64,8 @@ export function checkDocument(fields, doc, libraries = new Map()) {
     checkTyped(f, type, v, path, x, err);
     if (!isSet(x.library)) return;
     const lib = libraries.get(x.library);
-    if (!lib) add('warning', f.id, path, t('Bibliothèque de valeurs supprimée : valeurs non contrôlées', 'Value library deleted: values not checked'));
-    else if (!lib.has(v)) err(t(`Absent de la bibliothèque « ${libraryName(libraries, x.library)} »`, `Not in the library “${libraryName(libraries, x.library)}”`));
+    if (!lib) add('warning', f.id, path, t('Liste de valeurs absente (supprimée, ou pas dans ce mapping) : valeurs non contrôlées', 'Value list missing (deleted, or not in this mapping): values not checked'));
+    else if (!lib.has(v)) err(t(`Absent de la liste « ${libraryName(libraries, x.library)} »`, `Not in the list “${libraryName(libraries, x.library)}”`));
   }
 
   function checkTyped(f, type, v, path, x, err) {

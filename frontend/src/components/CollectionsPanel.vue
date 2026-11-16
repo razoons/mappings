@@ -4,8 +4,8 @@
     <div class="collections">
       <div class="d-flex align-center pl-1 pr-1 pt-1">
         <v-tabs v-model="tab" density="compact" class="flex-grow-1">
-          <v-tab value="flows" class="text-none">{{ t('Flux', 'Flows') }}</v-tab>
-          <v-tab value="models" class="text-none">{{ t('Modèles', 'Models') }}</v-tab>
+          <v-tab value="flows" class="text-none">{{ t('Mappings', 'Mappings') }}</v-tab>
+          <v-tab value="library" class="text-none">{{ t('Bibliothèque', 'Library') }}</v-tab>
         </v-tabs>
         <v-btn icon="mdi-chevron-double-left" size="small" variant="text" :title="t('Masquer le panneau', 'Hide the panel')" @click="$emit('update:modelValue', false)" />
       </div>
@@ -23,10 +23,11 @@
           <v-btn icon="mdi-plus" size="small" variant="text" :title="t('Nouvelle collection', 'New collection')" @click="newCollection" />
         </template>
         <template v-else>
-          <v-btn icon="mdi-database-plus-outline" size="small" variant="text" :title="t('Nouveau modèle', 'New model')" @click="newModel(null)" />
+          <v-btn icon="mdi-database-plus-outline" size="small" variant="text" :title="t('Nouveau modèle (structure d’une source ou d’une cible)', 'New model (structure of a source or target)')" @click="newModel(null)" />
+          <v-btn icon="mdi-playlist-plus" size="small" variant="text" :title="t('Nouvelle liste de valeurs (énumération, transcodage)', 'New value list (enumeration, transcoding)')" @click="newList(null)" />
           <v-btn icon="mdi-folder-plus-outline" size="small" variant="text" :title="t('Nouveau dossier', 'New folder')" @click="startRename(addFolder(LIBRARY_ID).id)" />
         </template>
-        <v-btn icon="mdi-import" size="small" variant="text" :title="t('Importer un fichier .json : flux, collection ou modèles', 'Import a .json file: flow, collection or models')" @click="$emit('import')" />
+        <v-btn icon="mdi-import" size="small" variant="text" :title="t('Importer un fichier .json : mapping, collection ou export de la bibliothèque', 'Import a .json file: mapping, collection or library export')" @click="$emit('import')" />
       </div>
       <v-alert v-if="storage.error" type="warning" density="compact" variant="tonal" class="mx-3 mt-2 text-caption">
         {{ t('Les données ne peuvent plus être enregistrées dans le navigateur (espace plein ?). Exportez-les pour ne rien perdre.', 'Data can no longer be saved in the browser (storage full?). Export it so nothing is lost.') }}
@@ -35,14 +36,22 @@
         <CollectionTree :items="roots" />
         <div v-if="!roots.length" class="text-caption text-medium-emphasis px-4 py-2">
           {{
-            tab === 'models'
-              ? t('Aucun modèle. Créez-en un ici, ou depuis une source ou une cible d’un flux (bouton de la bibliothèque dans son en-tête).', 'No model yet. Create one here, or from a source or target of a flow (library button in its header).')
+            tab === 'library'
+              ? t('Bibliothèque vide. Créez ici un modèle ou une liste de valeurs, ou enregistrez-en un depuis un mapping (bouton « base de données + » de l’en-tête d’une source, d’une cible ou d’une liste).', 'Empty library. Create a model or a value list here, or save one from a mapping (“database +” button in the header of a source, target or list).')
               : t('Aucune collection.', 'No collection.')
           }}
         </div>
         <div v-else-if="filter && !roots.some(shown)" class="text-caption text-medium-emphasis px-4 py-2">
           {{ t('Aucun élément ne correspond.', 'No matching item.') }}
         </div>
+      </div>
+      <div class="panel-footer">
+        <v-btn class="text-none" variant="text" size="small" prepend-icon="mdi-map-legend" :title="t('Légende : types, sockets, liens, couleurs', 'Legend: types, sockets, links, colors')" @click="$emit('legend')">
+          {{ t('Légende', 'Legend') }}
+        </v-btn>
+        <v-btn class="text-none" variant="text" size="small" prepend-icon="mdi-keyboard-outline" :title="t('Raccourcis clavier et souris (?)', 'Keyboard and mouse shortcuts (?)')" @click="$emit('shortcuts')">
+          {{ t('Raccourcis', 'Shortcuts') }}
+        </v-btn>
       </div>
     </div>
   </v-navigation-drawer>
@@ -69,6 +78,8 @@ import {
   workspace,
 } from '../services/collections';
 import { createModel, deleteLibraryFolder, deleteModel, MODEL_DRAG_TYPE, usageCounts, usageOf } from '../services/models';
+import { createList, deleteList, listUsage } from '../services/valueLists';
+import { askConfirm } from '../services/dialogs';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -76,13 +87,13 @@ const props = defineProps({
   editingModelId: { type: String, default: null },
 });
 /**
- * `export` / `image` / `share` : exporter l'élément `id` en fichier, en image, en lien ; `import` : importer un
- * fichier ; `edit-model` : modifier le modèle `id` ; `use-model` : `(id, 'source' | 'target')` l'ajouter au flux ouvert.
+ * `export` / `image` : exporter l'élément `id` en fichier, en image ; `import` : importer un
+ * fichier ; `edit-model` : modifier le modèle ou la liste `id` ; `use-model` : `(id, 'source' | 'target' | 'library')`, l'ajouter au flux ouvert.
  */
-const emit = defineEmits(['update:modelValue', 'export', 'image', 'share', 'import', 'edit-model', 'use-model', 'open-flow']);
+const emit = defineEmits(['update:modelValue', 'export', 'image', 'import', 'edit-model', 'use-model', 'open-flow', 'legend', 'shortcuts']);
 
 const tab = ref('flows');
-const roots = computed(() => (tab.value === 'models' ? workspace.library.items : workspace.collections));
+const roots = computed(() => (tab.value === 'library' ? workspace.library.items : workspace.collections));
 /** Nombre de flux qui utilisent chaque modèle. */
 const usage = computed(() => usageCounts());
 
@@ -110,57 +121,102 @@ function newCollection() {
   startRename(addCollection().id);
 }
 
+/** Nouveau mapping dans un conteneur : il s'ouvre, et son nom se saisit tout de suite. */
+function newMappingIn(containerId) {
+  const mapping = makeMapping();
+  emit('open-flow', null); // ferme l'éditeur de la bibliothèque s'il est ouvert
+  insertMapping(mapping, containerId);
+  renameMapping(mapping.id);
+}
+
+/** Lance la saisie du nom d'un mapping, dans l'onglet Mappings. */
+function renameMapping(id) {
+  tab.value = 'flows';
+  filter.value = '';
+  startRename(id);
+}
+
+defineExpose({ renameMapping });
+
 function newModel(folderId) {
   startRename(createModel(t('Nouveau modèle', 'New model'), [newField([], 'id')], undefined, folderId).id);
 }
 
-const flowList = (uses) => uses.map((u) => `• ${[...u.path, u.mapping.name].join(' › ')}`).join('\n');
+function newList(folderId) {
+  startRename(createList(t('Nouvelle liste de valeurs', 'New value list'), { item: 'string', values: [] }, folderId).id);
+}
 
-function confirmRemove(item) {
-  if (item.type === 'model') {
-    const uses = usageOf(item.id);
-    const question = uses.length
-      ? t(
-          `Le modèle « ${item.name} » est utilisé par ${count(uses.length, 'flux', 'flow', 'flux', 'flows')} :\n${flowList(uses)}\n\nLe supprimer quand même ? Ses sources et cibles gardent leurs champs, mais ne sont plus reliées au modèle.`,
-          `The model « ${item.name} » is used by ${count(uses.length, 'flow', 'flow')}:\n${flowList(uses)}\n\nDelete it anyway? Its sources and targets keep their fields, but are no longer linked to the model.`,
-        )
-      : t(`Supprimer le modèle « ${item.name} » ?`, `Delete the model « ${item.name} »?`);
-    if (confirm(question)) deleteModel(item.id);
+const flowNames = (uses) => uses.map((u) => [...u.path, u.mapping.name].join(' › '));
+
+async function confirmRemove(item) {
+  if (item.type === 'model' || item.type === 'valuelist') {
+    const isList = item.type === 'valuelist';
+    const uses = isList ? listUsage(item.id) : usageOf(item.id);
+    const ok = await askConfirm({
+      title: isList ? t(`Supprimer la liste « ${item.name} » ?`, `Delete the list “${item.name}”?`) : t(`Supprimer le modèle « ${item.name} » ?`, `Delete the model “${item.name}”?`),
+      text: uses.length
+        ? isList
+          ? t(`Elle est utilisée par ${count(uses.length, 'mapping', 'mapping')} : leurs nœuds gardent leurs valeurs, mais n’y sont plus reliés.`, `It is used by ${count(uses.length, 'mapping', 'mapping')}: their nodes keep their values, but are no longer linked to it.`)
+          : t(`Il est utilisé par ${count(uses.length, 'mapping', 'mapping')} : leurs sources et cibles gardent leurs champs, mais n’y sont plus reliées.`, `It is used by ${count(uses.length, 'mapping', 'mapping')}: their sources and targets keep their fields, but are no longer linked to it.`)
+        : '',
+      lines: flowNames(uses),
+      okLabel: t('Supprimer', 'Delete'),
+      danger: true,
+    });
+    if (!ok) return;
+    if (isList) deleteList(item.id);
+    else deleteModel(item.id);
     return;
   }
   const n = isContainer(item) ? leafCount(item) : 0;
-  const inLibrary = tab.value === 'models';
-  const what = inLibrary ? count(n, 'modèle', 'model') : count(n, 'flux', 'flow', 'flux', 'flows');
-  const question =
-    item.type === 'mapping'
-      ? t(`Supprimer le flux « ${item.name} » ?`, `Delete the flow « ${item.name} »?`)
-      : t(
-          `Supprimer « ${item.name} » et ${n ? `ses ${what}` : 'son contenu'} ? Exportez-le d’abord pour le garder.`,
-          `Delete « ${item.name} » and ${n ? `its ${what}` : 'its content'}? Export it first to keep it.`,
-        );
-  if (!confirm(question)) return;
+  const inLibrary = tab.value === 'library';
+  const what = inLibrary ? count(n, 'élément', 'item') : count(n, 'mapping', 'mapping');
+  const ok = await askConfirm({
+    title: item.type === 'mapping' ? t(`Supprimer le mapping « ${item.name} » ?`, `Delete the mapping “${item.name}”?`) : t(`Supprimer « ${item.name} » ?`, `Delete “${item.name}”?`),
+    text:
+      item.type === 'mapping'
+        ? ''
+        : t(`Son contenu (${n ? what : 'vide'}) est supprimé aussi. Exportez-le d’abord pour le garder.`, `Its content (${n ? what : 'empty'}) is deleted too. Export it first to keep it.`),
+    okLabel: t('Supprimer', 'Delete'),
+    danger: true,
+  });
+  if (!ok) return;
   if (inLibrary) deleteLibraryFolder(item.id);
   else remove(item.id);
 }
 
-function modelActions(item) {
+function libraryActions(item) {
+  const common = [
+    { icon: 'mdi-pencil-outline', label: t('Renommer', 'Rename'), run: () => startRename(item.id) },
+    { icon: 'mdi-content-copy', label: t('Dupliquer', 'Duplicate'), run: () => duplicate(item.id) },
+  ];
+  const remove = { icon: 'mdi-delete-outline', label: t('Supprimer', 'Delete'), danger: true, run: () => confirmRemove(item) };
   if (item.type === 'model') {
     return [
-      { icon: 'mdi-arrow-right-bold-box-outline', label: t('Ajouter au flux ouvert comme source', 'Add to the open flow as a source'), run: () => emit('use-model', item.id, 'source') },
-      { icon: 'mdi-arrow-left-bold-box-outline', label: t('Ajouter au flux ouvert comme cible', 'Add to the open flow as a target'), run: () => emit('use-model', item.id, 'target') },
-      { icon: 'mdi-code-braces', label: t('Modifier le modèle', 'Edit the model'), run: () => emit('edit-model', item.id) },
-      { icon: 'mdi-pencil-outline', label: t('Renommer', 'Rename'), run: () => startRename(item.id) },
-      { icon: 'mdi-content-copy', label: t('Dupliquer', 'Duplicate'), run: () => duplicate(item.id) },
+      { icon: 'mdi-arrow-right-bold-box-outline', label: t('Ajouter au mapping ouvert comme source', 'Add to the open mapping as a source'), run: () => emit('use-model', item.id, 'source') },
+      { icon: 'mdi-arrow-left-bold-box-outline', label: t('Ajouter au mapping ouvert comme cible', 'Add to the open mapping as a target'), run: () => emit('use-model', item.id, 'target') },
+      { icon: 'mdi-pencil-ruler', label: t('Modifier le modèle', 'Edit the model'), run: () => emit('edit-model', item.id) },
+      ...common,
       { icon: 'mdi-export', label: t('Exporter le modèle (.json)', 'Export the model (.json)'), run: () => emit('export', item.id) },
-      { icon: 'mdi-delete-outline', label: t('Supprimer', 'Delete'), danger: true, run: () => confirmRemove(item) },
+      remove,
+    ];
+  }
+  if (item.type === 'valuelist') {
+    return [
+      { icon: 'mdi-plus-box-outline', label: t('Ajouter au mapping ouvert', 'Add to the open mapping'), run: () => emit('use-model', item.id, 'library') },
+      { icon: 'mdi-pencil-ruler', label: t('Modifier la liste', 'Edit the list'), run: () => emit('edit-model', item.id) },
+      ...common,
+      { icon: 'mdi-export', label: t('Exporter la liste (.json)', 'Export the list (.json)'), run: () => emit('export', item.id) },
+      remove,
     ];
   }
   return [
     { icon: 'mdi-database-plus-outline', label: t('Nouveau modèle', 'New model'), run: () => newModel(item.id) },
+    { icon: 'mdi-playlist-plus', label: t('Nouvelle liste de valeurs', 'New value list'), run: () => newList(item.id) },
     { icon: 'mdi-folder-plus-outline', label: t('Nouveau dossier', 'New folder'), run: () => startRename(addFolder(item.id).id) },
     { icon: 'mdi-pencil-outline', label: t('Renommer', 'Rename'), run: () => startRename(item.id) },
-    { icon: 'mdi-export', label: t('Exporter les modèles du dossier (.json)', 'Export the folder models (.json)'), run: () => emit('export', item.id) },
-    { icon: 'mdi-delete-outline', label: t('Supprimer', 'Delete'), danger: true, run: () => confirmRemove(item) },
+    { icon: 'mdi-export', label: t('Exporter le dossier (.json)', 'Export the folder (.json)'), run: () => emit('export', item.id) },
+    remove,
   ];
 }
 
@@ -168,7 +224,7 @@ function flowActions(item) {
   const list = [];
   if (isContainer(item)) {
     list.push(
-      { icon: 'mdi-vector-polyline-plus', label: t('Nouveau flux', 'New flow'), run: () => insertMapping(makeMapping(), item.id) },
+      { icon: 'mdi-vector-polyline-plus', label: t('Nouveau mapping', 'New mapping'), run: () => newMappingIn(item.id) },
       { icon: 'mdi-folder-plus-outline', label: t('Nouveau dossier', 'New folder'), run: () => startRename(addFolder(item.id).id) },
     );
   }
@@ -178,7 +234,7 @@ function flowActions(item) {
     {
       icon: 'mdi-export',
       label: {
-        mapping: t('Exporter le flux (.json)', 'Export the flow (.json)'),
+        mapping: t('Exporter le mapping (.json)', 'Export the mapping (.json)'),
         folder: t('Exporter le dossier en collection', 'Export the folder as a collection'),
         collection: t('Exporter la collection (.json)', 'Export the collection (.json)'),
       }[item.type],
@@ -187,19 +243,14 @@ function flowActions(item) {
     ...(item.type === 'mapping'
       ? [{ icon: 'mdi-image-outline', label: t('Exporter en image (.png)', 'Export as an image (.png)'), run: () => emit('image', item.id) }]
       : []),
-    {
-      icon: 'mdi-link-variant',
-      label: item.type === 'mapping' ? t('Copier le lien de partage', 'Copy the share link') : t('Copier le lien de partage (tous ses flux)', 'Copy the share link (all its flows)'),
-      run: () => emit('share', item.id),
-    },
     { icon: 'mdi-delete-outline', label: t('Supprimer', 'Delete'), danger: true, run: () => confirmRemove(item) },
   );
   return list;
 }
 
-/** Dans l'onglet Modèles, un élément lâché sur le fond va à la racine de la bibliothèque. */
+/** Dans l'onglet Bibliothèque, un élément lâché sur le fond va à la racine de la bibliothèque. */
 function dropOnRoot() {
-  if (tab.value === 'models' && drag.item && !drop.id) move(drag.item.id, LIBRARY_ID, 'inside');
+  if (tab.value === 'library' && drag.item && !drop.id) move(drag.item.id, LIBRARY_ID, 'inside');
   dragEnd();
 }
 
@@ -212,16 +263,16 @@ provide('collection-tree', {
   isOpen: (item) => !!filter.value?.trim() || item.open,
   /** Nombre affiché à droite : flux d'un conteneur, modèles d'un dossier de la bibliothèque, flux qui utilisent un modèle. */
   countOf(item) {
-    if (item.type === 'model') {
+    if (item.type === 'model' || item.type === 'valuelist') {
       const n = usage.value.get(item.id) ?? 0;
-      return n ? { value: n, title: t(`Utilisé par ${count(n, 'flux', 'flow', 'flux', 'flows')}`, `Used by ${count(n, 'flow', 'flow')}`) } : null;
+      return n ? { value: n, title: t(`Utilisé par ${count(n, 'mapping', 'mapping')}`, `Used by ${count(n, 'mapping', 'mapping')}`) } : null;
     }
     if (isContainer(item)) return { value: leafCount(item), title: '' };
     return null;
   },
   activate(item) {
     if (isContainer(item)) item.open = !item.open;
-    else if (item.type === 'model') emit('edit-model', item.id);
+    else if (item.type === 'model' || item.type === 'valuelist') emit('edit-model', item.id);
     else emit('open-flow', item.id);
   },
   /** Élément en surbrillance : le flux affiché, ou le modèle ouvert dans l'éditeur de modèles. */
@@ -229,11 +280,11 @@ provide('collection-tree', {
   startRename,
   commitRename,
   cancelRename: () => (renaming.value = null),
-  actions: (item) => (tab.value === 'models' ? modelActions(item) : flowActions(item)),
+  actions: (item) => (tab.value === 'library' ? libraryActions(item) : flowActions(item)),
   dragStart(e, item) {
     drag.item = item;
-    if (item.type === 'model') {
-      // Un modèle se range dans la bibliothèque, ou se lâche sur le schéma pour l'ajouter au flux ouvert.
+    if (item.type === 'model' || item.type === 'valuelist') {
+      // Un modèle ou une liste se range dans la bibliothèque, ou se lâche sur le schéma pour l'ajouter au flux ouvert.
       e.dataTransfer.setData(MODEL_DRAG_TYPE, item.id);
       e.dataTransfer.effectAllowed = 'copyMove';
     } else {
@@ -274,6 +325,12 @@ function dragEnd() {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 12px;
+}
+.collections .panel-footer {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 .tree-row {
   display: flex;

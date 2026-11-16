@@ -36,6 +36,8 @@ export const DATA_FILES_KEY = Symbol('dataFiles');
  * `revert`, `unlink` (par id de nœud) et `otherFlows(modelId)` (nombre d'autres flux qui utilisent le modèle).
  */
 export const MODEL_LINK_KEY = Symbol('modelLink');
+/** Même chose pour un nœud Liste de valeurs et les listes partagées de la bibliothèque (`data.listId`). */
+export const LIST_LINK_KEY = Symbol('listLink');
 
 /** Verrou de tout le schéma (ref booléenne), fourni par l'éditeur. */
 export const SCHEMA_LOCK_KEY = Symbol('schemaLock');

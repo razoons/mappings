@@ -68,7 +68,7 @@ import { isContainer, workspace } from '../services/collections';
 
 defineProps({ items: { type: Array, required: true }, depth: { type: Number, default: 0 } });
 
-const ICONS = { collection: 'mdi-folder-multiple-outline', folder: 'mdi-folder-outline', mapping: 'mdi-vector-polyline', model: 'mdi-database-outline' };
+const ICONS = { collection: 'mdi-folder-multiple-outline', folder: 'mdi-folder-outline', mapping: 'mdi-vector-polyline', model: 'mdi-database-outline', valuelist: 'mdi-format-list-bulleted' };
 
 /** Comportement partagé par tout l'arbre (fourni par CollectionsPanel). */
 const tree = inject('collection-tree');

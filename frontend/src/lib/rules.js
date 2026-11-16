@@ -199,7 +199,7 @@ export function validateTargets(nodes, edges) {
         }
         // Un conteneur optionnel laissé vide n'impose rien à ses sous-champs.
         if (isSet(f.format?.library) && !libraries.has(f.format.library))
-          add(f, chain, 'warning', t('Bibliothèque de valeurs supprimée : valeurs non contrôlées', 'Value library deleted: values not checked'));
+          add(f, chain, 'warning', t('Liste de valeurs absente (supprimée, ou pas dans ce mapping) : valeurs non contrôlées', 'Value list missing (deleted, or not in this mapping): values not checked'));
         if (isContainer(f) && (f.required || isMapped(f))) walk(f.children ?? [], chain);
       }
     };

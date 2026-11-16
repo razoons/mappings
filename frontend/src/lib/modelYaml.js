@@ -3,6 +3,7 @@ import { checkDocument, describeProblem } from './conformity';
 import { exampleOf, isContainer } from './fields';
 import { cleanFormat, formatKeys } from './formats';
 import { lang, t } from './i18n';
+import { distinctLibraries, libraryRef } from './libraries';
 import { isPlainObject } from './lists';
 import { uid } from './types';
 
@@ -50,13 +51,14 @@ const KEYS_FR = {
   maxDate: 'dateMax',
   minItems: 'élémentsMin',
   maxItems: 'élémentsMax',
-  library: 'bibliothèque',
+  library: 'listeValeurs',
 };
 const TYPES_FR = { string: 'texte', number: 'nombre', integer: 'entier', boolean: 'booléen', date: 'date', object: 'objet', array: 'liste' };
 
 const plain = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 // Saisie : le mot français, avec ou sans accents ni majuscules, donne le mot anglais.
-const KEY_OF = Object.fromEntries(Object.entries(KEYS_FR).map(([en, fr]) => [plain(fr), en]));
+// « bibliothèque » : ancien nom des listes de valeurs, toujours accepté.
+const KEY_OF = { ...Object.fromEntries(Object.entries(KEYS_FR).map(([en, fr]) => [plain(fr), en])), bibliotheque: 'library', valuelist: 'library' };
 const ALIASES = Object.fromEntries(Object.entries(TYPES_FR).map(([en, fr]) => [plain(fr), en]));
 const YES = { oui: true, vrai: true, non: false, faux: false };
 
@@ -83,7 +85,7 @@ export const yamlHelp = () =>
 #   obligatoire : oui pour un champ obligatoire
 #   format      : longueurMin, longueurMax, motif (texte) ; min, max (nombre, entier) ;
 #                 dateMin, dateMax (date, ex. 2026-01-31) ; élémentsMin, élémentsMax (liste) ;
-#                 bibliothèque : nom d'un nœud Bibliothèque (valeurs autorisées)
+#                 listeValeurs : nom d'une liste de valeurs (valeurs autorisées)
 #   exemple     : valeur d'exemple (données du calcul d'une source sans fichier) ; une liste d'objets
 #                 peut recevoir la liste complète, ex. plusieurs commandes
 #   objet       : ses sous-champs dans « champs »
@@ -95,7 +97,7 @@ export const yamlHelp = () =>
 #   required : true for a required field
 #   format   : minLength, maxLength, pattern (text); min, max (number, integer);
 #              minDate, maxDate (date, e.g. 2026-01-31); minItems, maxItems (list);
-#              library: name of a Library node (allowed values)
+#              library: name of a value list (allowed values)
 #   example  : example value (data used by a source without a file); a list of objects
 #              can receive the full list, e.g. several orders
 #   object   : its sub-fields in “fields”
@@ -248,16 +250,18 @@ function readField(name, raw, old, path, libs) {
     const v = spec[k.key];
     if (v === undefined || v === null) continue;
     if (k.kind === 'library') {
-      // Par son nom (ou son id) ; l'id est gardé si plusieurs bibliothèques portent ce nom et que l'ancien champ en désignait une.
-      const named = [...libs.values()].filter((l) => l.label === String(v) || l.id === String(v));
-      const lib = named.find((l) => l.id === old?.format?.library) ?? named[0];
-      // Bibliothèque supprimée depuis : l'ancien id est gardé tel quel (le contrôle le signale).
+      // Par son nom (ou son id) ; la référence est gardée si plusieurs listes portent ce nom et que l'ancien champ en désignait une.
+      const all = distinctLibraries(libs);
+      const named = all.filter((l) => l.label === String(v) || libs.get(String(v)) === l);
+      const lib = named.find((l) => libs.get(old?.format?.library) === l) ?? named[0];
+      // Liste absente (supprimée, ou pas dans ce flux) : l'ancienne référence est gardée telle quelle (le contrôle le signale).
       if (!lib && String(v) === old?.format?.library) {
         format[k.key] = old.format.library;
         continue;
       }
-      if (!lib) fail(t(`${word(k.key)} : aucun nœud Bibliothèque « ${v} » (${[...libs.values()].map((l) => l.label).join(', ') || 'aucune bibliothèque dans le schéma'})`, `${k.key}: no Library node “${v}” (${[...libs.values()].map((l) => l.label).join(', ') || 'no library in the schema'})`));
-      format[k.key] = lib.id;
+      const names = all.map((l) => l.label).join(', ');
+      if (!lib) fail(t(`${word(k.key)} : aucune liste de valeurs « ${v} » (${names || 'aucune liste disponible'})`, `${k.key}: no value list “${v}” (${names || 'no list available'})`));
+      format[k.key] = libs.get(old?.format?.library) === lib ? old.format.library : libraryRef(lib);
       continue;
     }
     if (k.kind === 'text') {

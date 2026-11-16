@@ -9,7 +9,7 @@
       </span>
       <button class="icon-btn nodrag result-btn" :title="t('Voir le résultat (JSON produit et sa conformité au modèle)', 'Show the result (JSON produced and its conformity to the model)')" @click="showResult = true">{{ t('Résultat', 'Result') }}</button>
       <button class="icon-btn nodrag" :title="t('Modèle de données (YAML : type, obligatoire, format de chaque champ)', 'Data model (YAML: type, required, format of each field)')" @click="editing = true">{ }</button>
-      <button v-if="modelLink && !data.modelId && !readOnly" class="icon-btn nodrag mdi mdi-database-plus-outline" :title="t('Enregistrer ce modèle dans la bibliothèque, pour le réutiliser dans d’autres flux', 'Save this model to the library, to reuse it in other flows')" @click="modelLink.create(id)" />
+      <button v-if="modelLink && !data.modelId && !readOnly" class="icon-btn nodrag mdi mdi-database-plus-outline" :title="t('Enregistrer ce modèle dans la bibliothèque, pour le réutiliser dans d’autres mappings', 'Save this model to the library, to reuse it in other mappings')" @click="modelLink.create(id)" />
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
