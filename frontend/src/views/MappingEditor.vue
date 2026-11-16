@@ -7,8 +7,7 @@
       @click="collectionsOpen = !collectionsOpen"
     />
     <v-btn prepend-icon="mdi-folder-open-outline" :title="t('Ouvrir un fichier sauvegardé (Ctrl O) ; un mapping ou une collection est ajouté', 'Open a saved file (Ctrl O); a mapping or a collection is added')" @click="openDocument">{{ t('Ouvrir', 'Open') }}</v-btn>
-    <v-btn prepend-icon="mdi-content-save-outline" :title="saveTitle" @click="saveDocument">{{ t('Sauvegarder', 'Save') }}</v-btn>
-    <v-btn icon="mdi-content-save-edit-outline" :title="t('Sauvegarder sous… : choisir l’emplacement et le nom (Ctrl Maj S)', 'Save as…: choose the location and the name (Ctrl Shift S)')" @click="saveDocumentAs()" />
+    <v-btn prepend-icon="mdi-download-outline" :title="t('Télécharger les collections et la bibliothèque dans un fichier (Ctrl S)', 'Download the collections and the library to a file (Ctrl S)')" @click="downloadDocument">{{ t('Télécharger', 'Download') }}</v-btn>
     <span class="doc-name" :title="doc.modified ? t('Modifié depuis la dernière sauvegarde', 'Changed since the last save') : t('Sauvegardé', 'Saved')">
       <v-icon icon="mdi-file-document-outline" size="16" />
       {{ doc.name ?? t('Non sauvegardé', 'Not saved') }}<span v-if="doc.modified" class="doc-modified"> ●</span>
@@ -154,7 +153,7 @@
       </v-card>
     </v-dialog>
 
-    <v-snackbar v-model="snack.show" :color="snack.color" :timeout="snack.action ? 5000 : snack.color === 'error' ? 3500 : 1800">
+    <v-snackbar v-model="snack.show" :color="snack.color" :timeout="snack.action ? 10000 : snack.color === 'error' ? 3500 : 1800">
       {{ snack.text }}
       <template v-if="snack.action" #actions>
         <v-btn variant="text" @click="snack.action.run(), (snack.show = false)">{{ snack.action.label }}</v-btn>
@@ -212,7 +211,7 @@ import { librariesOf, LIBRARY_OUTPUT, LIBRARY_TABLE } from '../lib/libraries';
 import { validateTargets } from '../lib/rules';
 import { initialParams, inputsOf, TRANSFORMS } from '../lib/transforms';
 import { canConnect, isList, typeMismatch, uid } from '../lib/types';
-import { canWriteBack, exportFile, openFile, saveFileAs, writeToHandle } from '../services/files';
+import { download, exportFile, openFile } from '../services/files';
 import { doc, markSaved } from '../services/document';
 import { schemaImage } from '../services/image';
 import {
@@ -501,56 +500,20 @@ async function exportItem(id) {
   }
 }
 
-// ── Fichier de travail : Ouvrir, Sauvegarder, Sauvegarder sous ───────────
+// ── Fichier de travail : Ouvrir, Télécharger ───────────
 
 const DEFAULT_FILE = 'schemap.json';
-const saveTitle = computed(() =>
-  doc.name
-    ? t(`Sauvegarder dans « ${doc.name} » : collections et bibliothèque (Ctrl S)`, `Save to “${doc.name}”: collections and library (Ctrl S)`)
-    : t('Sauvegarder les collections et la bibliothèque dans un fichier (Ctrl S)', 'Save the collections and the library to a file (Ctrl S)'),
-);
 watchEffect(() => {
   document.title = `${doc.name ?? t('Non sauvegardé', 'Not saved')}${doc.modified ? ' ●' : ''} — ScheMap`;
 });
 
-/** Le contenu à sauvegarder : le schéma affiché est d'abord rangé, même modifié à l'instant. */
-function documentText() {
+/** Télécharger : collections et bibliothèque dans un fichier JSON (le schéma affiché est d'abord rangé). */
+function downloadDocument() {
   saveGraph();
-  return workspaceFile();
-}
-
-/** Sauvegarder : réécrit le fichier ouvert ; sinon le crée, sous son nom (l'emplacement est alors demandé). */
-async function saveDocument() {
-  if (!doc.handle) return saveDocumentAs({ ask: false });
-  try {
-    await writeToHandle(doc.handle, documentText());
-    markSaved(doc.name, doc.handle);
-    notify(`${t('Sauvegardé', 'Saved')} : ${doc.name}`, 'success');
-  } catch (e) {
-    notify(`${t('Sauvegarde impossible', 'Save failed')} : ${e.message}`, 'error');
-  }
-}
-
-/**
- * Sauvegarder sous : l'emplacement et le nom sont choisis dans l'explorateur (le nom actuel est proposé). Sans
- * explorateur (navigateur autre que Chrome / Edge), le fichier est téléchargé : le nom est demandé ici, sauf pour
- * « Sauvegarder » (`ask` : `false`) qui reprend le nom actuel.
- */
-async function saveDocumentAs({ ask = true } = {}) {
-  let name = doc.name ?? DEFAULT_FILE;
-  if (!canWriteBack && ask) {
-    name = await askText({ title: t('Sauvegarder sous', 'Save as'), label: t('Nom du fichier', 'File name'), initial: name, okLabel: t('Sauvegarder', 'Save') });
-    if (!name) return;
-    if (!/\.json$/i.test(name)) name += '.json';
-  }
-  try {
-    const saved = await saveFileAs(documentText(), name);
-    if (!saved) return;
-    markSaved(saved.name, saved.handle);
-    notify(`${t('Sauvegardé', 'Saved')} : ${saved.name}`, 'success');
-  } catch (e) {
-    notify(`${t('Sauvegarde impossible', 'Save failed')} : ${e.message}`, 'error');
-  }
+  const name = doc.name ?? DEFAULT_FILE;
+  download(workspaceFile(), name);
+  markSaved(name, null);
+  notify(`${t('Téléchargé', 'Downloaded')} : ${name}`, 'success');
 }
 
 /**
@@ -1277,7 +1240,7 @@ function onKeydown(e) {
       modelEditorRef.value?.save();
     } else if (ctrl && key === 's') {
       e.preventDefault();
-      saveDocumentAs();
+      downloadDocument();
     } else if (ctrl && key === 'o') {
       e.preventDefault();
       openDocument();
@@ -1289,8 +1252,7 @@ function onKeydown(e) {
   if (ctrl && (key === 's' || key === 'o')) {
     e.preventDefault();
     if (key === 'o') openDocument();
-    else if (e.shiftKey) saveDocumentAs();
-    else saveDocument();
+    else downloadDocument();
     return;
   }
   if (placing.value && key === 'escape') return endPlacing(false);

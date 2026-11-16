@@ -52,8 +52,7 @@ const groups = computed(() => {
       title: t('Fichiers', 'Files'),
       rows: [
         { keys: [[ctrl, 'O']], label: t('Ouvrir un fichier sauvegardé (un mapping ou une collection est ajouté)', 'Open a saved file (a mapping or a collection is added)') },
-        { keys: [[ctrl, 'S']], label: t('Sauvegarder dans le fichier ouvert ; dans la bibliothèque, enregistrer le modèle ou la liste ouvert', 'Save to the open file; in the library, save the open model or list') },
-        { keys: [[ctrl, 'Shift', 'S']], label: t('Sauvegarder sous (emplacement et nom à choisir)', 'Save as (choose location and name)') },
+        { keys: [[ctrl, 'S']], label: t('Télécharger les collections et la bibliothèque ; dans la bibliothèque, enregistrer le modèle ou la liste ouvert', 'Download the collections and the library; in the library, save the open model or list') },
       ],
     },
     {
