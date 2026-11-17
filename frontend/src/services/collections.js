@@ -12,6 +12,8 @@ import { uid } from '../lib/types';
  * modèles `{ id, type: 'model', name, fields, sample? }` (`sample` : document d'exemple JSON, en texte).
  * La bibliothèque est un conteneur `{ id: 'library', type: 'library', items }` qui n'est pas affiché.
  * Un nœud source ou cible relié à un modèle porte son id dans `data.modelId` (voir services/models.js).
+ * Un modèle composite porte en plus son schéma (`composite: true`, `graph`), qui s'ouvre comme un flux : ses champs
+ * sont ceux de la cible de ce schéma.
  */
 
 const KEY = 'mapping-collections';
@@ -106,12 +108,30 @@ export const firstMapping = (list = workspace.collections) => leavesIn(list, 'ma
 /** Nombre de flux (ou de modèles, dans la bibliothèque) d'un conteneur. */
 export const leafCount = (item) => ['mapping', 'model', 'valuelist'].reduce((n, type) => n + [...leavesIn(item.items, type)].length, 0);
 
-/** Tous les flux : `{ mapping, path }` (`path` : noms de la collection et des dossiers). */
-export function* allMappings(list = workspace.collections, path = []) {
+/** Flux de `list` : `{ mapping, path }` (`path` : noms de la collection et des dossiers). */
+function* mappingsIn(list, path = []) {
   for (const item of list) {
     if (item.type === 'mapping') yield { mapping: item, path };
-    else if (isContainer(item)) yield* allMappings(item.items, [...path, item.name]);
+    else if (isContainer(item)) yield* mappingsIn(item.items, [...path, item.name]);
   }
+}
+
+/** Le modèle est composite : il a son propre schéma (voir services/models.js). */
+export const isComposite = (item) => item?.type === 'model' && !!item.composite;
+
+/**
+ * Tous les schémas : les flux des collections, puis ceux des modèles composites de la bibliothèque (`path` : la
+ * bibliothèque et ses dossiers). Ils utilisent les modèles et les listes de la même façon.
+ */
+export function* allMappings() {
+  yield* mappingsIn(workspace.collections);
+  function* composites(list, path) {
+    for (const item of list) {
+      if (isComposite(item)) yield { mapping: item, path };
+      else if (isContainer(item)) yield* composites(item.items, [...path, item.name]);
+    }
+  }
+  yield* composites(workspace.library.items, [workspace.library.name]);
 }
 
 export const allModels = () => [...leavesIn(workspace.library.items, 'model')];
@@ -127,7 +147,8 @@ export function activeContainer() {
 /** Collection du flux ouvert. */
 export function activeCollection() {
   const loc = locate(workspace.activeId);
-  return loc?.path[0] ?? activeContainer();
+  const root = loc?.path[0];
+  return root && root !== workspace.library ? root : activeContainer();
 }
 
 const inLibrary = (loc) => (loc.path[0] ?? loc.item) === workspace.library;
@@ -264,7 +285,14 @@ export function move(id, targetId, where) {
 const exportedLibraryItem = (m) =>
   m.type === 'valuelist'
     ? { type: 'valuelist', id: m.id, name: m.name, item: m.item, values: m.values, mapped: !!m.mapped, outItem: m.outItem, targets: m.targets }
-    : { type: 'model', id: m.id, name: m.name, fields: m.fields, ...(m.sample !== undefined && { sample: m.sample }) };
+    : {
+        type: 'model',
+        id: m.id,
+        name: m.name,
+        fields: m.fields,
+        ...(m.sample !== undefined && { sample: m.sample }),
+        ...(m.composite && { composite: true, graph: m.graph }),
+      };
 
 /**
  * Éléments de la bibliothèque utilisés par les flux de `items` (pour les joindre à un export) : modèles reliés aux
@@ -280,9 +308,16 @@ function libraryItemsUsedBy(items) {
       walkFields(n.data?.fields ?? []); // listes désignées par un champ, même sans nœud dans le flux
     }
   }
-  for (const id of [...ids]) {
-    const model = find(id);
-    if (model?.type === 'model') walkFields(model.fields);
+  // Un modèle composite emporte aussi les éléments qu'utilise son schéma (et ainsi de suite).
+  const pending = [...ids];
+  while (pending.length) {
+    const model = find(pending.pop());
+    if (model?.type !== 'model') continue;
+    walkFields(model.fields);
+    for (const n of model.graph?.nodes ?? []) {
+      for (const id of [n.data?.modelId, n.data?.listId]) if (id && !ids.has(id)) (ids.add(id), pending.push(id));
+      walkFields(n.data?.fields ?? []);
+    }
   }
   return [...ids].map(find).filter((m) => m?.type === 'model' || m?.type === 'valuelist').map(exportedLibraryItem);
 }
@@ -329,7 +364,8 @@ export function restoreWorkspace(saved, { replace = false, folderName = '' } = {
   if (replace) {
     workspace.collections.splice(0, workspace.collections.length, ...saved.collections);
     workspace.library = { ...makeLibrary(), ...saved.library, id: LIBRARY_ID, type: 'library' };
-    workspace.activeId = find(saved.activeId)?.type === 'mapping' ? saved.activeId : null;
+    const active = find(saved.activeId);
+    workspace.activeId = active?.type === 'mapping' || isComposite(active) ? saved.activeId : null;
     if (!workspace.activeId) ensureActive();
     return { collections: saved.collections.length, library: [...leavesIn(workspace.library.items, 'model')].length + [...leavesIn(workspace.library.items, 'valuelist')].length };
   }
@@ -358,7 +394,14 @@ function readLibraryItem(raw) {
       targets: Array.isArray(raw.targets) ? raw.targets : [],
     };
   }
-  return { id: raw.id, type: 'model', name: raw.name || untitled(), fields: raw.fields, ...(typeof raw.sample === 'string' && { sample: raw.sample }) };
+  return {
+    id: raw.id,
+    type: 'model',
+    name: raw.name || untitled(),
+    fields: raw.fields,
+    ...(typeof raw.sample === 'string' && { sample: raw.sample }),
+    ...(raw.composite && isGraph(raw.graph) && { composite: true, graph: { nodes: raw.graph.nodes, edges: raw.graph.edges } }),
+  };
 }
 
 function readItem(raw) {

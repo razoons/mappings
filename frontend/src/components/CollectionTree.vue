@@ -28,7 +28,7 @@
         @click.stop="item.open = !item.open"
       />
       <span v-else class="chevron" />
-      <v-icon size="16" class="kind" :icon="ICONS[item.type]" />
+      <v-icon size="16" class="kind" :icon="item.composite ? 'mdi-database-cog-outline' : ICONS[item.type]" />
       <input
         v-if="tree.renaming === item.id"
         v-focus

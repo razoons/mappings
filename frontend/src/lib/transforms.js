@@ -287,6 +287,27 @@ export const TRANSFORMS = {
       return { result: ctx.connected('value') ? ctx.item('value', list, i) : list[i], found: true };
     },
   },
+  lookup: {
+    label: 'Rechercher par clé',
+    category: 'Liste',
+    // La clé n'est pas une liste : une liste de clés (ex. chantiers[].id_site) fait une recherche par élément.
+    inputs: [
+      { id: 'key', label: 'Clé', type: 'any' },
+      { id: 'keys', label: 'Clés', type: 'any[]' },
+      { id: 'values', label: 'Valeurs', type: 'any[]' },
+    ],
+    outputs: [
+      { id: 'result', label: 'Valeur', type: 'any' },
+      { id: 'found', label: 'Trouvé', type: 'boolean' },
+    ],
+    passes: { result: { inputs: ['values'], as: 'item' } },
+    compute: ({ key, keys, values }, _, ctx) => {
+      const wanted = String(key ?? '').trim();
+      const i = wanted === '' ? -1 : keys.findIndex((k) => String(k ?? '').trim() === wanted);
+      if (i < 0) return { result: null, found: false };
+      return { result: ctx.connected('values') ? (values[i] ?? null) : keys[i], found: true };
+    },
+  },
   list_count: {
     label: 'Compter',
     category: 'Liste',
@@ -823,6 +844,7 @@ const EN = {
   list_map: { label: 'Map each', sockets: { value: 'Value', result: 'List' } },
   list_at: { label: 'Item n', sockets: { index: 'Index', value: 'Value', result: 'Item' }, params: { from: 'From' } },
   list_find: { label: 'Find', sockets: { cond: 'Condition', value: 'Value', result: 'Item', found: 'Found' } },
+  lookup: { label: 'Look up by key', sockets: { key: 'Key', keys: 'Keys', values: 'Values', result: 'Value', found: 'Found' } },
   list_count: { label: 'Count', sockets: { result: 'Number' } },
   list_aggregate: { label: 'Aggregate', sockets: { value: 'Value', result: 'Result' }, params: { op: 'Operation' } },
   list_test: { label: 'Test items', sockets: { cond: 'Condition', result: 'Result' }, params: { op: 'Mode' } },

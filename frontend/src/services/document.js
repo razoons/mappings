@@ -83,3 +83,13 @@ export function markSaved(name, handle) {
   }
   storeHandle(doc.handle);
 }
+
+/** Change le nom du fichier (celui du prochain téléchargement), sans toucher à l'état « modifié ». */
+export function renameDocument(name) {
+  doc.name = name;
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ name: doc.name, savedHash: doc.savedHash }));
+  } catch {
+    /* espace plein : le nom sera oublié au rechargement */
+  }
+}

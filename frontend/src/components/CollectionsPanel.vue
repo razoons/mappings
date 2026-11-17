@@ -24,6 +24,7 @@
         </template>
         <template v-else>
           <v-btn icon="mdi-database-plus-outline" size="small" variant="text" :title="t('Nouveau modèle (structure d’une source ou d’une cible)', 'New model (structure of a source or target)')" @click="newModel(null)" />
+          <v-btn icon="mdi-database-cog-outline" size="small" variant="text" :title="t('Nouveau modèle composite (des modèles joints dans un schéma)', 'New composite model (models joined in a schema)')" @click="$emit('new-composite', null)" />
           <v-btn icon="mdi-playlist-plus" size="small" variant="text" :title="t('Nouvelle liste de valeurs (énumération, transcodage)', 'New value list (enumeration, transcoding)')" @click="newList(null)" />
           <v-btn icon="mdi-folder-plus-outline" size="small" variant="text" :title="t('Nouveau dossier', 'New folder')" @click="startRename(addFolder(LIBRARY_ID).id)" />
         </template>
@@ -87,9 +88,10 @@ const props = defineProps({
 });
 /**
  * `export` / `image` : exporter l'élément `id` en fichier, en image ; `import` : importer un
- * fichier ; `edit-model` : modifier le modèle ou la liste `id` ; `use-model` : `(id, 'source' | 'target' | 'library')`, l'ajouter au flux ouvert.
+ * fichier ; `edit-model` : modifier le modèle ou la liste `id` (un modèle composite s'ouvre comme un flux) ;
+ * `new-composite` : `(dossier, mapping)`, nouveau modèle composite, vide ou copié d'un mapping ; `use-model` : `(id, 'source' | 'target' | 'library')`, l'ajouter au flux ouvert.
  */
-const emit = defineEmits(['update:modelValue', 'export', 'image', 'import', 'edit-model', 'use-model', 'open-flow', 'legend', 'shortcuts']);
+const emit = defineEmits(['update:modelValue', 'export', 'image', 'import', 'edit-model', 'use-model', 'new-composite', 'open-flow', 'legend', 'shortcuts']);
 
 const tab = ref('flows');
 const roots = computed(() => (tab.value === 'library' ? workspace.library.items : workspace.collections));
@@ -194,7 +196,9 @@ function libraryActions(item) {
     return [
       { icon: 'mdi-arrow-right-bold-box-outline', label: t('Ajouter au mapping ouvert comme source', 'Add to the open mapping as a source'), run: () => emit('use-model', item.id, 'source') },
       { icon: 'mdi-arrow-left-bold-box-outline', label: t('Ajouter au mapping ouvert comme cible', 'Add to the open mapping as a target'), run: () => emit('use-model', item.id, 'target') },
-      { icon: 'mdi-pencil-ruler', label: t('Modifier le modèle', 'Edit the model'), run: () => emit('edit-model', item.id) },
+      item.composite
+        ? { icon: 'mdi-database-cog-outline', label: t('Ouvrir le schéma du modèle composite', 'Open the composite model schema'), run: () => emit('edit-model', item.id) }
+        : { icon: 'mdi-pencil-ruler', label: t('Modifier le modèle', 'Edit the model'), run: () => emit('edit-model', item.id) },
       ...common,
       { icon: 'mdi-export', label: t('Exporter le modèle (.json)', 'Export the model (.json)'), run: () => emit('export', item.id) },
       remove,
@@ -211,6 +215,7 @@ function libraryActions(item) {
   }
   return [
     { icon: 'mdi-database-plus-outline', label: t('Nouveau modèle', 'New model'), run: () => newModel(item.id) },
+    { icon: 'mdi-database-cog-outline', label: t('Nouveau modèle composite', 'New composite model'), run: () => emit('new-composite', item.id) },
     { icon: 'mdi-playlist-plus', label: t('Nouvelle liste de valeurs', 'New value list'), run: () => newList(item.id) },
     { icon: 'mdi-folder-plus-outline', label: t('Nouveau dossier', 'New folder'), run: () => startRename(addFolder(item.id).id) },
     { icon: 'mdi-pencil-outline', label: t('Renommer', 'Rename'), run: () => startRename(item.id) },
@@ -240,7 +245,10 @@ function flowActions(item) {
       run: () => emit('export', item.id),
     },
     ...(item.type === 'mapping'
-      ? [{ icon: 'mdi-image-outline', label: t('Exporter en image (.png)', 'Export as an image (.png)'), run: () => emit('image', item.id) }]
+      ? [
+          { icon: 'mdi-image-outline', label: t('Exporter en image (.png)', 'Export as an image (.png)'), run: () => emit('image', item.id) },
+          { icon: 'mdi-database-cog-outline', label: t('Copier en modèle composite', 'Copy as a composite model'), run: () => emit('new-composite', null, item.id) },
+        ]
       : []),
     { icon: 'mdi-delete-outline', label: t('Supprimer', 'Delete'), danger: true, run: () => confirmRemove(item) },
   );

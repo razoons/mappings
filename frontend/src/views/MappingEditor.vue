@@ -8,10 +8,15 @@
     />
     <v-btn prepend-icon="mdi-folder-open-outline" :title="t('Ouvrir un fichier sauvegardé (Ctrl O) ; un mapping ou une collection est ajouté', 'Open a saved file (Ctrl O); a mapping or a collection is added')" @click="openDocument">{{ t('Ouvrir', 'Open') }}</v-btn>
     <v-btn prepend-icon="mdi-download-outline" :title="t('Télécharger les collections et la bibliothèque dans un fichier (Ctrl S)', 'Download the collections and the library to a file (Ctrl S)')" @click="downloadDocument">{{ t('Télécharger', 'Download') }}</v-btn>
-    <span class="doc-name" :title="doc.modified ? t('Modifié depuis la dernière sauvegarde', 'Changed since the last save') : t('Sauvegardé', 'Saved')">
+    <button
+      class="doc-name"
+      :title="`${doc.modified ? t('Modifié depuis la dernière sauvegarde', 'Changed since the last save') : t('Sauvegardé', 'Saved')} — ${t('cliquer pour changer le nom du fichier téléchargé', 'click to change the name of the downloaded file')}`"
+      @click="renameDocumentFile"
+    >
       <v-icon icon="mdi-file-document-outline" size="16" />
-      {{ doc.name ?? t('Non sauvegardé', 'Not saved') }}<span v-if="doc.modified" class="doc-modified"> ●</span>
-    </span>
+      <span class="doc-name-text">{{ doc.name ?? DEFAULT_FILE }}</span><span v-if="doc.modified" class="doc-modified"> ●</span>
+      <v-icon class="doc-name-edit" icon="mdi-pencil-outline" size="14" />
+    </button>
     <v-divider vertical inset class="mx-2" />
     <template v-if="!editingModelId">
       <v-btn prepend-icon="mdi-file-outline" :title="t('Nouveau mapping, ajouté à côté de celui-ci dans la collection', 'New mapping, added next to this one in the collection')" @click="newMapping">{{ t('Nouveau', 'New') }}</v-btn>
@@ -20,6 +25,22 @@
       <v-btn icon="mdi-arrow-collapse-vertical" :title="t('Tout replier', 'Collapse all')" @click="collapseAll(true)" />
       <v-btn icon="mdi-arrow-expand-vertical" :title="t('Tout déplier', 'Expand all')" @click="collapseAll(false)" />
       <v-btn icon="mdi-graph-outline" :title="t('Réorganiser le schéma (colonnes dans le sens des liens)', 'Rearrange the schema (columns following the links)')" :disabled="schemaLocked" @click="arrangeSchema" />
+      <v-divider vertical inset class="mx-2" />
+      <span
+        v-if="current.name"
+        class="flow-name"
+        :class="{ composite: compositeOpen }"
+        :title="
+          compositeOpen
+            ? `${t('Modèle composite affiché', 'Displayed composite model')} : ${flowPath} — ${t('ses champs sont ceux de sa cible, et ses données ce qu’elle produit', 'its fields are those of its target, and its data what the target produces')}`
+            : `${t('Mapping affiché', 'Displayed mapping')} : ${flowPath}`
+        "
+      >
+        <v-icon :icon="compositeOpen ? 'mdi-database-cog-outline' : 'mdi-source-branch'" size="16" />
+        <span v-if="compositeOpen" class="flow-kind">{{ t('Modèle composite', 'Composite model') }}</span>
+        <span v-if="flowFolders" class="flow-folders">{{ flowFolders }} ›</span>
+        <span class="flow-title">{{ current.name }}</span>
+      </span>
     </template>
     <v-btn v-else class="ml-2 text-none" prepend-icon="mdi-arrow-left" :title="t('Revenir au mapping ouvert', 'Back to the open mapping')" @click="closeModelEditor()">
       {{ t('Retour au mapping', 'Back to the mapping') }} « {{ current.name }} »
@@ -40,6 +61,7 @@
     :editing-model-id="editingModelId"
     @edit-model="editModel"
     @use-model="useModel"
+    @new-composite="newComposite"
     @open-flow="openFlow"
     @legend="legendOpen = true"
     @shortcuts="shortcutsOpen = true"
@@ -75,6 +97,22 @@
             <LockIcon :locked="schemaLocked" />
           </ControlButton>
         </Controls>
+        <!-- Modèle composite ouvert : même bandeau que l'éditeur des modèles (brouillon jusqu'à l'enregistrement). -->
+        <Panel v-if="compositeOpen" position="top-center" class="model-bar">
+          <v-icon icon="mdi-database-cog-outline" size="18" />
+          <span class="model-bar-title">{{ t('Modèle composite de la bibliothèque', 'Library composite model') }}</span>
+          <span class="model-bar-usage">{{ compositeUsageText }}</span>
+          <span v-if="compositeDirty" class="model-bar-dirty">{{ t('modifications non enregistrées', 'unsaved changes') }}</span>
+          <v-btn size="small" color="primary" variant="flat" :disabled="!compositeDirty" @click="saveComposite">{{ t('Enregistrer le modèle', 'Save the model') }}</v-btn>
+          <v-btn size="small" variant="text" :disabled="!compositeDirty" :title="t('Revenir à la version enregistrée', 'Back to the saved version')" @click="discardComposite">{{ t('Annuler les modifications', 'Discard the changes') }}</v-btn>
+          <v-btn
+            size="small"
+            variant="text"
+            icon="mdi-close"
+            :title="compositeReturnName ? t(`Fermer et revenir au mapping « ${compositeReturnName} »`, `Close and go back to the mapping “${compositeReturnName}”`) : t('Fermer et revenir au mapping', 'Close and go back to the mapping')"
+            @click="closeComposite"
+          />
+        </Panel>
         <Panel position="top-right" class="side-panel">
           <!-- Boutons flottants d'ajout et de légende, au-dessus du panneau des contrôles. -->
           <v-btn
@@ -183,22 +221,28 @@ import TransformNode from '../components/nodes/TransformNode.vue';
 import GroupNode from '../components/nodes/GroupNode.vue';
 import LibraryNode from '../components/nodes/LibraryNode.vue';
 import TypedEdge from '../components/nodes/TypedEdge.vue';
-import { DATA_FILES_KEY, EDGE_INSERT_KEY, LIBRARIES_KEY, LIST_LINK_KEY, MODEL_LINK_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
+import { DATA_FILES_KEY, EDGE_INSERT_KEY, FIELD_ORIGIN_KEY, LIBRARIES_KEY, LIST_LINK_KEY, MODEL_LINK_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from '../components/nodes/shared';
 import { askChoice, askConfirm, askText } from '../services/dialogs';
 import { applyList, createList, libraryListNodes, listContent, listImpactOf, listOf, revertListNode, sameList } from '../services/valueLists';
 import {
   applyModel,
+  compositeContent,
+  compositeOutput,
+  createComposite,
   createModel,
   folderOf,
   hooks as modelHooks,
   impactOf,
   MODEL_DRAG_TYPE,
   modelOf,
+  refreshComposite,
   renameItem,
   revertNode,
   sameFields,
   sampleForSource,
   stripFields,
+  usageCounts,
+  usesComposite,
 } from '../services/models';
 import { checkDocument, describeProblem } from '../lib/conformity';
 import { demoGraph } from '../lib/demo';
@@ -206,13 +250,13 @@ import { count, t } from '../lib/i18n';
 import { allFields, fieldFromSocket, migrateFields, parseDocument, newField, setTreeCollapsed } from '../lib/fields';
 import { autoLayout } from '../lib/layout';
 import { fitGroup, groupAround, groupAt, groupsFirst, isGroup, newGroup, removeKeepingChildren, reparent } from '../lib/groups';
-import { createsCycle, evaluateGraph, getSocket } from '../lib/graph';
+import { createsCycle, evaluateGraph, getSocket, originsOf } from '../lib/graph';
 import { librariesOf, LIBRARY_OUTPUT, LIBRARY_TABLE } from '../lib/libraries';
 import { validateTargets } from '../lib/rules';
 import { initialParams, inputsOf, TRANSFORMS } from '../lib/transforms';
 import { canConnect, isList, typeMismatch, uid } from '../lib/types';
 import { download, exportFile, openFile } from '../services/files';
-import { doc, markSaved } from '../services/document';
+import { doc, markSaved, renameDocument } from '../services/document';
 import { schemaImage } from '../services/image';
 import {
   activeCollection,
@@ -225,8 +269,10 @@ import {
   collectionNamed,
   replaceCollection,
   find,
+  locate,
   firstMapping,
   insertMapping,
+  isComposite,
   makeMapping,
   leafCount,
   mappingFile,
@@ -398,7 +444,8 @@ const snapshot = () => JSON.parse(JSON.stringify(serialize()));
 let saveTimer;
 function saveGraph(mapping = activeMapping()) {
   clearTimeout(saveTimer);
-  if (mapping) mapping.graph = snapshot();
+  if (!mapping) return;
+  mapping.graph = snapshot();
 }
 // Écrit après chaque modification (avec un léger délai pendant les déplacements).
 watch(
@@ -436,14 +483,106 @@ watch(
   (id, previous) => {
     const before = !discardDisplayed && find(previous);
     discardDisplayed = false;
+    // Modèle composite quitté sans passer par son bandeau : ses modifications sont enregistrées plutôt que perdues.
+    const leftDirty = before && isComposite(before) && compositeWasDirty;
     if (before) saveGraph(before);
     else clearTimeout(saveTimer);
+    if (leftDirty) refreshComposite(before);
     dataFiles.clear();
     nodeMenu.value = null;
     addMenu.value = null;
     openActive();
+    startCompositeSession(previous);
   },
 );
+
+// ── Modèle composite ouvert ─────────────────────────────────
+// Son schéma s'affiche à la place du mapping. Comme dans l'éditeur des modèles, les changements sont un brouillon
+// (rangé au fil de l'eau dans le schéma) : ses champs et ses données ne changent, dans la bibliothèque et dans les
+// mappings qui l'utilisent, qu'à « Enregistrer le modèle ». Fermer ramène au mapping d'où il a été ouvert.
+
+/** `id` : modèle ouvert ; `returnTo` : mapping d'où il a été ouvert ; `saved` : version enregistrée de son schéma (JSON). */
+const compositeSession = reactive({ id: null, returnTo: null, saved: '' });
+
+/** Contenu d'un schéma qui compte pour le modèle (sans les positions ni la sélection). */
+const graphKey = (g) =>
+  JSON.stringify({
+    nodes: g.nodes.map(({ id, type, data, parentNode }) => ({ id, type, data, parentNode })),
+    edges: g.edges.map(({ source, sourceHandle, target, targetHandle }) => ({ source, sourceHandle, target, targetHandle })),
+  });
+
+function startCompositeSession(previous = null) {
+  const item = activeMapping();
+  if (!isComposite(item)) return Object.assign(compositeSession, { id: null, returnTo: null, saved: '' });
+  if (compositeSession.id === item.id) return;
+  const prev = previous ? find(previous) : null;
+  compositeSession.returnTo = prev?.type === 'mapping' ? prev.id : isComposite(prev) ? compositeSession.returnTo : null;
+  compositeSession.id = item.id;
+  compositeSession.saved = JSON.stringify(serialize());
+}
+
+/** Le schéma affiché diffère de sa version enregistrée, ou les champs du modèle ne le suivent pas encore. */
+const compositeDirty = computed(() => {
+  const item = activeMapping();
+  if (!isComposite(item) || compositeSession.id !== item.id) return false;
+  const live = serialize();
+  if (graphKey(live) !== graphKey(JSON.parse(compositeSession.saved))) return true;
+  const content = compositeContent(live);
+  return !sameFields(content.fields, item.fields) || content.sample !== item.sample;
+});
+
+// État avant un changement de schéma affiché (le calcul suit le schéma affiché : il faut le retenir avant).
+let compositeWasDirty = false;
+watch(compositeDirty, (dirty) => (compositeWasDirty = dirty));
+
+const compositeUsageText = computed(() => {
+  const n = compositeOpen.value ? (usageCounts().get(workspace.activeId) ?? 0) : 0;
+  return n ? t(`utilisé par ${n} mapping`, `used by ${n} mapping${n > 1 ? 's' : ''}`) : t('utilisé par aucun mapping', 'used by no mapping');
+});
+const compositeReturnName = computed(() => (compositeSession.returnTo && find(compositeSession.returnTo)?.name) || '');
+
+/** Enregistre le modèle composite : ses champs et ses données suivent son schéma, dans les mappings aussi. */
+function saveComposite() {
+  const item = activeMapping();
+  if (!isComposite(item)) return;
+  saveGraph();
+  refreshComposite(item);
+  compositeSession.saved = JSON.stringify(serialize());
+  notify(t(`Modèle « ${item.name} » enregistré.`, `Model “${item.name}” saved.`), 'success');
+}
+
+/** Revient à la version enregistrée du schéma. */
+function discardComposite() {
+  const item = activeMapping();
+  if (!isComposite(item)) return;
+  clearTimeout(saveTimer);
+  item.graph = JSON.parse(compositeSession.saved);
+  openActive({ fit: false });
+}
+
+/** Avant de quitter un modèle composite modifié : l'enregistrer, abandonner les modifications, ou rester (`false`). */
+async function leaveComposite() {
+  if (!compositeDirty.value) return true;
+  const choice = await askChoice({
+    title: t('Modifications non enregistrées', 'Unsaved changes'),
+    text: t('Le modèle composite ouvert a des modifications non enregistrées.', 'The open composite model has unsaved changes.'),
+    choices: [
+      { value: 'discard', label: t('Abandonner', 'Discard'), color: 'error' },
+      { value: 'save', label: t('Enregistrer', 'Save'), color: 'primary' },
+    ],
+  });
+  if (choice === 'save') saveComposite();
+  else if (choice === 'discard') discardComposite();
+  return !!choice;
+}
+
+/** Ferme le modèle composite : retour au mapping d'où il a été ouvert (le premier mapping sinon). */
+async function closeComposite() {
+  if (!(await leaveComposite())) return;
+  const back = (compositeSession.returnTo && find(compositeSession.returnTo)) || firstMapping();
+  if (back) workspace.activeId = back.id;
+  else insertMapping(makeMapping());
+}
 
 // ── Historique (Ctrl+Z / Ctrl+Y) ────────────────────────────
 // Un instantané (JSON du mapping) par modification, pris une fois l'action terminée (après un court délai, jamais
@@ -506,6 +645,24 @@ const DEFAULT_FILE = 'schemap.json';
 watchEffect(() => {
   document.title = `${doc.name ?? t('Non sauvegardé', 'Not saved')}${doc.modified ? ' ●' : ''} — ScheMap`;
 });
+
+/** Dossiers du mapping affiché (« MDM › Ariane ») et chemin complet, pour la barre d'outils. */
+const flowFolders = computed(() => {
+  const id = workspace.activeId;
+  return id ? (locate(id)?.path ?? []).map((p) => p.name).join(' › ') : '';
+});
+/** Le schéma affiché est celui d'un modèle composite de la bibliothèque. */
+const compositeOpen = computed(() => isComposite(activeMapping()));
+const flowPath = computed(() => [flowFolders.value, current.name].filter(Boolean).join(' › '));
+
+/** Nom du fichier téléchargé : à changer avant de télécharger (« .json » ajouté s'il manque). */
+async function renameDocumentFile() {
+  let name = await askText({ title: t('Nom du fichier', 'File name'), label: t('Nom du fichier téléchargé', 'Name of the downloaded file'), initial: doc.name ?? DEFAULT_FILE, okLabel: t('Renommer', 'Rename') });
+  name = name?.trim();
+  if (!name) return;
+  if (!/\.json$/i.test(name)) name += '.json';
+  renameDocument(name);
+}
 
 /** Télécharger : collections et bibliothèque dans un fichier JSON (le schéma affiché est d'abord rangé). */
 function downloadDocument() {
@@ -681,6 +838,7 @@ async function open() {
 /** Nouveau mapping vide, rangé à côté du mapping ouvert. */
 async function newMapping() {
   if (editingModelId.value && !(await leaveModel())) return;
+  if (!(await leaveComposite())) return;
   editingModelId.value = null;
   const mapping = insertMapping(makeMapping());
   // Son nom se saisit tout de suite, dans le panneau de gauche.
@@ -693,6 +851,7 @@ function loadDemo() {
 }
 
 openActive();
+startCompositeSession();
 
 // ── Bibliothèque : modèles et listes de valeurs ─────────────
 
@@ -862,12 +1021,43 @@ function libraryLink(kindName) {
     saveAs,
     revert: (nodeId) => kind.revert(workspace.activeId, nodeId),
     unlink: (nodeId) => updateNodeData(nodeId, { [kind.key]: undefined }),
+    // Les champs d'un modèle composite viennent de son schéma : ils ne s'enregistrent pas depuis un flux.
+    canSave: (item) => !isComposite(item),
     otherFlows: (id) => otherUsage.value.get(id) ?? 0,
   };
 }
 
 provide(MODEL_LINK_KEY, libraryLink('model'));
 provide(LIST_LINK_KEY, libraryLink('list'));
+
+/**
+ * Origine des champs d'un modèle composite (préfixe affiché devant leur nom) : dans son schéma ouvert, pour sa cible ;
+ * dans un flux, pour un nœud relié à un modèle composite (d'après le schéma enregistré de ce modèle).
+ */
+const fieldOrigins = computed(() => {
+  const map = new Map();
+  const fill = (nodeId, fields, graph, outputId) => {
+    const origins = new Map();
+    for (const f of allFields(fields)) {
+      const names = originsOf(graph.nodes, graph.edges, outputId, f.id);
+      if (names.length) origins.set(f.id, names.join(' + '));
+    }
+    map.set(nodeId, origins);
+  };
+  const live = { nodes: nodes.value, edges: edges.value };
+  if (compositeOpen.value) {
+    const out = compositeOutput(live);
+    if (out) fill(out.id, out.data.fields, live, out.id);
+  }
+  for (const n of nodes.value) {
+    const item = n.data?.modelId ? find(n.data.modelId) : null;
+    if (!isComposite(item)) continue;
+    const out = compositeOutput(item.graph);
+    if (out) fill(n.id, n.data.fields, item.graph, out.id);
+  }
+  return map;
+});
+provide(FIELD_ORIGIN_KEY, (nodeId, fieldId) => fieldOrigins.value.get(nodeId)?.get(fieldId) ?? '');
 
 const LOCKED_MESSAGE = () => t('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour ajouter un nœud.', 'Schema locked: unlock it (padlock at the bottom left) to add a node.');
 
@@ -895,6 +1085,12 @@ async function useModel(itemId, kind, screen = null) {
     editingModelId.value = null;
   }
   if (schemaLocked.value) return notify(LOCKED_MESSAGE(), 'warning');
+  if (isComposite(activeMapping()) && usesComposite(itemId, workspace.activeId)) {
+    return notify(
+      t(`« ${item.name} » utilise ce modèle composite : il ne peut pas y être ajouté.`, `“${item.name}” uses this composite model: it cannot be added to it.`),
+      'warning',
+    );
+  }
   if (item.type === 'valuelist') {
     addNodes([listNode(item, flowPosition(screen, 0.1, 0.6))]);
     return notify(t(`Liste « ${item.name} » ajoutée au mapping.`, `List “${item.name}” added to the mapping.`), 'success');
@@ -955,6 +1151,9 @@ const leaveModel = async () =>
   });
 
 async function editModel(id) {
+  // Un modèle composite s'ouvre comme un flux : son schéma.
+  if (isComposite(find(id))) return id === workspace.activeId ? undefined : openFlow(id);
+  if (!(await leaveComposite())) return;
   if (id === editingModelId.value || !(await leaveModel())) return;
   saveGraph();
   nodeMenu.value = null;
@@ -967,9 +1166,38 @@ async function closeModelEditor() {
   editingModelId.value = null;
 }
 
+/**
+ * Nouveau modèle composite dans la bibliothèque (dans le dossier `folderId`), vide ou copié du mapping `fromId` ;
+ * son schéma s'ouvre aussitôt.
+ */
+async function newComposite(folderId = null, fromId = null) {
+  if (fromId) saveGraph();
+  const from = fromId ? find(fromId) : null;
+  if (from && !compositeOutput(from.graph)) {
+    return notify(t('Ce mapping n’a pas de cible : c’est elle qui donne les champs du modèle composite.', 'This mapping has no target: it gives the fields of the composite model.'), 'warning');
+  }
+  const name = await askText({
+    title: t('Nouveau modèle composite', 'New composite model'),
+    label: t('Nom du modèle composite', 'Composite model name'),
+    initial: from ? from.name : t('Modèle composite', 'Composite model'),
+    okLabel: t('Créer', 'Create'),
+  });
+  if (!name) return;
+  const item = createComposite(name, from?.graph ?? null, folderId);
+  await openFlow(item.id);
+  notify(
+    t(
+      `Modèle composite « ${name} » créé : ajoutez ses sources (glissez des modèles), reliez-les à sa cible (« Rechercher par clé » pour une jointure).`,
+      `Composite model “${name}” created: add its sources (drag models), link them to its target (“Look up by key” for a join).`,
+    ),
+    'success',
+  );
+}
+
 /** Ouvre un flux de la collection (et ferme l'éditeur de la bibliothèque s'il était ouvert). */
 async function openFlow(id) {
   if (editingModelId.value && !(await leaveModel())) return;
+  if (id !== workspace.activeId && !(await leaveComposite())) return;
   editingModelId.value = null;
   // Sans id : seulement revenir au mapping (un nouveau mapping vient d'être ouvert par le panneau).
   if (id) workspace.activeId = id;

@@ -34,6 +34,7 @@ export const NODE_PREVIEWS = {
     inputs: { list: [{ email: 'paul@mail.fr', nom: 'Paul' }, { email: 'ada@mail.fr', nom: 'Ada' }] },
     each: { cond: [['email = « ada@mail.fr »', 'email = “ada@mail.fr”'], (x) => x.email === 'ada@mail.fr'], value: [['nom', 'name'], (x) => x.nom] },
   },
+  lookup: { inputs: { key: 'S2', keys: ['S1', 'S2', 'S3'], values: ['Lyon', 'Paris', 'Nantes'] } },
   list_count: { inputs: { list: ['a', 'b', 'c'] } },
   list_aggregate: { inputs: { list: [2, 4, 9] }, params: { op: 'Moyenne' } },
   list_test: { inputs: { list: [12, 30, 7] }, each: { cond: [['élément ≥ 10', 'item ≥ 10'], (x) => x >= 10] }, params: { op: 'Tous' } },

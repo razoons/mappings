@@ -64,6 +64,14 @@ export const NODE_DOCS_EN = {
     summary: 'First item that matches the condition.',
     details: ['“Found” tells whether an item was found; otherwise the item is empty.', 'If “Value” (∀) is linked, you get the value computed for the found item.'],
   },
+  lookup: {
+    summary: 'Join: the value whose key matches, e.g. the number of the client site whose id is the site id of the work site.',
+    details: [
+      '“Keys” and “Values” are two lists of the same length, e.g. sites[].id and sites[].numeroSite: the value returned is the one at the rank of the first key equal to “Key” (compared as text).',
+      'A list linked to “Key” (e.g. sites[].id_site) looks up each item.',
+      'Without “Values”, the key found is returned. “Found” tells whether a key matched; otherwise the value is empty.',
+    ],
+  },
   list_count: { summary: 'Number of items in the list.' },
   list_aggregate: {
     summary: 'Sum, average, minimum or maximum of the items.',

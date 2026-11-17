@@ -9,7 +9,7 @@
       <span v-else-if="others" class="model-state muted">{{ t(`+ ${others} autre${others > 1 ? 's' : ''} mapping${others > 1 ? 's' : ''}`, `+ ${others} other mapping${others > 1 ? 's' : ''}`) }}</span>
       <span class="spacer" />
       <template v-if="diverged && !readOnly">
-        <button class="link-btn" :title="saveTitle" @click="link.save(nodeId)">{{ texts.save }}</button>
+        <button v-if="link.canSave?.(item) ?? true" class="link-btn" :title="saveTitle" @click="link.save(nodeId)">{{ texts.save }}</button>
         <button class="link-btn" :title="texts.saveAsTitle" @click="link.saveAs(nodeId)">{{ texts.saveAs }}</button>
         <button class="link-btn" :title="texts.revert" @click="link.revert(nodeId)">↺</button>
       </template>

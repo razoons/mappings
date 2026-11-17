@@ -313,6 +313,31 @@ export function evaluateGraph(nodes, edges, dataFiles = new Map()) {
   return { outputs, targets };
 }
 
+/**
+ * Sources d'où vient la valeur du champ `fieldId` d'une cible : noms (`data.label`) des nœuds source atteints en
+ * remontant les liens. Un nœud qui transmet certaines entrées à sa sortie (`passes`, ex. « Valeurs » de Rechercher
+ * par clé) n'est remonté que par elles ; les autres, par toutes leurs entrées reliées.
+ */
+export function originsOf(nodes, edges, targetId, fieldId) {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const found = new Set();
+  const seen = new Set();
+  const walk = (nodeId, handle) => {
+    const key = `${nodeId}:${handle}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const node = byId.get(nodeId);
+    if (node?.type === 'source') return void found.add(node.data.label || '?');
+    if (node?.type !== 'transform') return;
+    const pass = TRANSFORMS[node.data.kind]?.passes?.[handle];
+    const into = edges.filter((e) => e.target === nodeId);
+    const chosen = Array.isArray(pass?.inputs) ? into.filter((e) => pass.inputs.includes(e.targetHandle)) : [];
+    for (const e of chosen.length ? chosen : into) walk(e.source, e.sourceHandle);
+  };
+  for (const e of edges) if (e.target === targetId && e.targetHandle === fieldId) walk(e.source, e.sourceHandle);
+  return [...found];
+}
+
 /** Refuse les cycles : la source ne doit pas être atteignable depuis la cible (`ignoredEdgeId` : lien en cours de déplacement). */
 export function createsCycle(edges, source, target, ignoredEdgeId) {
   const stack = [target];

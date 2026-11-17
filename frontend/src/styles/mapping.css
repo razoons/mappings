@@ -1109,3 +1109,72 @@ kbd {
 .doc-name .doc-modified {
   color: var(--warning);
 }
+button.doc-name {
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: none;
+  border: 1px solid transparent;
+}
+button.doc-name:hover {
+  border-color: var(--border, rgba(127, 127, 127, 0.4));
+  color: inherit;
+}
+.doc-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.doc-name .doc-name-edit {
+  opacity: 0;
+}
+.doc-name:hover .doc-name-edit {
+  opacity: 0.8;
+}
+
+/* Mapping affiché, dans la barre d'outils */
+.flow-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 420px;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.flow-name .flow-folders {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flow-name .flow-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Schéma d'un modèle composite (bibliothèque) affiché à la place d'un mapping. */
+.flow-name.composite {
+  color: rgb(var(--v-theme-primary));
+}
+.flow-name .flow-kind {
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(var(--v-theme-primary), 0.12);
+}
+
+/* Modèle composite : la source d'où vient le champ, en préfixe de son nom. */
+.field-origin {
+  flex: none;
+  max-width: 110px;
+  margin-right: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+.model-bar > span {
+  white-space: nowrap;
+}

@@ -39,6 +39,12 @@ export const MODEL_LINK_KEY = Symbol('modelLink');
 /** Même chose pour un nœud Liste de valeurs et les listes partagées de la bibliothèque (`data.listId`). */
 export const LIST_LINK_KEY = Symbol('listLink');
 
+/**
+ * Origine des champs d'un modèle composite, fournie par l'éditeur : `(nodeId, fieldId)` → nom de la source d'où
+ * vient le champ (« Chantier », « Site client »), ou `''`.
+ */
+export const FIELD_ORIGIN_KEY = Symbol('fieldOrigin');
+
 /** Verrou de tout le schéma (ref booléenne), fourni par l'éditeur. */
 export const SCHEMA_LOCK_KEY = Symbol('schemaLock');
 

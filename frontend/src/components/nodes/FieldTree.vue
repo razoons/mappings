@@ -31,6 +31,7 @@
         @click="ops.toggle(f.id)"
       >{{ f.collapsed ? '▸' : '▾' }}</button>
       <span v-else class="toggle" />
+      <span v-if="originOf(f)" class="field-origin" :title="`${t('Vient de', 'Comes from')} « ${originOf(f)} »`">{{ originOf(f) }} ›</span>
       <input class="nodrag" :disabled="locked" :value="f.name" :title="f.description || undefined" @input="ops.rename(f.id, $event.target.value)" />
       <button
         class="required-btn nodrag"
@@ -124,7 +125,7 @@ import { descendantIds, flattenRows, isContainer, sourceSocketType, targetSocket
 import { isPlainObject } from '../../lib/lists';
 import { formatValue } from '../../lib/types';
 import FieldRules from './FieldRules.vue';
-import { DATA_FILES_KEY, dragState, socketAttrs, useFieldEditor, useLibraries } from './shared';
+import { DATA_FILES_KEY, dragState, FIELD_ORIGIN_KEY, socketAttrs, useFieldEditor, useLibraries } from './shared';
 
 const props = defineProps({
   nodeId: { type: String, required: true },
@@ -150,6 +151,10 @@ const rows = computed(() => flattenRows(props.data.fields));
 const position = computed(() => (props.side === 'source' ? Position.Right : Position.Left));
 const draggedId = ref(null);
 const drop = ref(null);
+
+// Modèle composite : la source d'où vient chaque champ, en préfixe de son nom.
+const fieldOrigin = inject(FIELD_ORIGIN_KEY, null);
+const originOf = (f) => fieldOrigin?.(props.nodeId, f.id) ?? '';
 
 const socketType = (chain) => (props.side === 'source' ? sourceSocketType(chain) : targetSocketType(chain.at(-1)));
 

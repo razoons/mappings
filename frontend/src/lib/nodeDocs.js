@@ -80,6 +80,14 @@ export const NODE_DOCS = {
     summary: 'Premier élément qui vérifie la condition.',
     details: ['« Trouvé » indique si un élément a été trouvé ; sinon l’élément est vide.', 'Si « Valeur » (∀) est reliée, on obtient la valeur calculée pour l’élément trouvé.'],
   },
+  lookup: {
+    summary: 'Jointure : la valeur dont la clé correspond, ex. le numéro du site client dont l’id vaut l’id_site du chantier.',
+    details: [
+      '« Clés » et « Valeurs » sont deux listes de même longueur, ex. sites[].id et sites[].numeroSite : la valeur rendue est celle du rang de la première clé égale à « Clé » (comparées en texte).',
+      'Une liste branchée sur « Clé » (ex. chantiers[].id_site) fait une recherche par élément.',
+      'Sans « Valeurs », c’est la clé trouvée qui est rendue. « Trouvé » indique si une clé correspond ; sinon la valeur est vide.',
+    ],
+  },
   list_count: {
     summary: 'Nombre d’éléments de la liste.',
   },

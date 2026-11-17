@@ -1,8 +1,9 @@
 import { allFields, findChain, pathLabel, reshapeSample, typeKey, TYPE_OPTIONS } from '../lib/fields';
+import { evaluateGraph } from '../lib/graph';
 import { t } from '../lib/i18n';
 import { isPlainObject } from '../lib/lists';
 import { uid } from '../lib/types';
-import { addToLibrary, allMappings, find, locate, remove, rename, workspace } from './collections';
+import { addToLibrary, allMappings, find, isComposite, locate, remove, rename, workspace } from './collections';
 
 /**
  * Modèles de données partagés : un nœud source ou cible relié à un modèle de la bibliothèque porte `data.modelId`
@@ -42,6 +43,74 @@ export const makeModel = (name, fields, sample) => ({
   fields: stripFields(JSON.parse(JSON.stringify(fields))),
   ...(sample !== undefined && { sample }),
 });
+
+// ── Modèles composites ─────────────────────────────────────
+// Un modèle composite a son propre schéma (`graph`), qui s'ouvre comme un flux : des sources (souvent des modèles
+// de la bibliothèque), des transformations (ex. « Rechercher par clé » pour une jointure) et une cible, sa sortie.
+// Ses champs sont ceux de cette cible, et son exemple le document qu'elle produit avec les exemples des sources :
+// ajouté à un flux comme source, il donne directement les données jointes.
+
+/** Cible d'un schéma qui fait la sortie du modèle composite : la première. */
+export const compositeOutput = (graph) => graph?.nodes.find((n) => n.type === 'target') ?? null;
+
+/** Crée un modèle composite (schéma `graph`, sinon une cible vide à son nom) dans la bibliothèque, et calcule ses champs. */
+export function createComposite(name, graph = null, folderId = null) {
+  const start = graph ?? { nodes: [{ id: uid('target'), type: 'target', position: { x: 700, y: 120 }, data: { label: name, fields: [] } }], edges: [] };
+  const item = { ...makeModel(name, []), composite: true, graph: JSON.parse(JSON.stringify(start)) };
+  for (const n of item.graph.nodes) n.selected = undefined;
+  computeComposite(item);
+  return addToLibrary(item, folderId);
+}
+
+/** Champs et exemple que donne le schéma `graph` d'un modèle composite : `{ fields, sample }`. */
+export function compositeContent(graph) {
+  const out = compositeOutput(graph);
+  const value = out ? (evaluateGraph(graph.nodes, graph.edges).targets.get(out.id)?.value ?? {}) : {};
+  return { fields: stripFields(out?.data.fields ?? []), sample: JSON.stringify(value, null, 2) };
+}
+
+/** Champs et exemple d'un modèle composite, d'après son schéma. */
+function computeComposite(item) {
+  Object.assign(item, compositeContent(item.graph));
+}
+
+const sameJson = (a, b) => {
+  try {
+    return canonical(JSON.parse(a || '{}')) === canonical(JSON.parse(b || '{}'));
+  } catch {
+    return a === b;
+  }
+};
+
+/**
+ * Recalcule un modèle composite après une modification de son schéma, et l'applique aux flux qui l'utilisent :
+ * leurs nœuds non modifiés localement suivent ses champs, et une source dont l'exemple n'a pas été changé
+ * reçoit le nouveau document. Les modèles composites qui l'utilisent sont recalculés à leur tour.
+ */
+export function refreshComposite(item, seen = new Set()) {
+  if (!isComposite(item) || seen.has(item.id)) return;
+  seen.add(item.id);
+  const before = { fields: item.fields, sample: item.sample };
+  computeComposite(item);
+  if (sameFields(before.fields, item.fields) && sameJson(before.sample, item.sample)) return;
+  for (const { mapping, nodes } of usageOf(item.id)) {
+    for (const node of nodes) {
+      const untouched = node.type === 'source' && (node.data.sample === undefined || sameJson(node.data.sample, before.sample));
+      if (sameFields(node.data.fields, before.fields)) syncNode(mapping.graph, node, item.fields);
+      if (untouched) node.data.sample = item.sample;
+    }
+    if (isComposite(mapping)) refreshComposite(mapping, seen);
+  }
+}
+
+/** Le modèle `id` est le composite `compositeId`, ou un modèle composite dont le schéma l'utilise (même indirectement). */
+export function usesComposite(id, compositeId, seen = new Set()) {
+  if (id === compositeId) return true;
+  const item = find(id);
+  if (!isComposite(item) || seen.has(id)) return false;
+  seen.add(id);
+  return item.graph.nodes.some((n) => n.data?.modelId && usesComposite(n.data.modelId, compositeId, seen));
+}
 
 /** Modèle de la bibliothèque relié à un nœud (`null` s'il n'en a pas ou si le modèle a été supprimé). */
 export const modelOf = (data) => {
@@ -172,6 +241,7 @@ export function applyModel(modelId, fields, { sample, from } = {}) {
       const origin = from && mapping.id === from.mappingId && node.id === from.nodeId;
       if (origin || sameFields(node.data.fields, before)) syncNode(mapping.graph, node, model.fields);
     }
+    if (isComposite(mapping)) refreshComposite(mapping);
   }
   hooks.reload();
 }
@@ -184,6 +254,7 @@ export function revertNode(mappingId, nodeId) {
   const model = modelOf(node?.data);
   if (!model) return;
   syncNode(mapping.graph, node, model.fields);
+  if (isComposite(mapping)) refreshComposite(mapping);
   hooks.reload();
 }
 
