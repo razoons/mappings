@@ -1,6 +1,7 @@
 <template>
-  <div class="node node-library" :class="{ selected, collapsed: data.collapsed, locked: readOnly, mapped }">
+  <div class="node node-library" :class="{ selected, collapsed: data.collapsed, locked: readOnly, mapped, sized: data.width }" :style="widthStyle(data)">
     <div class="node-header" :style="{ background: HEADER_COLORS.library }">
+      <WidthHandle :node-id="id" :read-only="readOnly" />
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
       <span class="node-kind">{{ t('Liste de valeurs', 'Value list') }}</span>
       <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
@@ -131,7 +132,8 @@ import { pathLabel } from '../../lib/fields';
 import { count, t } from '../../lib/i18n';
 import { fromRows, LIBRARY_OUTPUT, LIBRARY_TABLE, LIBRARY_TYPES, parseLibraryValue, rowsOf } from '../../lib/libraries';
 import { HEADER_COLORS, listOf, socketTitle } from '../../lib/types';
-import { LIST_LINK_KEY, socketAttrs, useReadOnly } from './shared';
+import { LIST_LINK_KEY, socketAttrs, useReadOnly, widthStyle } from './shared';
+import WidthHandle from './WidthHandle.vue';
 
 defineOptions({ inheritAttrs: false });
 

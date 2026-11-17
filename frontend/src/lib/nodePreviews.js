@@ -9,70 +9,76 @@
  * - `params` : réglages.
  */
 export const NODE_PREVIEWS = {
+  // Même thème que la démo (services/demo.js) : la pizzeria « La Bonne Pâte », sa commande en ligne, son fichier
+  // fidélité et sa carte.
+
   // ── Entrée ──────────────────────────────────────────────
-  const_string: { params: { value: 'FR' } },
-  const_number: { params: { value: '19,6' } },
+  const_string: { params: { value: 'LBP' } },
+  const_number: { params: { value: '9,5' } },
   const_bool: { params: { value: 'vrai' } },
   now: {},
 
   // ── Structure ───────────────────────────────────────────
-  current: { current: { item: { sku: 'B-12', qty: 3 }, index: 2 } },
-  get_field: { inputs: { obj: { client: 'Ada', lignes: [{ sku: 'A-1' }, { sku: 'B-12' }] } }, params: { path: 'lignes[1].sku' } },
-  set_field: { inputs: { obj: { id: 1, nom: 'Ada' } }, each: { value: ['"FR"', () => 'FR'] }, params: { path: 'pays' } },
-  remove_field: { inputs: { obj: { id: 1, nom: 'Ada', interne: 'x' } }, params: { keys: 'interne' } },
-  list_create: { inputs: { a: 'x', b: ['y', 'z'] } },
+  current: { current: { item: { product: 'regina', qty: 1 }, index: 1 } },
+  get_field: { inputs: { obj: { orderId: 'W-20481', items: [{ product: 'margherita' }, { product: 'regina' }] } }, params: { path: 'items[1].product' } },
+  set_field: { inputs: { obj: { email: 'julie.martin@mail.com', points: 640 } }, each: { value: [['vrai', 'true'], () => true] }, params: { path: 'vip' } },
+  remove_field: { inputs: { obj: { orderId: 'W-20481', phone: '0612345678', note: null } }, params: { keys: 'note' } },
+  list_create: { inputs: { a: 'margherita', b: ['regina', 'tiramisu'] } },
 
   // ── Liste ───────────────────────────────────────────────
-  list_filter: { inputs: { list: [1, 5, 8, 3] }, each: { cond: [['élément > 4', 'item > 4'], (x) => x > 4] } },
-  list_sort: { inputs: { list: ['Zoé', 'Ada', 'Léo'] } },
+  list_filter: { inputs: { list: [9.5, 13, 4.5] }, each: { cond: [['élément > 5', 'item > 5'], (x) => x > 5] } },
+  list_sort: { inputs: { list: ['tiramisu', 'regina', 'margherita'] } },
   list_map: {
-    inputs: { list: [{ qty: 2, price: 5 }, { qty: 1, price: 3 }] },
-    each: { value: ['qty × price', (x) => x.qty * x.price] },
+    inputs: { list: [{ qty: 2, unitPrice: 9.5 }, { qty: 1, unitPrice: 13 }] },
+    each: { value: ['qty × unitPrice', (x) => x.qty * x.unitPrice] },
   },
-  list_at: { inputs: { list: ['a', 'b', 'c'], index: '0' }, params: { from: 'Fin' } },
+  list_at: { inputs: { list: ['margherita', 'regina', 'tiramisu'], index: '0' }, params: { from: 'Fin' } },
   list_find: {
-    inputs: { list: [{ email: 'paul@mail.fr', nom: 'Paul' }, { email: 'ada@mail.fr', nom: 'Ada' }] },
-    each: { cond: [['email = « ada@mail.fr »', 'email = “ada@mail.fr”'], (x) => x.email === 'ada@mail.fr'], value: [['nom', 'name'], (x) => x.nom] },
+    inputs: { list: [{ email: 'paul.durand@mail.com', firstName: 'paul' }, { email: 'julie.martin@mail.com', firstName: 'julie' }] },
+    each: {
+      cond: [['email = « julie.martin@mail.com »', 'email = “julie.martin@mail.com”'], (x) => x.email === 'julie.martin@mail.com'],
+      value: ['firstName', (x) => x.firstName],
+    },
   },
-  lookup: { inputs: { key: 'S2', keys: ['S1', 'S2', 'S3'], values: ['Lyon', 'Paris', 'Nantes'] } },
-  list_count: { inputs: { list: ['a', 'b', 'c'] } },
-  list_aggregate: { inputs: { list: [2, 4, 9] }, params: { op: 'Moyenne' } },
-  list_test: { inputs: { list: [12, 30, 7] }, each: { cond: [['élément ≥ 10', 'item ≥ 10'], (x) => x >= 10] }, params: { op: 'Tous' } },
-  list_slice: { inputs: { list: ['a', 'b', 'c', 'd'], start: '1', count: '2' } },
-  list_reverse: { inputs: { list: [1, 2, 3] } },
-  list_unique: { inputs: { list: ['a', 'b', 'a', 'c'] } },
-  list_join: { inputs: { list: ['vip', 'newsletter'] }, params: { sep: ', ' } },
+  lookup: { inputs: { key: 'julie.martin@mail.com', keys: ['paul.durand@mail.com', 'julie.martin@mail.com', 'nina.costa@mail.com'], values: [120, 640, 35] } },
+  list_count: { inputs: { list: ['margherita', 'regina', 'tiramisu'] } },
+  list_aggregate: { inputs: { list: [120, 640, 35] }, params: { op: 'Moyenne' } },
+  list_test: { inputs: { list: [9.5, 13, 4.5] }, each: { cond: [['élément ≥ 5', 'item ≥ 5'], (x) => x >= 5] }, params: { op: 'Tous' } },
+  list_slice: { inputs: { list: ['margherita', 'regina', 'calzone', 'tiramisu'], start: '1', count: '2' } },
+  list_reverse: { inputs: { list: ['margherita', 'regina', 'tiramisu'] } },
+  list_unique: { inputs: { list: ['margherita', 'regina', 'margherita', 'tiramisu'] } },
+  list_join: { inputs: { list: ['Pizza Margherita', 'Tiramisu maison'] }, params: { sep: ', ' } },
 
   // ── Texte ───────────────────────────────────────────────
-  concat: { inputs: { a: 'Ada', b: 'Lovelace' } },
-  case: { inputs: { text: 'jean-luc picard' }, params: { mode: 'Capitaliser' } },
-  trim: { inputs: { text: '  Ada   Lovelace ' } },
-  substring: { inputs: { text: 'FR76-3000-6000', count: '4' }, params: { mode: 'Gauche' } },
-  replace: { inputs: { text: '06.12.34.56.78' }, params: { search: '.', replace: '' } },
-  split: { inputs: { text: 'Ada Lovelace' }, params: { sep: ' ', index: '1' } },
-  split_list: { inputs: { text: 'vip, newsletter ,promo' } },
-  length: { inputs: { text: 'Lovelace' } },
+  concat: { inputs: { a: 'Julie', b: 'MARTIN' } },
+  case: { inputs: { text: 'pizza quatre-fromages' }, params: { mode: 'Capitaliser' } },
+  trim: { inputs: { text: '  Julie.Martin@Mail.com ' } },
+  substring: { inputs: { text: 'LBP-W-20481', count: '3' }, params: { mode: 'Gauche' } },
+  replace: { inputs: { text: '06 12 34 56 78' }, params: { search: ' ', replace: '' } },
+  split: { inputs: { text: 'Julie Martin' }, params: { sep: ' ', index: '1' } },
+  split_list: { inputs: { text: 'margherita, regina ,tiramisu' } },
+  length: { inputs: { text: 'W-20481' } },
 
   // ── Math ────────────────────────────────────────────────
   math: { inputs: { a: '2', b: '9.5' }, params: { op: 'Multiplication' } },
-  round: { inputs: { value: '12.346' }, params: { decimals: '2' } },
+  round: { inputs: { value: '40.996' }, params: { decimals: '2' } },
 
   // ── Logique ─────────────────────────────────────────────
-  compare: { inputs: { a: 'paid', b: 'paid' }, params: { op: '=' } },
+  compare: { inputs: { a: '640', b: '500' }, params: { op: '≥' } },
   logic: { inputs: { a: 'true', b: 'false' }, params: { op: 'ET' } },
   not: { inputs: { a: 'true' } },
-  switch: { inputs: { cond: 'true', yes: 'majeur', no: 'mineur' } },
-  coalesce: { inputs: { value: '', fallback: 'inconnu' } },
+  switch: { inputs: { cond: 'true', yes: 'Client VIP', no: 'Client' } },
+  coalesce: { inputs: { value: '', fallback: 'Aucune' } },
 
   // ── Conversion ──────────────────────────────────────────
-  to_string: { inputs: { value: 19.6 } },
-  to_number: { inputs: { value: '3,5' } },
-  transcode: { inputs: { table: { FRA: 'FR', ENG: 'GB', ESP: 'ES' }, value: 'ENG', fallback: '??' } },
+  to_string: { inputs: { value: 9.5 } },
+  to_number: { inputs: { value: '9,5' } },
+  transcode: { inputs: { table: { margherita: 'Pizza Margherita', regina: 'Pizza Regina', tiramisu: 'Tiramisu maison' }, value: 'regina', fallback: '??' } },
   to_integer: { inputs: { value: '2.7' }, params: { mode: 'Arrondi' } },
   to_bool: { inputs: { value: 'oui' } },
 
   // ── Date ────────────────────────────────────────────────
-  date_format: { inputs: { date: '2026-09-14' }, params: { format: 'JJ/MM/AAAA' } },
-  date_part: { inputs: { date: '2026-09-14' }, params: { part: 'Jour de la semaine', days: 'lun, mar, mer, jeu, ven, sam, dim' } },
-  age: { inputs: { date: '1990-06-15', ref: '2026-06-14' } },
+  date_format: { inputs: { date: '2026-11-07' }, params: { format: 'JJ/MM/AAAA' } },
+  date_part: { inputs: { date: '2026-11-07' }, params: { part: 'Jour de la semaine', days: 'lun, mar, mer, jeu, ven, sam, dim' } },
+  age: { inputs: { date: '1990-06-15', ref: '2026-11-07' } },
 };

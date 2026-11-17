@@ -1,12 +1,14 @@
 <template>
   <div
     class="node node-data"
-    :class="{ selected, collapsed: data.collapsed, locked: readOnly, 'file-over': fileOver }"
+    :class="{ selected, collapsed: data.collapsed, locked: readOnly, 'file-over': fileOver, sized: data.width }"
+    :style="widthStyle(data)"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
     <div class="node-header" :style="{ background: HEADER_COLORS.source }">
+      <WidthHandle :node-id="id" :read-only="readOnly" />
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
       <span class="node-kind">{{ t('Source', 'Source') }}</span>
       <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
@@ -67,7 +69,8 @@ import { allFields } from '../../lib/fields';
 import { count, t } from '../../lib/i18n';
 import { HEADER_COLORS } from '../../lib/types';
 import { openFile } from '../../services/files';
-import { DATA_FILES_KEY, MODEL_LINK_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults } from './shared';
+import { DATA_FILES_KEY, MODEL_LINK_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults, widthStyle } from './shared';
+import WidthHandle from './WidthHandle.vue';
 
 defineOptions({ inheritAttrs: false });
 

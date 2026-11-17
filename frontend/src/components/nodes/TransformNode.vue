@@ -1,7 +1,8 @@
 <template>
   <div v-if="!def" class="node">{{ t('Nœud inconnu', 'Unknown node') }} : {{ data.kind }}</div>
-  <div v-else class="node node-transform" :class="{ selected, collapsed: data.collapsed, locked: readOnly }">
+  <div v-else class="node node-transform" :class="{ selected, collapsed: data.collapsed, locked: readOnly, sized: data.width }" :style="widthStyle(data)">
     <div class="node-header" :style="{ background: HEADER_COLORS[def.category] }">
+      <WidthHandle :node-id="id" :read-only="readOnly" />
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
       <span class="node-title-static">{{ def.label }}</span>
       <a class="icon-btn help-link nodrag" :href="`/noeuds#${data.kind}`" :title="t('Documentation de ce nœud', 'Documentation of this node')">?</a>
@@ -89,7 +90,8 @@ import LockButton from './LockButton.vue';
 import { t } from '../../lib/i18n';
 import { inputsOf, paramsWithDefaults, TRANSFORMS } from '../../lib/transforms';
 import { coerce, formatValue, HEADER_COLORS, isList, isNumeric } from '../../lib/types';
-import { socketAttrs, useReadOnly, useResults } from './shared';
+import { socketAttrs, useReadOnly, useResults, widthStyle } from './shared';
+import WidthHandle from './WidthHandle.vue';
 
 defineOptions({ inheritAttrs: false });
 

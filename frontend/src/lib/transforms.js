@@ -290,7 +290,7 @@ export const TRANSFORMS = {
   lookup: {
     label: 'Rechercher par clé',
     category: 'Liste',
-    // La clé n'est pas une liste : une liste de clés (ex. chantiers[].id_site) fait une recherche par élément.
+    // La clé n'est pas une liste : une liste de clés (ex. commandes[].email, pour plusieurs commandes) fait une recherche par élément.
     inputs: [
       { id: 'key', label: 'Clé', type: 'any' },
       { id: 'keys', label: 'Clés', type: 'any[]' },

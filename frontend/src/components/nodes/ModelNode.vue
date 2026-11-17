@@ -1,6 +1,7 @@
 <template>
-  <div class="node node-data model-node" :class="{ selected, collapsed: data.collapsed }">
+  <div class="node node-data model-node" :class="{ selected, collapsed: data.collapsed, sized: data.width }" :style="widthStyle(data)">
     <div class="node-header" :style="{ background: HEADER_COLORS.model }">
+      <WidthHandle :node-id="id" />
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
       <span class="node-kind">{{ t('Modèle', 'Model') }}</span>
       <input class="node-title nodrag" :value="data.label" :title="t('Nom du modèle', 'Model name')" @input="updateNodeData(id, { label: $event.target.value })" />
@@ -34,7 +35,8 @@ import CollapseButton from './CollapseButton.vue';
 import FieldTree from './FieldTree.vue';
 import { t } from '../../lib/i18n';
 import { HEADER_COLORS } from '../../lib/types';
-import { useFieldEditor, useModelEditor } from './shared';
+import { useFieldEditor, useModelEditor, widthStyle } from './shared';
+import WidthHandle from './WidthHandle.vue';
 
 /**
  * Modèle de la bibliothèque, dans l'éditeur de modèles : le même arbre de champs qu'une source ou une cible,

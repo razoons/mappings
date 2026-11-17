@@ -102,11 +102,47 @@ kbd {
 
 /* ── Nœuds ──────────────────────────────────────────────── */
 .node {
+  position: relative;
   background: var(--node);
   border: 1px solid var(--node-border);
   border-radius: 6px;
   box-shadow: var(--node-shadow);
   min-width: 180px;
+}
+/* Largeur choisie à la main (poignée au bord droit de l’en-tête) : elle l’emporte sur celle du type de nœud. */
+.node.sized {
+  width: var(--node-width) !important;
+  min-width: 0;
+  max-width: none;
+}
+/* Zone de prise : 10 px à cheval sur le bord droit de l'en-tête ; repère visible : une bande claire de 4 px dans l'en-tête. */
+.width-handle {
+  position: absolute;
+  top: 0;
+  right: -5px;
+  bottom: 0;
+  width: 10px;
+  cursor: ew-resize;
+  z-index: 1;
+}
+.width-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 5px;
+  width: 4px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 0 4px 0 0;
+  transition: width 0.1s, background 0.1s;
+}
+.node.collapsed .width-handle::after {
+  border-radius: 0 4px 4px 0;
+}
+.width-handle:hover::after,
+.width-handle:active::after {
+  width: 6px;
+  background: rgba(255, 255, 255, 0.85);
 }
 .node.selected {
   outline: 2px solid var(--accent);
@@ -1174,7 +1210,4 @@ button.doc-name:hover {
   white-space: nowrap;
   font-size: 11px;
   color: var(--muted);
-}
-.model-bar > span {
-  white-space: nowrap;
 }

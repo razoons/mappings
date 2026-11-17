@@ -30,18 +30,18 @@ export const NODE_DOCS = {
   },
   get_field: {
     summary: 'Lit une valeur dans un objet à partir d’un chemin pointé.',
-    details: ['Un index entre crochets désigne un élément de tableau : « lignes[0].sku ».', 'Un chemin introuvable donne une valeur vide.'],
+    details: ['Un index entre crochets désigne un élément de tableau : « items[0].product ».', 'Un chemin introuvable donne une valeur vide.'],
   },
   set_field: {
     summary: 'Ajoute ou remplace une clé dans un objet, ou dans chaque objet d’une liste.',
     details: [
-      'Le chemin peut être pointé (« adresse.ville ») : les objets intermédiaires sont créés.',
+      'Le chemin peut être pointé (« address.city ») : les objets intermédiaires sont créés.',
       'Sur une liste, la valeur est évaluée pour chaque objet : branchez « Élément courant » ou un champ source pour donner à chacun sa propre valeur.',
     ],
   },
   remove_field: {
     summary: 'Retire une ou plusieurs clés d’un objet, ou de chaque objet d’une liste.',
-    details: ['Clés séparées par des virgules ; un chemin pointé retire une clé imbriquée (« adresse.cp »).'],
+    details: ['Clés séparées par des virgules ; un chemin pointé retire une clé imbriquée (« address.zip »).'],
   },
   list_create: {
     summary: 'Construit une liste à partir de ses entrées A, B, C…',
@@ -55,7 +55,7 @@ export const NODE_DOCS = {
   // ── Liste ───────────────────────────────────────────────
   list_filter: {
     summary: 'Garde les éléments pour lesquels la condition est vraie.',
-    details: ['La condition (∀) est évaluée pour chaque élément : construisez-la à partir des champs de l’élément, ex. Comparer(statut, « paid »).'],
+    details: ['La condition (∀) est évaluée pour chaque élément : construisez-la à partir des champs de l’élément, ex. Comparer(size, « L »).'],
   },
   list_sort: {
     summary: 'Trie la liste, croissant ou décroissant.',
@@ -81,10 +81,10 @@ export const NODE_DOCS = {
     details: ['« Trouvé » indique si un élément a été trouvé ; sinon l’élément est vide.', 'Si « Valeur » (∀) est reliée, on obtient la valeur calculée pour l’élément trouvé.'],
   },
   lookup: {
-    summary: 'Jointure : la valeur dont la clé correspond, ex. le numéro du site client dont l’id vaut l’id_site du chantier.',
+    summary: 'Jointure : la valeur dont la clé correspond, ex. les points du client du fichier fidélité dont l’email est celui de la commande.',
     details: [
-      '« Clés » et « Valeurs » sont deux listes de même longueur, ex. sites[].id et sites[].numeroSite : la valeur rendue est celle du rang de la première clé égale à « Clé » (comparées en texte).',
-      'Une liste branchée sur « Clé » (ex. chantiers[].id_site) fait une recherche par élément.',
+      '« Clés » et « Valeurs » sont deux listes de même longueur, ex. clients[].email et clients[].points du fichier fidélité : la valeur rendue est celle du rang de la première clé égale à « Clé » (comparées en texte).',
+      'Une liste branchée sur « Clé » (ex. commandes[].email, pour plusieurs commandes) fait une recherche par élément.',
       'Sans « Valeurs », c’est la clé trouvée qui est rendue. « Trouvé » indique si une clé correspond ; sinon la valeur est vide.',
     ],
   },
@@ -93,7 +93,7 @@ export const NODE_DOCS = {
   },
   list_aggregate: {
     summary: 'Somme, moyenne, minimum ou maximum des éléments.',
-    details: ['Sans « Valeur », les éléments sont convertis en nombres ; avec « Valeur » (∀), c’est elle qui est agrégée, ex. qty × price.', 'Une liste vide donne 0.'],
+    details: ['Sans « Valeur », les éléments sont convertis en nombres ; avec « Valeur » (∀), c’est elle qui est agrégée, ex. qty × unitPrice.', 'Une liste vide donne 0.'],
   },
   list_test: {
     summary: 'Vrai si au moins un, tous, ou aucun des éléments vérifie la condition.',
@@ -121,7 +121,7 @@ export const NODE_DOCS = {
   },
   case: {
     summary: 'Met le texte en MAJUSCULES, en minuscules, ou capitalise chaque mot.',
-    details: ['« Capitaliser » met une majuscule après une espace, un tiret ou une apostrophe : « jean-luc » → « Jean-Luc ».'],
+    details: ['« Capitaliser » met une majuscule après une espace, un tiret ou une apostrophe : « quatre-fromages » → « Quatre-Fromages ».'],
     guarantee: 'Conserve les longueurs min. et max. de l’entrée.',
   },
   trim: {
@@ -197,7 +197,7 @@ export const NODE_DOCS = {
     details: ['Tronquer et Plancher diffèrent pour les négatifs : -2.7 → -2 (tronqué), -3 (plancher).', 'À placer devant un champ cible Entier alimenté par un nombre décimal : la conversion devient explicite et n’est plus signalée.'],
   },
   transcode: {
-    summary: 'Traduit une valeur d’un référentiel à un autre (FRA → FR) avec la table de correspondance d’une liste de valeurs.',
+    summary: 'Traduit une valeur d’un référentiel à un autre (margherita → Pizza Margherita) avec la table de correspondance d’une liste de valeurs.',
     details: [
       'Table : la sortie Table d’une liste de valeurs dont la case « Table de correspondance » est cochée. Une même liste peut alimenter plusieurs Transcoder.',
       'Valeur absente de la table (ou sans correspondance) : la sortie vaut « Si absente », ou rien si elle est vide. Branchez-y la valeur d’origine pour la garder telle quelle.',
@@ -259,16 +259,42 @@ export const BASE_NODES = [
     ],
   },
   {
+    kind: 'model',
+    label: 'Modèle de la bibliothèque',
+    color: 'model',
+    summary: 'Structure de données réutilisable (champs, types, obligatoire, règles) : une source ou une cible qui s’y relie en reprend les champs, dans autant de mappings que nécessaire.',
+    details: [
+      'Créer : bouton « nouveau modèle » du panneau Bibliothèque, ou bouton « base de données + » de l’en-tête d’une source ou d’une cible, qui relie aussitôt le nœud au modèle créé.',
+      'Utiliser : glisser le modèle depuis le panneau sur le schéma (un menu demande source ou cible), ou menu ⋯ du modèle › « Ajouter au mapping ouvert ». Le nombre à droite du modèle est celui des mappings qui l’utilisent.',
+      'Modifier dans la bibliothèque : un clic sur le modèle l’ouvre à la place du mapping, avec le même arbre de champs qu’une source et { } pour le YAML. Les changements restent un brouillon jusqu’à « Enregistrer » du bandeau du haut (Ctrl S). S’il est utilisé ailleurs, un avertissement liste les champs touchés dans chaque mapping : appliquer, annuler, ou enregistrer sous un nouveau modèle.',
+      'Modifier depuis un mapping : le nœud relié porte un bandeau au nom du modèle. Changer ses champs le fait passer en « modifié ici » : « Enregistrer dans le modèle », « Nouveau modèle… » (variante), ↺ (revenir au modèle), ✕ (délier : les champs restent, propres au mapping).',
+      'Seuls la structure et les règles sont partagées : les exemples d’une source et l’état replié des champs restent propres à chaque mapping. Un champ du modèle peut se référer à une liste de valeurs de la bibliothèque (⚙) : il est contrôlé dans tout mapping.',
+    ],
+  },
+  {
+    kind: 'composite',
+    label: 'Modèle composite',
+    color: 'model',
+    summary: 'Modèle construit avec des nœuds : ses champs sont ceux de sa cible, et ses données ce qu’elle produit à partir de ses sources (par exemple « Commande fidélité » : la commande en ligne, enrichie des points fidélité de son client).',
+    details: [
+      'Créer : bouton « modèle composite » du panneau Bibliothèque (ou menu ⋯ d’un dossier), ou menu ⋯ d’un mapping › « Copier en modèle composite ».',
+      'Construire : un clic dans la bibliothèque ouvre son schéma à la place du mapping. On y glisse les modèles sources et on les relie à sa cible, avec « Rechercher par clé » pour une jointure (Clé : email de la commande ; Clés : clients[].email du fichier fidélité ; Valeurs : clients[].points).',
+      'Comme un modèle simple, les changements restent un brouillon jusqu’à « Enregistrer » (bandeau du haut) ; « Annuler » revient à la version enregistrée ; ✕ ramène au mapping d’où il a été ouvert.',
+      'Utiliser : il s’ajoute à un mapping comme tout modèle (glisser depuis le panneau) et donne directement les données jointes. Devant chaque champ, en gris, la source d’où il vient (« Commande en ligne › orderId », « Fichier fidélité › points »). À l’enregistrement, ses changements s’appliquent aux mappings qui l’utilisent, sauf là où il a été modifié localement.',
+      'Un modèle composite peut en utiliser un autre, mais pas lui-même.',
+    ],
+  },
+  {
     kind: 'library',
     label: 'Liste de valeurs',
     color: 'library',
     summary: 'Liste de valeurs autorisées (textes, entiers, nombres ou dates), partagée par les champs qui s’y réfèrent.',
     details: [
-      'Un champ de source ou de cible s’y réfère dans ses règles (⚙ › Valeurs autorisées) : sa valeur — ou chaque élément d’une liste — doit faire partie de la liste. Plusieurs champs, dans des nœuds différents, peuvent partager la même liste ; la modifier les met tous à jour. En YAML : « listeValeurs: Pays ». Enregistrée dans la bibliothèque (bouton « base de données + » de son en-tête), une liste se réutilise dans d’autres mappings et dans les modèles.',
+      'Un champ de source ou de cible s’y réfère dans ses règles (⚙ › Valeurs autorisées) : sa valeur — ou chaque élément d’une liste — doit faire partie de la liste. Plusieurs champs, dans des nœuds différents, peuvent partager la même liste ; la modifier les met tous à jour. En YAML : « listeValeurs: Carte ». Enregistrée dans la bibliothèque (bouton « base de données + » de son en-tête), une liste se réutilise dans d’autres mappings et dans les modèles.',
       'Saisie : une valeur par ligne du nœud (Entrée pour ajouter), ou toutes à la fois avec ≡ (une par ligne). Les doublons sont ignorés. Changer le type convertit les valeurs et retire celles qui ne s’y prêtent pas.',
       'Contrôles : ⛔ une valeur hors liste dans un fichier de données, un exemple ou le résultat d’une cible ; ⚠ un champ cible alimenté par une source qui ne garantit pas ces valeurs (la source doit se référer à la même liste, ou à une liste dont toutes les valeurs y figurent) ; ⚠ une liste absente.',
       'La sortie Valeurs donne la liste, à brancher sur une transformation de liste (Trouver, Tester les éléments…) ou sur une liste cible.',
-      'Table de correspondance (case à cocher) : chaque valeur reçoit une correspondance dans un autre référentiel (FRA → FR), avec son propre type. La sortie Table alimente le nœud Transcoder. En bloc (≡) : « valeur ; correspondance » par ligne, ou un copier-coller de deux colonnes de tableur.',
+      'Table de correspondance (case à cocher) : chaque valeur reçoit une correspondance dans un autre référentiel (margherita → Pizza Margherita), avec son propre type. La sortie Table alimente le nœud Transcoder. En bloc (≡) : « valeur ; correspondance » par ligne, ou un copier-coller de deux colonnes de tableur.',
       'Pour une source, l’exemple d’un champ qui a une liste de valeurs se choisit dans une liste déroulante.',
     ],
   },

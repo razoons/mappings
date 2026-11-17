@@ -1,6 +1,7 @@
 <template>
-  <div class="node node-data" :class="{ selected, collapsed: data.collapsed, locked: readOnly }">
+  <div class="node node-data" :class="{ selected, collapsed: data.collapsed, locked: readOnly, sized: data.width }" :style="widthStyle(data)">
     <div class="node-header" :style="{ background: HEADER_COLORS.target }">
+      <WidthHandle :node-id="id" :read-only="readOnly" />
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
       <span class="node-kind">{{ t('Cible', 'Target') }}</span>
       <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
@@ -65,7 +66,8 @@ import { allFields } from '../../lib/fields';
 import { t } from '../../lib/i18n';
 import { countIssues } from '../../lib/rules';
 import { HEADER_COLORS } from '../../lib/types';
-import { DATA_FILES_KEY, MODEL_LINK_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults } from './shared';
+import { DATA_FILES_KEY, MODEL_LINK_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults, widthStyle } from './shared';
+import WidthHandle from './WidthHandle.vue';
 
 defineOptions({ inheritAttrs: false });
 
