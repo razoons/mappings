@@ -41,7 +41,7 @@ export const LIST_LINK_KEY = Symbol('listLink');
 
 /**
  * Origine des champs d'un modèle composite, fournie par l'éditeur : `(nodeId, fieldId)` → nom de la source d'où
- * vient le champ (« Chantier », « Site client »), ou `''`.
+ * vient le champ (« Commande en ligne », « Fichier fidélité »), ou `''`.
  */
 export const FIELD_ORIGIN_KEY = Symbol('fieldOrigin');
 
@@ -210,3 +210,6 @@ export function useModelEditor(getData, ops, { source = false } = {}) {
     ],
   };
 }
+
+/** Style d'un nœud dont la largeur a été réglée à la main (`data.width`, voir WidthHandle). */
+export const widthStyle = (data) => (data.width ? { '--node-width': `${data.width}px` } : undefined);

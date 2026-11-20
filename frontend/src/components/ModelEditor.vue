@@ -11,14 +11,21 @@
       <Background variant="lines" :gap="24" color="var(--grid)" />
       <Controls :show-interactive="false" />
       <Panel position="top-center" class="model-bar">
-        <v-icon :icon="isList ? 'mdi-format-list-bulleted' : 'mdi-database-outline'" size="18" />
-        <span class="model-bar-title">{{ isList ? t('Liste de valeurs de la bibliothèque', 'Library value list') : t('Modèle de la bibliothèque', 'Library model') }}</span>
-        <span class="model-bar-usage">{{ usageText }}</span>
-        <span v-if="dirty" class="model-bar-dirty">{{ t('modifications non enregistrées', 'unsaved changes') }}</span>
-        <v-btn size="small" color="primary" variant="flat" :disabled="!dirty" @click="save">
-          {{ isList ? t('Enregistrer la liste', 'Save the list') : t('Enregistrer le modèle', 'Save the model') }}
+        <!-- Seulement enregistrer, annuler, fermer (le reste dans les infobulles), comme pour un modèle composite. -->
+        <v-btn
+          size="small"
+          color="primary"
+          variant="flat"
+          prepend-icon="mdi-content-save-outline"
+          :disabled="!dirty"
+          :title="`${isList ? t('Enregistrer la liste (Ctrl S)', 'Save the list (Ctrl S)') : t('Enregistrer le modèle (Ctrl S)', 'Save the model (Ctrl S)')} — ${usageText}`"
+          @click="save"
+        >
+          {{ t('Enregistrer', 'Save') }}
         </v-btn>
-        <v-btn size="small" variant="text" :disabled="!dirty" :title="t('Revenir à la version enregistrée', 'Back to the saved version')" @click="reload">{{ t('Annuler les modifications', 'Discard the changes') }}</v-btn>
+        <v-btn size="small" variant="text" prepend-icon="mdi-undo" :disabled="!dirty" :title="t('Annuler les modifications : revenir à la version enregistrée', 'Discard the changes: back to the saved version')" @click="reload">
+          {{ t('Annuler', 'Discard') }}
+        </v-btn>
         <v-btn size="small" variant="text" icon="mdi-close" :title="t('Fermer et revenir au mapping', 'Close and go back to the mapping')" @click="$emit('close')" />
       </Panel>
     </VueFlow>
@@ -143,21 +150,12 @@ defineExpose({ dirty, save, reload });
 .model-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 8px 6px 14px;
+  gap: 4px;
+  padding: 6px;
   border-radius: 10px;
   background: rgb(var(--v-theme-surface));
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
   font-size: 0.875rem;
-}
-.model-bar-title {
-  font-weight: 600;
-}
-.model-bar-usage {
-  opacity: 0.7;
-}
-.model-bar-dirty {
-  color: rgb(var(--v-theme-warning));
 }
 .model-node {
   min-width: 520px;

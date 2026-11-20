@@ -16,7 +16,7 @@ export const NODE_DOCS_EN = {
   },
   get_field: {
     summary: 'Reads a value in an object from a dotted path.',
-    details: ['An index in brackets designates an array item: “lines[0].sku”.', 'A path that cannot be found gives an empty value.'],
+    details: ['An index in brackets designates an array item: “items[0].product”.', 'A path that cannot be found gives an empty value.'],
   },
   set_field: {
     summary: 'Adds or replaces a key in an object, or in each object of a list.',
@@ -39,7 +39,7 @@ export const NODE_DOCS_EN = {
   },
   list_filter: {
     summary: 'Keeps the items for which the condition is true.',
-    details: ['The condition (∀) is evaluated for each item: build it from the item’s fields, e.g. Compare(status, “paid”).'],
+    details: ['The condition (∀) is evaluated for each item: build it from the item’s fields, e.g. Compare(size, “L”).'],
   },
   list_sort: {
     summary: 'Sorts the list, ascending or descending.',
@@ -65,10 +65,10 @@ export const NODE_DOCS_EN = {
     details: ['“Found” tells whether an item was found; otherwise the item is empty.', 'If “Value” (∀) is linked, you get the value computed for the found item.'],
   },
   lookup: {
-    summary: 'Join: the value whose key matches, e.g. the number of the client site whose id is the site id of the work site.',
+    summary: 'Join: the value whose key matches, e.g. the points of the loyalty file client whose email is the order’s.',
     details: [
-      '“Keys” and “Values” are two lists of the same length, e.g. sites[].id and sites[].numeroSite: the value returned is the one at the rank of the first key equal to “Key” (compared as text).',
-      'A list linked to “Key” (e.g. sites[].id_site) looks up each item.',
+      '“Keys” and “Values” are two lists of the same length, e.g. clients[].email and clients[].points of the loyalty file: the value returned is the one at the rank of the first key equal to “Key” (compared as text).',
+      'A list linked to “Key” (e.g. orders[].email, for several orders) looks up each item.',
       'Without “Values”, the key found is returned. “Found” tells whether a key matched; otherwise the value is empty.',
     ],
   },
@@ -76,7 +76,7 @@ export const NODE_DOCS_EN = {
   list_aggregate: {
     summary: 'Sum, average, minimum or maximum of the items.',
     details: [
-      'Without “Value”, the items are converted to numbers; with “Value” (∀), it is the value that is aggregated, e.g. qty × price.',
+      'Without “Value”, the items are converted to numbers; with “Value” (∀), it is the value that is aggregated, e.g. qty × unitPrice.',
       'An empty list gives 0.',
     ],
   },
@@ -99,7 +99,7 @@ export const NODE_DOCS_EN = {
   },
   case: {
     summary: 'Puts the text in UPPERCASE, in lowercase, or capitalizes each word.',
-    details: ['“Capitalize” puts a capital letter after a space, a hyphen or an apostrophe: “jean-luc” → “Jean-Luc”.'],
+    details: ['“Capitalize” puts a capital letter after a space, a hyphen or an apostrophe: “quatre-fromages” → “Quatre-Fromages”.'],
     guarantee: 'Keeps the min. and max. lengths of the input.',
   },
   trim: {
@@ -162,7 +162,7 @@ export const NODE_DOCS_EN = {
     ],
   },
   transcode: {
-    summary: 'Translates a value from one reference list to another (FRA → FR) with the mapping table of a value list.',
+    summary: 'Translates a value from one reference list to another (margherita → Pizza Margherita) with the mapping table of a value list.',
     details: [
       'Table: the Table output of a value list whose “Mapping table” box is checked. The same list can feed several Transcode nodes.',
       'Value missing from the table (or without a mapping): the output is “If missing”, or nothing if it is empty. Plug the original value into it to keep it as is.',
@@ -222,15 +222,37 @@ export const NODE_DOCS_EN = {
       'Checks: ⛔ required not mapped; ⛔ incompatible types; ⛔ different date formats; ⛔ decimals not guaranteed; ⚠ type implicitly converted; ⚠ required fed by an optional source; ⚠ format not guaranteed; ⚠ type or value not guaranteed (a node that cannot guarantee anything, e.g. Read a field). Guarantees flow through every node: each node states what it guarantees (length, bounds, decimals, date format, possible values), and whatever the path does not guarantee is reported. Details in the Checks panel.',
     ],
   },
+  model: {
+    label: 'Library model',
+    summary: 'Reusable data structure (fields, types, required, rules): a source or a target linked to it takes its fields, in as many mappings as needed.',
+    details: [
+      'Create: “new model” button of the Library panel, or “database +” button of the header of a source or a target, which links the node to the created model right away.',
+      'Use: drag the model from the panel onto the schema (a menu asks for source or target), or the model’s ⋯ menu › “Add to the open mapping”. The number to the right of the model is the number of mappings that use it.',
+      'Edit in the library: a click on the model opens it in place of the mapping, with the same field tree as a source and { } for the YAML. Changes stay a draft until “Save” in the top bar (Ctrl S). If it is used elsewhere, a warning lists the fields affected in each mapping: apply, cancel, or save as a new model.',
+      'Edit from a mapping: the linked node shows a banner with the model’s name. Changing its fields makes it “changed here”: “Save to the model”, “New model…” (variant), ↺ (back to the model), ✕ (unlink: the fields stay, specific to the mapping).',
+      'Only the structure and the rules are shared: a source’s examples and the collapsed state of fields stay specific to each mapping. A model field can refer to a value list of the library (⚙): it is checked in every mapping.',
+    ],
+  },
+  composite: {
+    label: 'Composite model',
+    summary: 'Model built with nodes: its fields are those of its target, and its data what the target produces from its sources (for example “Loyalty order”: the online order, enriched with its customer’s loyalty points).',
+    details: [
+      'Create: “composite model” button of the Library panel (or ⋯ menu of a folder), or ⋯ menu of a mapping › “Copy as a composite model”.',
+      'Build: a click in the library opens its schema in place of the mapping. Drag the source models there and link them to its target, with “Look up by key” for a join (Key: the order’s email; Keys: clients[].email of the loyalty file; Values: clients[].points).',
+      'As for a simple model, changes stay a draft until “Save” (top bar); “Discard” goes back to the saved version; ✕ returns to the mapping it was opened from.',
+      'Use: it is added to a mapping like any model (drag from the panel) and directly gives the joined data. Before each field, in grey, the source it comes from (“Online order › orderId”, “Loyalty file › points”). When saved, its changes apply to the mappings that use it, except where it was changed locally.',
+      'A composite model can use another one, but not itself.',
+    ],
+  },
   library: {
     label: 'Value list',
     summary: 'List of allowed values (texts, integers, numbers or dates), shared by the fields that refer to it.',
     details: [
-      'A source or target field refers to it in its rules (⚙ › Allowed values): its value — or each item of a list — must belong to the list. Several fields, in different nodes, can share the same value list; editing it updates them all. In YAML: “library: Countries”. Saved to the library (“database +” button of its header), a list can be reused in other mappings and in models.',
+      'A source or target field refers to it in its rules (⚙ › Allowed values): its value — or each item of a list — must belong to the list. Several fields, in different nodes, can share the same value list; editing it updates them all. In YAML: “library: Carte”. Saved to the library (“database +” button of its header), a list can be reused in other mappings and in models.',
       'Input: one value per line of the node (Enter to add), or all at once with ≡ (one per line). Duplicates are ignored. Changing the type converts the values and removes those that do not fit.',
       'Checks: ⛔ a value outside the list in a data file, an example or a target’s result; ⚠ a target field fed by a source that does not guarantee these values (the source must refer to the same value list, or to a list whose values all belong to it); ⚠ a missing list.',
       'The Values output gives the list, to plug into a list transformation (Find, Test items…) or into a target list.',
-      'Mapping table (checkbox): each value receives a mapping in another reference list (FRA → FR), with its own type. The Table output feeds the Transcode node. In bulk (≡): “value ; mapping” per line, or a paste of two spreadsheet columns.',
+      'Mapping table (checkbox): each value receives a mapping in another reference list (margherita → Pizza Margherita), with its own type. The Table output feeds the Transcode node. In bulk (≡): “value ; mapping” per line, or a paste of two spreadsheet columns.',
       'For a source, the example of a field with a value list is picked from a drop-down list.',
     ],
   },

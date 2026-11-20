@@ -19,32 +19,22 @@
     </button>
     <v-divider vertical inset class="mx-2" />
     <template v-if="!editingModelId">
-      <v-btn prepend-icon="mdi-file-outline" :title="t('Nouveau mapping, ajouté à côté de celui-ci dans la collection', 'New mapping, added next to this one in the collection')" @click="newMapping">{{ t('Nouveau', 'New') }}</v-btn>
-      <v-btn prepend-icon="mdi-school-outline" :title="t('Ajouter le mapping de démonstration à la collection', 'Add the demo mapping to the collection')" @click="loadDemo">{{ t('Démo', 'Demo') }}</v-btn>
-      <v-divider vertical inset class="mx-2" />
+      <!-- Démo : seulement avec un mapping affiché (pas un modèle composite). -->
+      <template v-if="!compositeOpen">
+        <v-btn prepend-icon="mdi-school-outline" :title="t('Ajouter la démo : un dossier « Démo » dans les mappings et dans la bibliothèque', 'Add the demo: a “Demo” folder in the mappings and in the library')" @click="loadDemo">{{ t('Démo', 'Demo') }}</v-btn>
+        <v-divider vertical inset class="mx-2" />
+      </template>
       <v-btn icon="mdi-arrow-collapse-vertical" :title="t('Tout replier', 'Collapse all')" @click="collapseAll(true)" />
       <v-btn icon="mdi-arrow-expand-vertical" :title="t('Tout déplier', 'Expand all')" @click="collapseAll(false)" />
       <v-btn icon="mdi-graph-outline" :title="t('Réorganiser le schéma (colonnes dans le sens des liens)', 'Rearrange the schema (columns following the links)')" :disabled="schemaLocked" @click="arrangeSchema" />
       <v-divider vertical inset class="mx-2" />
-      <span
-        v-if="current.name"
-        class="flow-name"
-        :class="{ composite: compositeOpen }"
-        :title="
-          compositeOpen
-            ? `${t('Modèle composite affiché', 'Displayed composite model')} : ${flowPath} — ${t('ses champs sont ceux de sa cible, et ses données ce qu’elle produit', 'its fields are those of its target, and its data what the target produces')}`
-            : `${t('Mapping affiché', 'Displayed mapping')} : ${flowPath}`
-        "
-      >
-        <v-icon :icon="compositeOpen ? 'mdi-database-cog-outline' : 'mdi-source-branch'" size="16" />
-        <span v-if="compositeOpen" class="flow-kind">{{ t('Modèle composite', 'Composite model') }}</span>
-        <span v-if="flowFolders" class="flow-folders">{{ flowFolders }} ›</span>
-        <span class="flow-title">{{ current.name }}</span>
-      </span>
     </template>
-    <v-btn v-else class="ml-2 text-none" prepend-icon="mdi-arrow-left" :title="t('Revenir au mapping ouvert', 'Back to the open mapping')" @click="closeModelEditor()">
-      {{ t('Retour au mapping', 'Back to the mapping') }} « {{ current.name }} »
-    </v-btn>
+    <span v-if="shown.name" class="flow-name" :class="{ composite: shown.kind }" :title="shown.title">
+      <v-icon :icon="shown.icon" size="16" />
+      <span v-if="shown.kind" class="flow-kind">{{ shown.kind }}</span>
+      <span v-if="shown.folders" class="flow-folders">{{ shown.folders }} ›</span>
+      <span class="flow-title">{{ shown.name }}</span>
+    </span>
     <v-spacer />
     <v-btn prepend-icon="mdi-help-circle-outline" href="/noeuds" :title="t('Documentation des nœuds', 'Node documentation')">{{ t('Nœuds', 'Nodes') }}</v-btn>
     <v-btn prepend-icon="mdi-email-outline" href="/aide" :title="t('Aide et contact', 'Help and contact')">{{ t('Aide', 'Help') }}</v-btn>
@@ -62,6 +52,7 @@
     @edit-model="editModel"
     @use-model="useModel"
     @new-composite="newComposite"
+    @new-mapping="newMapping"
     @open-flow="openFlow"
     @legend="legendOpen = true"
     @shortcuts="shortcutsOpen = true"
@@ -98,13 +89,22 @@
           </ControlButton>
         </Controls>
         <!-- Modèle composite ouvert : même bandeau que l'éditeur des modèles (brouillon jusqu'à l'enregistrement). -->
+        <!-- Bandeau d'un modèle composite : seulement enregistrer, annuler, fermer (le reste dans les infobulles). -->
         <Panel v-if="compositeOpen" position="top-center" class="model-bar">
-          <v-icon icon="mdi-database-cog-outline" size="18" />
-          <span class="model-bar-title">{{ t('Modèle composite de la bibliothèque', 'Library composite model') }}</span>
-          <span class="model-bar-usage">{{ compositeUsageText }}</span>
-          <span v-if="compositeDirty" class="model-bar-dirty">{{ t('modifications non enregistrées', 'unsaved changes') }}</span>
-          <v-btn size="small" color="primary" variant="flat" :disabled="!compositeDirty" @click="saveComposite">{{ t('Enregistrer le modèle', 'Save the model') }}</v-btn>
-          <v-btn size="small" variant="text" :disabled="!compositeDirty" :title="t('Revenir à la version enregistrée', 'Back to the saved version')" @click="discardComposite">{{ t('Annuler les modifications', 'Discard the changes') }}</v-btn>
+          <v-btn
+            size="small"
+            color="primary"
+            variant="flat"
+            prepend-icon="mdi-content-save-outline"
+            :disabled="!compositeDirty"
+            :title="`${t('Enregistrer le modèle composite', 'Save the composite model')} — ${compositeUsageText}`"
+            @click="saveComposite"
+          >
+            {{ t('Enregistrer', 'Save') }}
+          </v-btn>
+          <v-btn size="small" variant="text" prepend-icon="mdi-undo" :disabled="!compositeDirty" :title="t('Annuler les modifications : revenir à la version enregistrée', 'Discard the changes: back to the saved version')" @click="discardComposite">
+            {{ t('Annuler', 'Discard') }}
+          </v-btn>
           <v-btn
             size="small"
             variant="text"
@@ -245,7 +245,7 @@ import {
   usesComposite,
 } from '../services/models';
 import { checkDocument, describeProblem } from '../lib/conformity';
-import { demoGraph } from '../lib/demo';
+import { installDemo } from '../services/demo';
 import { count, t } from '../lib/i18n';
 import { allFields, fieldFromSocket, migrateFields, parseDocument, newField, setTreeCollapsed } from '../lib/fields';
 import { autoLayout } from '../lib/layout';
@@ -646,14 +646,35 @@ watchEffect(() => {
   document.title = `${doc.name ?? t('Non sauvegardé', 'Not saved')}${doc.modified ? ' ●' : ''} — ScheMap`;
 });
 
-/** Dossiers du mapping affiché (« MDM › Ariane ») et chemin complet, pour la barre d'outils. */
-const flowFolders = computed(() => {
-  const id = workspace.activeId;
-  return id ? (locate(id)?.path ?? []).map((p) => p.name).join(' › ') : '';
-});
 /** Le schéma affiché est celui d'un modèle composite de la bibliothèque. */
 const compositeOpen = computed(() => isComposite(activeMapping()));
-const flowPath = computed(() => [flowFolders.value, current.name].filter(Boolean).join(' › '));
+
+/**
+ * Élément affiché, pour la barre d'outils : mapping, modèle composite, ou modèle / liste ouvert dans l'éditeur de
+ * la bibliothèque. `kind` : étiquette des éléments de la bibliothèque (rien pour un mapping) ; `folders` : ses
+ * dossiers (« Pizzeria › Livraisons »).
+ */
+const shown = computed(() => {
+  const id = editingModelId.value ?? workspace.activeId;
+  const loc = id ? locate(id) : null;
+  const folders = (loc?.path ?? []).map((p) => p.name).join(' › ');
+  const path = (name) => [folders, name].filter(Boolean).join(' › ');
+  if (editingModelId.value) {
+    const list = loc?.item.type === 'valuelist';
+    const kind = list ? t('Liste de valeurs', 'Value list') : t('Modèle', 'Model');
+    return { kind, icon: list ? 'mdi-format-list-bulleted' : 'mdi-database-outline', folders, name: loc?.item.name ?? '', title: `${kind} : ${path(loc?.item.name ?? '')}` };
+  }
+  if (compositeOpen.value) {
+    return {
+      kind: t('Modèle composite', 'Composite model'),
+      icon: 'mdi-database-cog-outline',
+      folders,
+      name: current.name,
+      title: `${t('Modèle composite affiché', 'Displayed composite model')} : ${path(current.name)} — ${t('ses champs sont ceux de sa cible, et ses données ce qu’elle produit', 'its fields are those of its target, and its data what the target produces')}`,
+    };
+  }
+  return { kind: null, icon: 'mdi-source-branch', folders, name: current.name, title: `${t('Mapping affiché', 'Displayed mapping')} : ${path(current.name)}` };
+});
 
 /** Nom du fichier téléchargé : à changer avant de télécharger (« .json » ajouté s'il manque). */
 async function renameDocumentFile() {
@@ -846,8 +867,16 @@ async function newMapping() {
   panelRef.value?.renameMapping(mapping.id);
 }
 
+/** Démo : un dossier « Démo » dans les mappings et dans la bibliothèque (voir services/demo.js). */
 function loadDemo() {
-  insertMapping(makeMapping(t('Démo', 'Demo'), demoGraph()));
+  installDemo();
+  notify(
+    t(
+      'Démo ajoutée : un dossier « Démo » dans les mappings (le mapping, ouvert) et dans la bibliothèque (une liste, deux modèles simples, un modèle composite).',
+      'Demo added: a “Demo” folder in the mappings (the mapping, now open) and in the library (a list, two simple models, a composite model).',
+    ),
+    'success',
+  );
 }
 
 openActive();
@@ -1152,7 +1181,8 @@ const leaveModel = async () =>
 
 async function editModel(id) {
   // Un modèle composite s'ouvre comme un flux : son schéma.
-  if (isComposite(find(id))) return id === workspace.activeId ? undefined : openFlow(id);
+  // Déjà affiché, sauf si un modèle ou une liste est ouvert par-dessus : on y revient alors.
+  if (isComposite(find(id))) return id === workspace.activeId && !editingModelId.value ? undefined : openFlow(id);
   if (!(await leaveComposite())) return;
   if (id === editingModelId.value || !(await leaveModel())) return;
   saveGraph();
@@ -1494,6 +1524,9 @@ function onKeydown(e) {
     if (ctrl && (key === 'z' || key === 'y')) {
       e.preventDefault();
       notify(t('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour annuler ou rétablir.', 'Schema locked: unlock it (padlock at the bottom left) to undo or redo.'), 'warning');
+    } else if (e.shiftKey && key === 'a') {
+      e.preventDefault();
+      notify(t('Schéma verrouillé : déverrouillez-le (cadenas en bas à gauche) pour ajouter un nœud.', 'Schema locked: unlock it (padlock at the bottom left) to add a node.'), 'warning');
     }
     return;
   }

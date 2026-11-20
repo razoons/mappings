@@ -45,7 +45,7 @@ const ICONS = { model: 'mdi-database-outline', list: 'mdi-format-list-bulleted' 
 const link = inject(props.kind === 'list' ? LIST_LINK_KEY : MODEL_LINK_KEY);
 const item = computed(() => link.itemOf(props.data));
 const diverged = computed(() => !!item.value && link.diverged(props.data));
-/** Dossiers de la bibliothèque qui contiennent l'élément (« MDM › Site client »), sans la racine. */
+/** Dossiers de la bibliothèque qui contiennent l'élément (« Pizzeria › Clients »), sans la racine. */
 const folders = computed(() => {
   if (!item.value) return [];
   const path = locate(item.value.id)?.path ?? [];

@@ -1,6 +1,7 @@
 <template>
   <!-- Jamais en surimpression (pas de voile sur le schéma) : un modèle doit pouvoir être glissé jusqu'au schéma. -->
-  <v-navigation-drawer :model-value="modelValue" width="300" :mobile="false" @update:model-value="$emit('update:modelValue', $event)">
+  <v-navigation-drawer :model-value="modelValue" :width="width" :mobile="false" :class="{ resizing }" @update:model-value="$emit('update:modelValue', $event)">
+    <div class="panel-resize" :title="t('Glisser pour ajuster la largeur du panneau ; double-clic : largeur par défaut', 'Drag to adjust the panel width; double-click: default width')" @pointerdown="startResize" @dblclick="setWidth(DEFAULT_WIDTH)" />
     <div class="collections">
       <div class="d-flex align-center pl-1 pr-1 pt-1">
         <v-tabs v-model="tab" density="compact" class="flex-grow-1">
@@ -20,7 +21,8 @@
           hide-details
         />
         <template v-if="tab === 'flows'">
-          <v-btn icon="mdi-plus" size="small" variant="text" :title="t('Nouvelle collection', 'New collection')" @click="newCollection" />
+          <v-btn icon="mdi-folder-plus-outline" size="small" variant="text" :title="t('Nouveau dossier', 'New folder')" @click="newCollection" />
+          <v-btn icon="mdi-file-plus-outline" size="small" variant="text" :title="t('Nouveau mapping, ajouté à côté de celui qui est ouvert', 'New mapping, added next to the open one')" @click="$emit('new-mapping')" />
         </template>
         <template v-else>
           <v-btn icon="mdi-database-plus-outline" size="small" variant="text" :title="t('Nouveau modèle (structure d’une source ou d’une cible)', 'New model (structure of a source or target)')" @click="newModel(null)" />
@@ -71,6 +73,7 @@ import {
   isContainer,
   leafCount,
   LIBRARY_ID,
+  makeCollection,
   makeMapping,
   move,
   remove,
@@ -89,9 +92,49 @@ const props = defineProps({
 /**
  * `export` / `image` : exporter l'élément `id` en fichier, en image ; `import` : importer un
  * fichier ; `edit-model` : modifier le modèle ou la liste `id` (un modèle composite s'ouvre comme un flux) ;
- * `new-composite` : `(dossier, mapping)`, nouveau modèle composite, vide ou copié d'un mapping ; `use-model` : `(id, 'source' | 'target' | 'library')`, l'ajouter au flux ouvert.
+ * `new-composite` : `(dossier, mapping)`, nouveau modèle composite, vide ou copié d'un mapping ; `new-mapping` : nouveau mapping, à côté de celui qui est ouvert ; `use-model` : `(id, 'source' | 'target' | 'library')`, l'ajouter au flux ouvert.
  */
-const emit = defineEmits(['update:modelValue', 'export', 'image', 'import', 'edit-model', 'use-model', 'new-composite', 'open-flow', 'legend', 'shortcuts']);
+const emit = defineEmits(['update:modelValue', 'export', 'image', 'import', 'edit-model', 'use-model', 'new-composite', 'new-mapping', 'open-flow', 'legend', 'shortcuts']);
+
+// ── Largeur du panneau (poignée du bord droit), gardée dans le navigateur ──
+const WIDTH_KEY = 'schemap-panel-width';
+const DEFAULT_WIDTH = 300;
+const MIN_WIDTH = 220;
+const maxWidth = () => Math.max(MIN_WIDTH, Math.round(window.innerWidth * 0.6));
+const clampWidth = (w) => Math.min(maxWidth(), Math.max(MIN_WIDTH, Math.round(w)));
+const width = ref(clampWidth(Number(localStorage.getItem(WIDTH_KEY)) || DEFAULT_WIDTH));
+/** Pendant le glisser : sans animation, le panneau suit la souris. */
+const resizing = ref(false);
+
+function setWidth(w) {
+  width.value = clampWidth(w);
+  try {
+    localStorage.setItem(WIDTH_KEY, String(width.value));
+  } catch {
+    /* espace plein : la largeur sera oubliée au rechargement */
+  }
+}
+
+function startResize(e) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const handle = e.currentTarget;
+  const startX = e.clientX;
+  const startWidth = width.value;
+  resizing.value = true;
+  handle.setPointerCapture(e.pointerId);
+  const move = (ev) => (width.value = clampWidth(startWidth + ev.clientX - startX));
+  const end = () => {
+    resizing.value = false;
+    setWidth(width.value);
+    handle.removeEventListener('pointermove', move);
+    handle.removeEventListener('pointerup', end);
+    handle.removeEventListener('pointercancel', end);
+  };
+  handle.addEventListener('pointermove', move);
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+}
 
 const tab = ref('flows');
 const roots = computed(() => (tab.value === 'library' ? workspace.library.items : workspace.collections));
@@ -119,7 +162,8 @@ function commitRename(id, name) {
 }
 
 function newCollection() {
-  startRename(addCollection().id);
+  // Bouton « Nouveau dossier » : une collection, nommée comme un dossier.
+  startRename(addCollection(makeCollection(t('Nouveau dossier', 'New folder'))).id);
 }
 
 /** Nouveau mapping dans un conteneur : il s'ouvre, et son nom se saisit tout de suite. */
@@ -323,6 +367,26 @@ function dragEnd() {
 </script>
 
 <style>
+/* Poignée du bord droit du panneau : sa largeur. */
+.panel-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 10;
+}
+.panel-resize:hover,
+.resizing .panel-resize {
+  background: rgba(var(--v-theme-primary), 0.35);
+}
+/* Pendant le glisser, le panneau et le schéma suivent la souris sans animation. */
+.v-navigation-drawer.resizing,
+.v-navigation-drawer.resizing ~ .v-main,
+body:has(.v-navigation-drawer.resizing) .v-main {
+  transition: none !important;
+}
 .collections {
   display: flex;
   flex-direction: column;
