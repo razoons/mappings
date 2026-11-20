@@ -24,7 +24,7 @@ import { computed, inject, onBeforeUnmount, ref } from 'vue';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, useVueFlow } from '@vue-flow/core';
 import { getSocket, outputType } from '../../lib/graph';
 import { GROUP_HEADER } from '../../lib/groups';
-import { EDGE_INSERT_KEY, SCHEMA_LOCK_KEY } from './shared';
+import { EDGE_INSERT_KEY, RESULTS_KEY, SCHEMA_LOCK_KEY } from './shared';
 import { t } from '../../lib/i18n';
 import { baseOf, isList, SOCKET_COLORS, typeMismatch } from '../../lib/types';
 
@@ -103,6 +103,9 @@ const path = computed(() => {
   });
 });
 
+/** Résultat de l'évaluation (contrôles), absent hors de l'éditeur de flux. */
+const results = inject(RESULTS_KEY, null);
+
 /** Types incompatibles : lien rouge en pointillés serrés (le détail est dans les contrôles). */
 const style = computed(() => {
   // Type réel : à travers les nœuds qui transmettent leurs entrées (Valeur par défaut, Condition…).
@@ -111,7 +114,9 @@ const style = computed(() => {
   const into = getSocket(props.targetNode, props.targetHandleId, 'target')?.type;
   // Survol du bouton « + » : le lien reste en évidence comme sous le pointeur.
   const highlight = hover.value ? { stroke: 'var(--edge-highlight)' } : {};
-  if (into && typeMismatch(type, into) === 'incompatible') return { stroke: 'var(--danger)', strokeWidth: 2, strokeDasharray: '2 4', ...highlight };
+  // Formats de date différents : signalé comme des types incompatibles.
+  const dateGap = results?.value.issues.byNode.get(props.targetNode.id)?.get(props.targetHandleId)?.some((i) => i.kind === 'date-format');
+  if ((into && typeMismatch(type, into) === 'incompatible') || dateGap) return { stroke: 'var(--danger)', strokeWidth: 2, strokeDasharray: '2 4', ...highlight };
   return { stroke: SOCKET_COLORS[baseOf(type)], strokeWidth: 2, strokeDasharray: isList(type) ? '7 4' : undefined, ...highlight };
 });
 </script>

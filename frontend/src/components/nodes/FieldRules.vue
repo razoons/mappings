@@ -58,12 +58,29 @@
             class="mt-2"
             @update:model-value="set(k, $event)"
           />
+          <v-combobox
+            v-else-if="k.kind === 'dateFormat'"
+            v-model="dateFormatDraft"
+            :items="dateFormatItems"
+            :disabled="locked"
+            :label="k.label"
+            :hint="dateFormatHint"
+            :error-messages="dateFormatProblem"
+            persistent-hint
+            density="compact"
+            variant="outlined"
+            clearable
+            class="mt-2"
+            @update:model-value="pickDateFormat(k, $event)"
+            @blur="setDateFormat(k, dateFormatDraft)"
+            @keydown.enter="setDateFormat(k, dateFormatDraft)"
+          />
           <v-text-field
             v-else
             :model-value="format[k.key] ?? ''"
             :disabled="locked"
             :label="k.label"
-            :type="k.kind === 'text' ? 'text' : k.kind === 'date' ? 'date' : 'number'"
+            :type="k.kind === 'text' ? 'text' : k.kind === 'date' ? 'date' : k.kind === 'datetime' ? 'datetime-local' : 'number'"
             :min="k.kind === 'int' ? 0 : undefined"
             density="compact"
             variant="outlined"
@@ -80,9 +97,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { DATE_FORMAT_PRESETS, dateFormatError, displayDateFormat, normalizeDateFormat } from '../../lib/dateFormats';
 import { formatKeys, formatSummary } from '../../lib/formats';
-import { t } from '../../lib/i18n';
+import { lang, t } from '../../lib/i18n';
 import { distinctLibraries, libraryName, libraryRef } from '../../lib/libraries';
 import { useLibraries } from './shared';
 
@@ -124,7 +142,42 @@ function set(k, raw) {
     if (k.kind === 'integer' && v !== undefined) v = Math.trunc(v);
     if (k.kind === 'int' && v !== undefined) v = Math.max(0, Math.trunc(v));
   }
-  if (k.kind === 'text' || k.kind === 'date' || k.kind === 'library') v = raw || undefined;
+  if (k.kind === 'text' || k.kind === 'date' || k.kind === 'datetime' || k.kind === 'library') v = raw || undefined;
   emit('update', { format: { ...format.value, [k.key]: v } });
+}
+
+// ── Format de date ─────────────────────────────────────────
+
+/** Type simple du champ (celui des éléments d'une liste). */
+const scalarType = computed(() => (props.field.type === 'array' ? (props.field.item ?? 'string') : props.field.type));
+const dateFormatItems = computed(() => (DATE_FORMAT_PRESETS[scalarType.value] ?? []).map(displayDateFormat));
+const dateFormatHint = computed(() =>
+  t('Au choix ou saisi (JJ, MM, AAAA, AA, HH, mm, ss) ; vide : ISO (AAAA-MM-JJ)', 'Pick or type one (DD, MM, YYYY, YY, HH, mm, ss); empty: ISO (YYYY-MM-DD)'),
+);
+/** Format en cours de saisie : enregistré quand il est choisi dans la liste, ou validé (Entrée, sortie du champ). */
+const dateFormatDraft = ref(null);
+/** Format saisi refusé (il n'est pas enregistré tant qu'il n'est pas utilisable). */
+const dateFormatProblem = ref('');
+watch(
+  () => [props.field.format?.dateFormat, lang.value],
+  ([f]) => (dateFormatDraft.value = displayDateFormat(f) || null),
+  { immediate: true },
+);
+
+/** Choix dans la liste (ou effacement) : enregistré tout de suite ; une saisie attend sa validation. */
+function pickDateFormat(k, value) {
+  if (!value || dateFormatItems.value.includes(value)) setDateFormat(k, value);
+}
+
+function setDateFormat(k, raw) {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  if (!text) {
+    dateFormatProblem.value = '';
+    if (format.value[k.key]) set(k, undefined);
+    return;
+  }
+  const norm = normalizeDateFormat(text, scalarType.value);
+  dateFormatProblem.value = norm.error ? dateFormatError(norm.error, t) : '';
+  if (!norm.error && norm.format !== format.value[k.key]) set(k, norm.format);
 }
 </script>

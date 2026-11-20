@@ -216,6 +216,13 @@ export const NODE_DOCS = {
     summary: 'Écrit une date sous forme de texte dans le format choisi.',
     details: ['Calculé en UTC.', 'Date invalide : texte vide.'],
   },
+  date_reformat: {
+    summary: 'Indique dans quel format la date doit être écrite : à placer entre deux dates de formats différents.',
+    details: [
+      'La date ne change pas : le champ cible l’écrit dans son propre format.',
+      'Le format choisi doit être celui du champ cible, sinon le contrôle signale toujours des formats différents.',
+    ],
+  },
   date_part: {
     summary: 'Extrait l’année, le mois, le jour du mois ou le jour de la semaine : en nombre et en nom.',
     details: [
@@ -255,7 +262,7 @@ export const BASE_NODES = [
       'Relier une liste à un tableau d’objets le parcourt : ses sous-champs sont évalués pour chaque élément.',
       'Sans lien sur le tableau, la première liste source reliée à un de ses sous-champs dicte le parcours.',
       'Un objet relié à un objet source le recopie ; les sous-champs reliés y remplacent leurs valeurs.',
-      'Contrôles : ⛔ obligatoire non mappé ; ⛔ types incompatibles ; ⚠ type converti implicitement ; ⚠ obligatoire alimenté par une source optionnelle ; ⚠ format non garanti. Détail dans le panneau Contrôles.',
+      'Contrôles : ⛔ obligatoire non mappé ; ⛔ types incompatibles ; ⛔ formats de date différents ; ⛔ décimales non garanties ; ⚠ type converti implicitement ; ⚠ obligatoire alimenté par une source optionnelle ; ⚠ format non garanti ; ⚠ type ou valeur non garantis (nœud qui ne peut rien garantir, ex. Lire un champ). Les garanties traversent tous les nœuds : chaque nœud dit ce qu’il garantit (longueur, bornes, décimales, format de date, valeurs possibles), et ce que le chemin ne garantit pas est signalé. Détail dans le panneau Contrôles.',
     ],
   },
   {

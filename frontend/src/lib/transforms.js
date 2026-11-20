@@ -1,7 +1,9 @@
 import { bindsOf, isPlainObject, pickItems, tagList } from './lists';
 import { bilingual, t } from './i18n';
-import { missingFrom, tableKey, valueSet } from './libraries';
+import { tableKey } from './libraries';
 import { coerce } from './types';
+import { DATE_FORMAT_PRESETS, displayDateFormat } from './dateFormats';
+import { GUARANTEES, roundDecimals } from './transformGuarantees';
 
 /**
  * Définition d'un nœud de transformation :
@@ -14,12 +16,8 @@ import { coerce } from './types';
  *   `ctx.connected(inputId)` dit si elle est reliée et `ctx.current` donne l'élément de l'itération englobante ;
  * - `variadic: { type, min }` (facultatif) : entrées en nombre libre A, B, C… ; il y en a toujours une de libre
  *   après la dernière utilisée (reliée ou saisie), et au moins `min` (voir `inputsOf`) ;
- * - `guarantee(input, params, inputIds, { libraries })` (facultatif) : ce que le nœud garantit sur sa sortie,
- *   `{ required, format, base? }` (`base` : type réel de la sortie, si elle est déclarée « Tout » ; `format.allowed` :
- *   ensemble des valeurs possibles, voir lib/libraries.js),
- *   pour le contrôle des champs cibles. `input(id)` donne `{ connected, info, value }` : `info` décrit ce que
- *   garantit l'amont (`{ required, format }`, ou `null` si inconnu), `value` la valeur saisie d'une entrée libre.
- *   Sans `guarantee`, le contrôle fait confiance au nœud ;
+ * - `guarantee` : ce que le nœud garantit sur ses sorties, pour le contrôle des champs cibles ; défini à part,
+ *   pour tous les nœuds, dans lib/transformGuarantees.js ;
  * - `tableInput` (facultatif) : entrée qui reçoit la table d'une bibliothèque ; la sortie prend le type de sa
  *   colonne Correspondance (voir outputType dans graph.js).
  */
@@ -53,24 +51,6 @@ const variadicInputs = (type, n) => Array.from({ length: n }, (_, i) => ({ id: v
 
 // ── Garanties (contrôle des cibles) ────────────────────────
 
-/** Garanties d'une entrée texte : celles de l'amont, ou la longueur exacte d'une valeur saisie. */
-function textInfo(i) {
-  if (i.connected) return i.info ?? {};
-  const n = Array.from(String(i.value)).length;
-  // Une saisie vide ne fournit rien : la valeur n'est pas garantie présente.
-  return { required: n > 0, format: { minLength: n, maxLength: n } };
-}
-
-/** Plus petite des bornes connues (`undefined` si aucune). */
-const minOf = (...xs) => {
-  const known = xs.filter((x) => typeof x === 'number' && !Number.isNaN(x));
-  return known.length ? Math.min(...known) : undefined;
-};
-
-/** Valeur min. / max. d'une entrée nombre : la valeur saisie, ou la borne garantie par l'amont. */
-const typed = (i) => Math.max(0, Math.trunc(Number(i.value)) || 0);
-const maxNumber = (i) => (i.connected ? i.info?.format?.max : typed(i));
-const minNumber = (i) => (i.connected ? i.info?.format?.min : typed(i));
 
 /** Copie de `obj` où le chemin `a.b.c` vaut `value` (les objets intermédiaires sont créés). */
 function setPath(obj, path, value) {
@@ -99,6 +79,9 @@ function looseCompare(a, b) {
 }
 
 const pad = (n) => String(n).padStart(2, '0');
+
+/** Résultat de calcul débarrassé du bruit des nombres à virgule (0.1 + 0.2 = 0.3, et non 0.30000000000000004). */
+const clean = (x) => (typeof x === 'number' && Number.isFinite(x) ? Number(x.toPrecision(15)) : x);
 
 const LIST_IN = { id: 'list', label: 'Liste', type: 'any[]' };
 const indexes = (list) => list.map((_, i) => i);
@@ -333,7 +316,7 @@ export const TRANSFORMS = {
         Minimum: Math.min(...nums),
         Maximum: Math.max(...nums),
       };
-      return { result: ops[p.op] };
+      return { result: clean(ops[p.op]) };
     },
   },
   list_test: {
@@ -408,16 +391,6 @@ export const TRANSFORMS = {
     params: [{ id: 'sep', label: 'Séparateur', default: ' ' }],
     // Les entrées arrivent dans l'ordre A, B, C… ; les vides sont ignorées (pas de séparateur en double).
     compute: (inputs, p) => ({ result: Object.values(inputs).filter((x) => x !== '').join(p.sep) }),
-    guarantee: (input, p, ids) => {
-      const parts = ids.map((id) => textInfo(input(id)));
-      const lengths = parts.map((t) => t.format?.maxLength);
-      const bounded = lengths.every((n) => typeof n === 'number');
-      const required = parts.some((t) => t.required) ? true : parts.every((t) => t.required === false) ? false : undefined;
-      // Une entrée toujours vide (saisie vide) est ignorée : pas de séparateur pour elle.
-      const kept = parts.filter((t) => t.format?.maxLength !== 0).length;
-      const seps = Math.max(0, kept - 1) * Array.from(p.sep).length;
-      return { required, format: { maxLength: bounded ? lengths.reduce((x, y) => x + y, 0) + seps : undefined } };
-    },
   },
   case: {
     label: 'Casse',
@@ -428,10 +401,6 @@ export const TRANSFORMS = {
     compute: ({ text }, p) => ({
       result: p.mode === 'MAJUSCULES' ? text.toUpperCase() : p.mode === 'minuscules' ? text.toLowerCase() : capitalize(text),
     }),
-    guarantee: (input) => {
-      const t = textInfo(input('text'));
-      return { required: t.required, format: { minLength: t.format?.minLength, maxLength: t.format?.maxLength } };
-    },
   },
   trim: {
     label: 'Nettoyer espaces',
@@ -439,10 +408,6 @@ export const TRANSFORMS = {
     inputs: [{ id: 'text', label: 'Texte', type: 'string' }],
     outputs: out('string'),
     compute: ({ text }) => ({ result: text.trim().replace(/\s+/g, ' ') }),
-    guarantee: (input) => {
-      const t = textInfo(input('text'));
-      return { required: t.required, format: { maxLength: t.format?.maxLength } };
-    },
   },
   substring: {
     label: 'Extraire (gauche / droite)',
@@ -461,13 +426,6 @@ export const TRANSFORMS = {
       if (p.mode === 'Droite') return { result: n ? chars.slice(-n).join('') : '' };
       const from = p.mode === 'Milieu' ? Math.max(0, (Math.trunc(start) || 1) - 1) : 0;
       return { result: chars.slice(from, from + n).join('') };
-    },
-    guarantee: (input, p) => {
-      const t = textInfo(input('text'));
-      const count = input('count');
-      // En milieu, le début peut tomber après la fin du texte : pas de longueur minimale.
-      const minLength = p.mode === 'Milieu' ? undefined : minOf(minNumber(count), t.format?.minLength);
-      return { required: t.required, format: { minLength, maxLength: minOf(maxNumber(count), t.format?.maxLength) } };
     },
   },
   replace: {
@@ -505,11 +463,8 @@ export const TRANSFORMS = {
     category: 'Texte',
     inputs: [{ id: 'text', label: 'Texte', type: 'string' }],
     outputs: out('integer', 'Longueur'),
-    compute: ({ text }) => ({ result: text.length }),
-    guarantee: (input) => {
-      const t = textInfo(input('text'));
-      return { required: true, format: { min: t.format?.minLength ?? 0, max: t.format?.maxLength } };
-    },
+    // Par caractère (et non par unité UTF-16) : un emoji compte pour un.
+    compute: ({ text }) => ({ result: Array.from(text).length }),
   },
 
   // ── Math ────────────────────────────────────────────────
@@ -540,7 +495,7 @@ export const TRANSFORMS = {
         Minimum: () => Math.min(a, b),
         Maximum: () => Math.max(a, b),
       };
-      return { result: ops[p.op]() };
+      return { result: clean(ops[p.op]()) };
     },
   },
   round: {
@@ -553,9 +508,10 @@ export const TRANSFORMS = {
       { id: 'decimals', label: 'Décimales', default: '0' },
     ],
     compute: ({ value }, p) => {
-      const f = 10 ** (Number(p.decimals) || 0);
+      const f = 10 ** roundDecimals(p.decimals);
       const fn = p.mode === 'Plancher' ? Math.floor : p.mode === 'Plafond' ? Math.ceil : Math.round;
-      return { result: fn(value * f) / f };
+      // Le produit est nettoyé d'abord : 1.005 × 100 vaut 100.49999999999999 en machine.
+      return { result: clean(fn(clean(value * f)) / f) };
     },
   },
 
@@ -674,28 +630,10 @@ export const TRANSFORMS = {
     outputs: out('any'),
     tableInput: 'table',
     compute: ({ table, value, fallback }) => {
-      const hit = isPlainObject(table) ? table[tableKey(value)] : undefined;
+      // Clés propres à la table seulement (« constructor » ou « toString » ne sont pas des correspondances).
+      const key = tableKey(value);
+      const hit = isPlainObject(table) && Object.hasOwn(table, key) ? table[key] : undefined;
       return { result: hit !== undefined ? hit : fallback === '' ? null : fallback };
-    },
-    guarantee: (input, _p, _ids, { libraries }) => {
-      const table = input('table');
-      const lib = table.connected && table.info?.table ? libraries.get(table.info.table) : undefined;
-      if (!lib?.mapped) return {};
-      const value = input('value');
-      const fallback = input('fallback');
-      // Valeurs possibles en entrée : celles d'une bibliothèque, d'un ensemble garanti, ou la valeur saisie.
-      const given = value.connected
-        ? (value.info?.format?.library && libraries.get(value.info.format.library)) || value.info?.format?.allowed
-        : valueSet('', lib.item, value.value === '' ? [] : [value.value]);
-      // Toutes ont une correspondance : la valeur par défaut ne sert jamais.
-      const covered = !!given && missingFrom(given, lib.mappedValues).length === 0;
-      const typedFallback = !fallback.connected && fallback.value !== '';
-      let allowed;
-      if (covered) allowed = lib.targetValues;
-      else if (!fallback.connected) allowed = valueSet(lib.targetValues.label, lib.outItem, [...lib.targetValues.values, ...(typedFallback ? [fallback.value] : [])]);
-      // Présente : celle reçue si toutes ont une correspondance, sinon il faut une valeur par défaut.
-      const required = covered ? (value.connected ? value.info?.required : true) : fallback.connected ? fallback.info?.required : typedFallback;
-      return { required, base: lib.outItem, format: allowed ? { allowed } : {} };
     },
   },
 
@@ -715,7 +653,7 @@ export const TRANSFORMS = {
     ],
     compute: ({ date }, p) => {
       if (isNaN(date.getTime())) return { result: '' };
-      const [y, m, j] = [date.getUTCFullYear(), pad(date.getUTCMonth() + 1), pad(date.getUTCDate())];
+      const [y, m, j] = [String(date.getUTCFullYear()).padStart(4, '0'), pad(date.getUTCMonth() + 1), pad(date.getUTCDate())];
       const formats = {
         'ISO 8601': date.toISOString(),
         'AAAA-MM-JJ': `${y}-${m}-${j}`,
@@ -725,6 +663,23 @@ export const TRANSFORMS = {
       };
       return { result: formats[p.format] };
     },
+  },
+  date_reformat: {
+    label: 'Changer le format de date',
+    category: 'Date',
+    inputs: [{ id: 'date', label: 'Date', type: 'date' }],
+    outputs: out('date'),
+    params: [
+      {
+        id: 'format',
+        label: 'Format',
+        default: 'DD/MM/YYYY',
+        options: [...DATE_FORMAT_PRESETS.date, ...DATE_FORMAT_PRESETS.datetime],
+        optionLabel: (o) => displayDateFormat(o),
+      },
+    ],
+    // La date est transmise telle quelle : le champ cible l'écrit dans son format, que ce nœud garantit.
+    compute: ({ date }) => ({ result: date }),
   },
   date_part: {
     label: 'Partie de date',
@@ -771,6 +726,9 @@ export const TRANSFORMS = {
     },
   },
 };
+
+// Garanties (contrôle des cibles) : un nœud sans garanties ne garantit rien.
+for (const [kind, guarantee] of Object.entries(GUARANTEES)) if (TRANSFORMS[kind]) TRANSFORMS[kind].guarantee = guarantee;
 
 export const CATEGORIES = ['Entrée', 'Structure', 'Liste', 'Texte', 'Math', 'Logique', 'Conversion', 'Date'];
 
@@ -877,6 +835,7 @@ const EN = {
   to_bool: { label: 'To boolean', sockets: { value: 'Value', result: 'Result' } },
   transcode: { label: 'Transcode', sockets: { table: 'Table', value: 'Value', fallback: 'If missing', result: 'Result' } },
   date_format: { label: 'Format date', sockets: { date: 'Date', result: 'Result' }, params: { format: 'Format' } },
+  date_reformat: { label: 'Change date format', sockets: { date: 'Date', result: 'Result' }, params: { format: 'Format' } },
   date_part: { label: 'Date part', sockets: { date: 'Date', result: 'Number', name: 'Name' }, params: { part: 'Part', days: 'Days', months: 'Months' } },
   age: { label: 'Age (years)', sockets: { date: 'Date', ref: 'Reference', result: 'Years' } },
 };

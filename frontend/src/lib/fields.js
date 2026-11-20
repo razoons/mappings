@@ -1,4 +1,5 @@
 import { bilingual, t } from './i18n';
+import { formatDate } from './dateFormats';
 import { cleanFormat } from './formats';
 import { isPlainObject } from './lists';
 import { listOf, uid } from './types';
@@ -25,13 +26,16 @@ export const descendantIds = (f) => allFields(f.children ?? []).map((d) => d.id)
  */
 export function sourceSocketType(chain) {
   const last = chain.at(-1);
-  if (last.type === 'array') return listOf(last.item ?? 'string');
+  if (last.type === 'array') return listOf(socketBase(last.item ?? 'string'));
   const inArray = chain.slice(0, -1).some((f) => f.type === 'array');
-  return inArray ? listOf(last.type) : last.type;
+  return inArray ? listOf(socketBase(last.type)) : socketBase(last.type);
 }
 
 /** Type du socket d'entrée d'un champ cible (sous un tableau, il est évalué pour chaque élément). */
-export const targetSocketType = (f) => (f.type === 'array' ? listOf(f.item ?? 'string') : f.type);
+export const targetSocketType = (f) => (f.type === 'array' ? listOf(socketBase(f.item ?? 'string')) : socketBase(f.type));
+
+/** Type de socket d'un type de champ : une date et heure circule comme une date. */
+const socketBase = (type) => (type === 'datetime' ? 'date' : type);
 
 /** `orders[].lines[].qty` */
 export const pathLabel = (chain) =>
@@ -88,6 +92,7 @@ export const TYPE_OPTIONS = [
   ['integer', 'Entier', 'Integer'],
   ['boolean', 'Booléen', 'Boolean'],
   ['date', 'Date', 'Date'],
+  ['datetime', 'Date et heure', 'Date and time'],
   ['object', 'Objet', 'Object'],
   ['array:object', 'Liste d’objets', 'List of objects'],
   ['array:string', 'Liste de textes', 'List of texts'],
@@ -95,6 +100,7 @@ export const TYPE_OPTIONS = [
   ['array:integer', 'Liste d’entiers', 'List of integers'],
   ['array:boolean', 'Liste de booléens', 'List of booleans'],
   ['array:date', 'Liste de dates', 'List of dates'],
+  ['array:datetime', 'Liste de dates et heures', 'List of date-times'],
 ].map(([key, fr, en]) => {
   const option = [key, fr];
   bilingual(option, 1, en);
@@ -149,11 +155,12 @@ export function migrateFields(fields) {
 // ── Déduction depuis un exemple JSON ───────────────────────
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 function primitiveOf(v) {
   if (typeof v === 'number') return Number.isInteger(v) ? 'integer' : 'number';
   if (typeof v === 'boolean') return 'boolean';
-  if (typeof v === 'string' && ISO_DATE.test(v)) return 'date';
+  if (typeof v === 'string' && ISO_DATE.test(v)) return ISO_DAY.test(v) ? 'date' : 'datetime';
   return 'string';
 }
 
@@ -180,13 +187,21 @@ export function parseDocument(text) {
   return parsed;
 }
 
-const EXAMPLE_VALUES = { string: 'texte', number: 0.5, integer: 0, boolean: false, date: '2026-01-01' };
+const EXAMPLE_VALUES = { string: 'texte', number: 0.5, integer: 0, boolean: false, date: '2026-01-01', datetime: '2026-01-01T08:30:00' };
+const EXAMPLE_DATE = new Date(Date.UTC(2026, 0, 1, 8, 30, 0));
+
+/** Valeur type d'un type simple ; une date suit le format de date du champ s'il en a un, un nombre sans décimales est entier. */
+const exampleValue = (type, f) => {
+  if (f.format?.dateFormat && (type === 'date' || type === 'datetime')) return formatDate(EXAMPLE_DATE, f.format.dateFormat);
+  if (type === 'number' && f.format?.maxDecimals === 0) return 1;
+  return EXAMPLE_VALUES[type];
+};
 
 /** Valeur type d'un champ (« texte », 0…), pour un exemple qui n'en précise pas. */
 export const exampleOf = (f) => {
   if (f.type === 'object') return sampleFromFields(f.children ?? []);
-  if (f.type === 'array') return [f.item === 'object' ? sampleFromFields(f.children ?? []) : EXAMPLE_VALUES[f.item ?? 'string']];
-  return EXAMPLE_VALUES[f.type];
+  if (f.type === 'array') return [f.item === 'object' ? sampleFromFields(f.children ?? []) : exampleValue(f.item ?? 'string', f)];
+  return exampleValue(f.type, f);
 };
 
 const sampleFromFields = (fields) => Object.fromEntries(fields.map((f) => [f.name, exampleOf(f)]));
@@ -243,8 +258,8 @@ export function syncFields(old, obj) {
     const next = { ...inferred, id: prev.id, collapsed: prev.collapsed };
     if (prev.required) next.required = true;
     if (prev.description) next.description = prev.description;
-    // Une chaîne peut être un texte ou une date : on garde le choix fait par l’utilisateur.
-    const textual = (t) => t === 'string' || t === 'date';
+    // Une chaîne peut être un texte, une date ou une date et heure : on garde le choix fait par l’utilisateur.
+    const textual = (t) => t === 'string' || t === 'date' || t === 'datetime';
     if (textual(next.type) && textual(prev.type)) next.type = prev.type;
     if (next.type === 'array' && prev.type === 'array' && textual(next.item) && textual(prev.item)) next.item = prev.item;
     // Un exemple entier ne dit pas si le champ est entier ou décimal : on garde le choix fait.

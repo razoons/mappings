@@ -179,6 +179,13 @@ export const NODE_DOCS_EN = {
     summary: 'Writes a date as text in the chosen format.',
     details: ['Computed in UTC.', 'Invalid date: empty text.'],
   },
+  date_reformat: {
+    summary: 'States the format the date must be written in: place it between two dates with different formats.',
+    details: [
+      'The date does not change: the target field writes it in its own format.',
+      'The chosen format must be the target field’s, otherwise the check still reports different formats.',
+    ],
+  },
   date_part: {
     summary: 'Extracts the year, the month, the day of the month or the day of the week: as a number and as a name.',
     details: [
@@ -212,7 +219,7 @@ export const NODE_DOCS_EN = {
       'Linking a list to an array of objects iterates it: its sub-fields are evaluated for each item.',
       'Without a link on the array, the first source list linked to one of its sub-fields drives the iteration.',
       'An object linked to a source object copies it; the linked sub-fields replace their values in it.',
-      'Checks: ⛔ required not mapped; ⛔ incompatible types; ⚠ type implicitly converted; ⚠ required fed by an optional source; ⚠ format not guaranteed. Details in the Checks panel.',
+      'Checks: ⛔ required not mapped; ⛔ incompatible types; ⛔ different date formats; ⛔ decimals not guaranteed; ⚠ type implicitly converted; ⚠ required fed by an optional source; ⚠ format not guaranteed; ⚠ type or value not guaranteed (a node that cannot guarantee anything, e.g. Read a field). Guarantees flow through every node: each node states what it guarantees (length, bounds, decimals, date format, possible values), and whatever the path does not guarantee is reported. Details in the Checks panel.',
     ],
   },
   library: {

@@ -1,3 +1,4 @@
+import { displayDateFormat } from './dateFormats';
 import { bilingual, t } from './i18n';
 import { libraryName } from './libraries';
 
@@ -7,6 +8,8 @@ import { libraryName } from './libraries';
  * `library` : id d'un nœud Bibliothèque dont la valeur doit faire partie (voir lib/libraries.js).
  */
 const LIBRARY_KEY = { key: 'library', label: 'Valeurs autorisées', en: 'Allowed values', kind: 'library' };
+/** Format d'écriture d'une date (voir lib/dateFormats.js). */
+const DATE_FORMAT_KEY = { key: 'dateFormat', label: 'Format de date', en: 'Date format', kind: 'dateFormat' };
 const FORMAT_KEYS = {
   string: [
     { key: 'minLength', label: 'Longueur min.', en: 'Min. length', kind: 'int' },
@@ -17,6 +20,7 @@ const FORMAT_KEYS = {
   number: [
     { key: 'min', label: 'Minimum', en: 'Minimum', kind: 'number' },
     { key: 'max', label: 'Maximum', en: 'Maximum', kind: 'number' },
+    { key: 'maxDecimals', label: 'Décimales max.', en: 'Max. decimals', kind: 'int' },
     LIBRARY_KEY,
   ],
   integer: [
@@ -25,9 +29,15 @@ const FORMAT_KEYS = {
     LIBRARY_KEY,
   ],
   date: [
+    DATE_FORMAT_KEY,
     { key: 'minDate', label: 'Au plus tôt', en: 'Earliest', kind: 'date' },
     { key: 'maxDate', label: 'Au plus tard', en: 'Latest', kind: 'date' },
     LIBRARY_KEY,
+  ],
+  datetime: [
+    DATE_FORMAT_KEY,
+    { key: 'minDate', label: 'Au plus tôt', en: 'Earliest', kind: 'datetime' },
+    { key: 'maxDate', label: 'Au plus tard', en: 'Latest', kind: 'datetime' },
   ],
   array: [
     { key: 'minItems', label: 'Éléments min.', en: 'Min. items', kind: 'int' },
@@ -63,6 +73,8 @@ export function formatSummary(f, libraries) {
   range(x.minItems, x.maxItems, t(' élt', ' items'));
   range(x.minLength, x.maxLength, t(' car.', ' chars'));
   range(x.min, x.max);
+  if (isSet(x.maxDecimals)) parts.push(t(`≤ ${x.maxDecimals} déc.`, `≤ ${x.maxDecimals} dec.`));
+  if (isSet(x.dateFormat)) parts.push(displayDateFormat(x.dateFormat));
   range(x.minDate, x.maxDate);
   if (isSet(x.pattern)) parts.push(`/${x.pattern}/`);
   if (isSet(x.library)) parts.push(`∈ ${libraryName(libraries, x.library)}`);

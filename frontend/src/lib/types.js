@@ -6,7 +6,8 @@ import { bindsOf, isPlainObject, tagList } from './lists';
  * ou une liste de scalaires (`string[]`…).
  *
  * Champ d'un modèle : `{ id, name, type, item?, children?, collapsed?, required?, format? }` où `type` vaut
- * `string | number | integer | boolean | date | object | array` et `item` le type des éléments d'un tableau
+ * `string | number | integer | boolean | date | datetime | object | array` et `item` le type des éléments d'un tableau
+ * (un champ Date et heure a un socket de type `date` : la valeur est une date, heure comprise)
  * (`required` et `format` : voir lib/formats.js).
  */
 export const isList = (t) => t.endsWith('[]');
@@ -84,6 +85,14 @@ export function typeMismatch(from, to) {
 /** Types qui se branchent sans perte de sens (choix du socket quand un lien crée un nœud). */
 export const canConnect = (from, to) => typeMismatch(from, to) !== 'incompatible';
 
+/** Nombre de décimales d'un nombre (écriture la plus courte : 0.1 en a 1, 1e-7 en a 7). */
+export function decimalsOf(v) {
+  if (!Number.isFinite(v)) return 0;
+  const [mantissa, exp] = String(v).toLowerCase().split('e');
+  const decimals = (mantissa.split('.')[1] ?? '').length;
+  return Math.max(0, decimals - Number(exp ?? 0));
+}
+
 const TRUTHY = ['true', '1', 'oui', 'yes', 'vrai', 'y', 'o', 'x'];
 
 function coerceScalar(v, type) {
@@ -110,6 +119,7 @@ function coerceScalar(v, type) {
       if (v == null) return false;
       return TRUTHY.includes(String(v).trim().toLowerCase());
     case 'date':
+    case 'datetime':
       if (v instanceof Date) return v;
       if (v == null || v === '') return new Date(NaN);
       return new Date(v);

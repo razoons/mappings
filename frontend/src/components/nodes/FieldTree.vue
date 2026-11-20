@@ -6,7 +6,7 @@
   </div>
 
   <div
-    v-for="{ field: f, depth, chain, hidden } in rows"
+    v-for="{ field: f, depth, chain, hidden } in shownRows"
     :key="f.id"
     class="row field-row tree-cols"
     :class="[{ dragging: draggedId === f.id }, dropClass(f.id), levelOf(f) && `issue-${levelOf(f)}`]"
@@ -104,7 +104,15 @@
   </div>
 
   <button
-    v-if="!locked"
+    v-if="hiddenCount"
+    class="add-field nodrag unused-note"
+    :title="t('Champs sans lien et sans erreur ni avertissement', 'Fields with no link and no error or warning')"
+    @click="emit('show-unused')"
+  >
+    {{ count(hiddenCount, 'champ inutilisé masqué', 'unused field hidden', 'champs inutilisés masqués', 'unused fields hidden') }} — {{ t('tout afficher', 'show all') }}
+  </button>
+  <button
+    v-else-if="!locked"
     class="add-field nodrag"
     :class="dropClass(null)"
     @click="ops.add"
@@ -120,7 +128,8 @@
 import { computed, inject, nextTick, ref, watch } from 'vue';
 import { Handle, Position, useVueFlow } from '@vue-flow/core';
 import { checkDocument, describeProblem } from '../../lib/conformity';
-import { t } from '../../lib/i18n';
+import { count, t } from '../../lib/i18n';
+import { displayDateFormat, isDateType } from '../../lib/dateFormats';
 import { descendantIds, flattenRows, isContainer, sourceSocketType, targetSocketType, TYPE_OPTIONS, typeKey } from '../../lib/fields';
 import { isPlainObject } from '../../lib/lists';
 import { formatValue } from '../../lib/types';
@@ -141,13 +150,22 @@ const props = defineProps({
   locked: Boolean,
   /** Sockets de liaison (absents dans l'éditeur de modèles : un modèle n'est relié à rien). */
   sockets: { type: Boolean, default: true },
+  /** Masquer les champs inutilisés : sans lien (ids de `linked`) et sans problème, eux et leurs sous-champs. */
+  hideUnused: Boolean,
+  /** Ids des champs reliés (côté source comme côté cible), pour `hideUnused`. */
+  linked: { type: Set, default: null },
 });
+const emit = defineEmits(['show-unused']);
 
 // Les données d'exemple d'une source suivent la structure ; celles d'une cible (exemples donnés) restent telles quelles.
 const ops = useFieldEditor(props.nodeId, () => props.data, { reshape: props.side === 'source' });
 const { updateNodeData, updateNodeInternals } = useVueFlow();
 const files = inject(DATA_FILES_KEY, null);
 const rows = computed(() => flattenRows(props.data.fields));
+/** Champ utile : relié, ou avec une erreur ou un avertissement, lui ou l'un de ses sous-champs. */
+const isUsed = (f) => !!props.linked?.has(f.id) || !!props.issues?.get(f.id)?.length || (f.children ?? []).some(isUsed);
+const shownRows = computed(() => (props.hideUnused ? rows.value.filter((r) => isUsed(r.field)) : rows.value));
+const hiddenCount = computed(() => rows.value.length - shownRows.value.length);
 const position = computed(() => (props.side === 'source' ? Position.Right : Position.Left));
 const draggedId = ref(null);
 const drop = ref(null);
@@ -211,6 +229,8 @@ const exampleText = (chain) => {
 };
 const examplePlaceholder = (f) => {
   if (f.type === 'array') return (f.item ?? 'string') === 'string' ? '"a", "b, c", ""' : '1, 2, 3';
+  if (f.format?.dateFormat && isDateType(f.type)) return displayDateFormat(f.format.dateFormat);
+  if (f.type === 'datetime') return t('AAAA-MM-JJTHH:mm:ss', 'YYYY-MM-DDTHH:mm:ss');
   return f.type === 'date' ? t('AAAA-MM-JJ', 'YYYY-MM-DD') : '—';
 };
 const exampleHint = (f) =>
@@ -296,7 +316,7 @@ function setExample(chain, value) {
 
 // Les handles visibles changent avec l'arbre : Vue Flow doit les re-mesurer.
 watch(
-  () => rows.value.map((r) => `${r.field.id}:${r.depth}`).join('|'),
+  () => shownRows.value.map((r) => `${r.field.id}:${r.depth}`).join('|'),
   () => nextTick(() => updateNodeInternals([props.nodeId])),
 );
 

@@ -73,6 +73,7 @@ export const NODE_PREVIEWS = {
 
   // ── Date ────────────────────────────────────────────────
   date_format: { inputs: { date: '2026-09-14' }, params: { format: 'JJ/MM/AAAA' } },
+  date_reformat: { inputs: { date: '2026-09-14' }, params: { format: 'DD/MM/YYYY' } },
   date_part: { inputs: { date: '2026-09-14' }, params: { part: 'Jour de la semaine', days: 'lun, mar, mer, jeu, ven, sam, dim' } },
   age: { inputs: { date: '1990-06-15', ref: '2026-06-14' } },
 };

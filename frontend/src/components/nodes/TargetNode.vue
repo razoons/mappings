@@ -10,6 +10,7 @@
       <button class="icon-btn nodrag result-btn" :title="t('Voir le résultat (JSON produit et sa conformité au modèle)', 'Show the result (JSON produced and its conformity to the model)')" @click="showResult = true">{{ t('Résultat', 'Result') }}</button>
       <button class="icon-btn nodrag" :title="t('Modèle de données (YAML : type, obligatoire, format de chaque champ)', 'Data model (YAML: type, required, format of each field)')" @click="editing = true">{ }</button>
       <button v-if="modelLink && !data.modelId && !readOnly" class="icon-btn nodrag mdi mdi-database-plus-outline" :title="t('Enregistrer ce modèle dans la bibliothèque, pour le réutiliser dans d’autres mappings', 'Save this model to the library, to reuse it in other mappings')" @click="modelLink.create(id)" />
+      <HideUnusedButton :node-id="id" :on="data.hideUnused" />
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
@@ -25,7 +26,7 @@
     </div>
     <ModelLink v-if="modelLink" :node-id="id" :data="data" :read-only="readOnly" />
     <div v-if="!data.collapsed" class="node-body">
-      <FieldTree :node-id="id" :data="data" side="target" :locked="readOnly" :values="previewOf(id)" :connected="connected" :issues="issues" />
+      <FieldTree :node-id="id" :data="data" side="target" :locked="readOnly" :values="previewOf(id)" :connected="connected" :issues="issues" :linked="connected" :hide-unused="!!data.hideUnused" @show-unused="updateNodeData(id, { hideUnused: false })" />
     </div>
 
     <ResultDialog
@@ -59,6 +60,7 @@ import TextDialog from '../TextDialog.vue';
 import ResultDialog from '../ResultDialog.vue';
 import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
+import HideUnusedButton from './HideUnusedButton.vue';
 import FieldTree from './FieldTree.vue';
 import ModelLink from './ModelLink.vue';
 import { allFields } from '../../lib/fields';

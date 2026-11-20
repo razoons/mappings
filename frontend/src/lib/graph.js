@@ -1,3 +1,4 @@
+import { readDateValue, writeDateValue } from './dateFormats';
 import { allFields, findChain, sourceSocketType, targetSocketType } from './fields';
 import { t } from './i18n';
 import { LIBRARY_OUTPUT, LIBRARY_TABLE, tableOf } from './libraries';
@@ -177,10 +178,19 @@ export function evaluateGraph(nodes, edges, dataFiles = new Map()) {
     }
     const { entries, list } = collect(root, chain.slice(start), {}, key);
     const base = baseOf(sourceSocketType(chain));
-    if (!list) return coerce(entries[0]?.value, base);
+    // Un texte écrit dans le format de date du champ devient une date.
+    const field = chain.at(-1);
+    // Valeur absente : reste absente (les nœuds la convertissent eux-mêmes, la cible la laisse absente).
+    if (!list) return entries[0]?.value == null ? null : coerce(readDateValue(field, entries[0].value), base);
+    // Liste absente (et non vide) : absente aussi, quand seul le champ lui-même est une liste.
+    const rest = chain.slice(start);
+    if (rest.slice(0, -1).every((f) => f.type !== 'array')) {
+      const raw = rest.reduce((v, f) => (isPlainObject(v) ? v[f.name] : undefined), root);
+      if (raw == null) return null;
+    }
     return coerce(
       tagList(
-        entries.map((e) => e.value),
+        entries.map((e) => readDateValue(field, e.value)),
         entries.map((e) => e.binds),
       ),
       listOf(base),
@@ -268,6 +278,12 @@ export function evaluateGraph(nodes, edges, dataFiles = new Map()) {
     return obj;
   }
 
+  /**
+   * Valeur absente pour un champ cible : rien, ou un texte vide hors champ texte. Elle reste absente (et non
+   * 0, liste vide ou date invalide), comme le suppose le contrôle des cibles.
+   */
+  const absent = (v, f) => v === undefined || v === null || (v === '' && targetSocketType(f) !== 'string');
+
   function buildField(nodeId, f, scope, preview) {
     const up = upstream(nodeId, f.id, scope);
     const children = f.children ?? [];
@@ -283,15 +299,17 @@ export function evaluateGraph(nodes, edges, dataFiles = new Map()) {
         v = structured ? [buildObject(nodeId, children, scope, preview)] : [];
       }
     } else if (f.type === 'array') {
-      v = up.connected ? coerce(up.value, listOf(f.item ?? 'string')) : [];
+      // Valeur absente : laissée absente (et non remplacée par une liste vide), pour que le contrôle la voie.
+      v = up.connected && !absent(up.value, f) ? writeDateValue(f, coerce(readDateValue(f, up.value), targetSocketType(f))) : up.connected ? null : [];
     } else if (f.type === 'object') {
       const base = up.connected && isPlainObject(up.value) ? up.value : {};
       const built = buildObject(nodeId, children, scope, preview);
       const obj = { ...base };
       for (const c of children) if (isMapped(nodeId, c) || !(c.name in base)) obj[c.name] = built[c.name];
       v = obj;
-    } else if (up.connected) {
-      v = coerce(up.value, f.type);
+    } else if (up.connected && !absent(up.value, f)) {
+      // Champ avec un format de date : un texte dans ce format est lu comme une date, la date est écrite dans ce format.
+      v = writeDateValue(f, coerce(readDateValue(f, up.value), targetSocketType(f)));
     }
 
     if (!(f.id in preview)) preview[f.id] = v;

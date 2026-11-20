@@ -14,6 +14,7 @@
       <button class="icon-btn nodrag" :title="t('Charger un fichier de données (ou le déposer sur le nœud)', 'Load a data file (or drop it on the node)')" @click="pickFile">⤒</button>
       <button class="icon-btn nodrag" :title="t('Modèle de données (YAML : type, obligatoire, format de chaque champ)', 'Data model (YAML: type, required, format of each field)')" @click="editing = true">{ }</button>
       <button v-if="modelLink && !data.modelId && !readOnly" class="icon-btn nodrag mdi mdi-database-plus-outline" :title="t('Enregistrer ce modèle dans la bibliothèque, pour le réutiliser dans d’autres mappings', 'Save this model to the library, to reuse it in other mappings')" @click="modelLink.create(id)" />
+      <HideUnusedButton :node-id="id" :on="data.hideUnused" />
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
         <Handle
@@ -36,7 +37,7 @@
     </div>
     <div v-if="fileOver" class="data-file-drop">{{ t('Déposer pour utiliser ce fichier comme données', 'Drop to use this file as data') }}</div>
     <div v-if="!data.collapsed" class="node-body">
-      <FieldTree :node-id="id" :data="data" side="source" :locked="readOnly" :values="outputsOf(id)" :issues="issues" />
+      <FieldTree :node-id="id" :data="data" side="source" :locked="readOnly" :values="outputsOf(id)" :issues="issues" :linked="linked" :hide-unused="!!data.hideUnused" @show-unused="updateNodeData(id, { hideUnused: false })" />
     </div>
 
     <TextDialog
@@ -61,6 +62,7 @@ import { Handle, Position, useVueFlow } from '@vue-flow/core';
 import TextDialog from '../TextDialog.vue';
 import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
+import HideUnusedButton from './HideUnusedButton.vue';
 import FieldTree from './FieldTree.vue';
 import ModelLink from './ModelLink.vue';
 import { allFields } from '../../lib/fields';
@@ -77,7 +79,9 @@ const props = defineProps({
   selected: Boolean,
 });
 
-const { updateNodeData } = useVueFlow();
+const { updateNodeData, edges } = useVueFlow();
+/** Ids des champs d'où part un lien. */
+const linked = computed(() => new Set(edges.value.filter((e) => e.source === props.id).map((e) => e.sourceHandle)));
 const { outputsOf, issuesOf } = useResults();
 const files = inject(DATA_FILES_KEY);
 // Absent hors de l'éditeur (aperçus de la documentation).

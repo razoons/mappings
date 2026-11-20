@@ -1,7 +1,9 @@
+import { displayDateFormat, isDateType, parseDate } from './dateFormats';
 import { isSet } from './formats';
 import { t } from './i18n';
 import { libraryName } from './libraries';
 import { isPlainObject } from './lists';
+import { decimalsOf } from './types';
 
 /**
  * Conformité d'un document JSON (fichier de données d'une source, résultat d'une cible) à un modèle de champs.
@@ -12,6 +14,16 @@ import { isPlainObject } from './lists';
  * Un champ vaut absent s'il manque, s'il est \`null\` ou si c'est un texte vide. Le document n'est pas modifié.
  * \`libraries\` (voir lib/libraries.js) : bibliothèques de valeurs auxquelles les champs peuvent se référer.
  */
+/**
+ * Date d'une valeur d'un champ Date ou Date et heure (`null` si ce n'en est pas une) : avec un format de date, un
+ * texte doit le respecter ; sans format, il est lu en ISO 8601.
+ */
+function toDateValue(format, v) {
+  if (v instanceof Date) return v;
+  if (typeof v === 'string' && isSet(format.dateFormat)) return parseDate(v, format.dateFormat);
+  return typeof v === 'string' || typeof v === 'number' ? new Date(v) : null;
+}
+
 export function checkDocument(fields, doc, libraries = new Map()) {
   const found = new Map();
   const add = (level, fieldId, path, message, example) => {
@@ -65,7 +77,8 @@ export function checkDocument(fields, doc, libraries = new Map()) {
     if (!isSet(x.library)) return;
     const lib = libraries.get(x.library);
     if (!lib) add('warning', f.id, path, t('Liste de valeurs absente (supprimée de la bibliothèque) : valeurs non contrôlées', 'Value list missing (deleted from the library): values not checked'));
-    else if (!lib.has(v)) err(t(`Absent de la liste « ${libraryName(libraries, x.library)} »`, `Not in the list “${libraryName(libraries, x.library)}”`));
+    // Une date écrite dans le format du champ se compare par sa valeur aux dates de la liste.
+    else if (!lib.has(isDateType(type) ? toDateValue(x, v) ?? v : v)) err(t(`Absent de la liste « ${libraryName(libraries, x.library)} »`, `Not in the list “${libraryName(libraries, x.library)}”`));
   }
 
   function checkTyped(f, type, v, path, x, err) {
@@ -92,13 +105,19 @@ export function checkDocument(fields, doc, libraries = new Map()) {
         if (type === 'integer' && !Number.isInteger(v)) return err(t('Entier attendu', 'Integer expected'));
         if (isSet(x.min) && v < x.min) err(t(`Inférieur à ${x.min}`, `Less than ${x.min}`));
         if (isSet(x.max) && v > x.max) err(t(`Supérieur à ${x.max}`, `Greater than ${x.max}`));
+        if (isSet(x.maxDecimals) && decimalsOf(v) > x.maxDecimals)
+          err(t(`Plus de ${x.maxDecimals} décimale${x.maxDecimals > 1 ? 's' : ''}`, `More than ${x.maxDecimals} decimal${x.maxDecimals === 1 ? '' : 's'}`));
         return;
       case 'boolean':
         if (typeof v !== 'boolean') err(t('Booléen attendu (true / false)', 'Boolean expected (true / false)'));
         return;
-      case 'date': {
-        const d = v instanceof Date ? v : typeof v === 'string' || typeof v === 'number' ? new Date(v) : null;
-        if (!d || Number.isNaN(d.getTime())) return err(t('Date attendue (ex. 2026-01-31)', 'Date expected (e.g. 2026-01-31)'));
+      case 'date':
+      case 'datetime': {
+        const d = toDateValue(x, v);
+        if (!d || Number.isNaN(d.getTime())) {
+          if (isSet(x.dateFormat)) return err(t(`Date attendue au format ${displayDateFormat(x.dateFormat)}`, `Date expected in the format ${displayDateFormat(x.dateFormat)}`));
+          return err(type === 'datetime' ? t('Date et heure attendue (ex. 2026-01-31T08:30:00)', 'Date and time expected (e.g. 2026-01-31T08:30:00)') : t('Date attendue (ex. 2026-01-31)', 'Date expected (e.g. 2026-01-31)'));
+        }
         if (isSet(x.minDate) && d < new Date(x.minDate)) err(t(`Antérieure au ${x.minDate}`, `Before ${x.minDate}`));
         if (isSet(x.maxDate) && d > new Date(x.maxDate)) err(t(`Postérieure au ${x.maxDate}`, `After ${x.maxDate}`));
         return;

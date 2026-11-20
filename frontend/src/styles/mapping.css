@@ -1178,3 +1178,12 @@ button.doc-name:hover {
 .model-bar > span {
   white-space: nowrap;
 }
+
+/* ── Champs inutilisés masqués ──────────────────────────── */
+.node-header .icon-btn.hide-unused.on {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.25);
+}
+.add-field.unused-note {
+  font-style: italic;
+}

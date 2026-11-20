@@ -1,5 +1,6 @@
 import { Document, parse, YAMLMap } from 'yaml';
 import { checkDocument, describeProblem } from './conformity';
+import { dateFormatError, displayDateFormat, normalizeDateFormat } from './dateFormats';
 import { exampleOf, isContainer } from './fields';
 import { cleanFormat, formatKeys } from './formats';
 import { lang, t } from './i18n';
@@ -19,7 +20,7 @@ import { uid } from './types';
  *       age: integer                      # forme courte : le type seul
  *   commandes:
  *     type: array
- *     items: object                       # éléments : string, number, integer, boolean, date ou object
+ *     items: object                       # éléments : string, number, integer, boolean, date, datetime ou object
  *     minItems: 1
  *     fields:
  *       ref: { type: string, required: true, pattern: '^C-\d+$', example: C-42 }
@@ -31,7 +32,7 @@ import { uid } from './types';
  * `texte`…) ; à la lecture, les deux vocabulaires sont acceptés.
  */
 
-const TYPES = ['string', 'number', 'integer', 'boolean', 'date', 'object', 'array'];
+const TYPES = ['string', 'number', 'integer', 'boolean', 'date', 'datetime', 'object', 'array'];
 const ITEM_TYPES = TYPES.filter((t) => t !== 'array');
 
 // ── Vocabulaire français ───────────────────────────────────
@@ -49,19 +50,28 @@ const KEYS_FR = {
   pattern: 'motif',
   min: 'min',
   max: 'max',
+  maxDecimals: 'décimalesMax',
   minDate: 'dateMin',
   maxDate: 'dateMax',
   minItems: 'élémentsMin',
   maxItems: 'élémentsMax',
   library: 'listeValeurs',
+  dateFormat: 'formatDate',
 };
-const TYPES_FR = { string: 'texte', number: 'nombre', integer: 'entier', boolean: 'booléen', date: 'date', object: 'objet', array: 'liste' };
+const TYPES_FR = { string: 'texte', number: 'nombre', integer: 'entier', boolean: 'booléen', date: 'date', datetime: 'dateheure', object: 'objet', array: 'liste' };
 
 const plain = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 // Saisie : le mot français, avec ou sans accents ni majuscules, donne le mot anglais.
 // « bibliothèque » : ancien nom des listes de valeurs, toujours accepté.
 const KEY_OF = { ...Object.fromEntries(Object.entries(KEYS_FR).map(([en, fr]) => [plain(fr), en])), bibliotheque: 'library', valuelist: 'library' };
-const ALIASES = Object.fromEntries(Object.entries(TYPES_FR).map(([en, fr]) => [plain(fr), en]));
+const ALIASES = {
+  ...Object.fromEntries(Object.entries(TYPES_FR).map(([en, fr]) => [plain(fr), en])),
+  'date-heure': 'datetime',
+  'date heure': 'datetime',
+  date_heure: 'datetime',
+  'date et heure': 'datetime',
+  'date-time': 'datetime',
+};
 const YES = { oui: true, vrai: true, non: false, faux: false };
 
 /** Mot-clé et nom de type dans la langue de l'interface. */
@@ -83,11 +93,12 @@ const normalizeFields = (obj) => Object.fromEntries(Object.entries(obj).map(([na
 export const yamlHelp = () =>
   t(
     `# Modèle de données : un champ par clé.
-#   type        : texte, nombre, entier, booléen, date, objet, liste (forme courte : « nom: texte »)
+#   type        : texte, nombre, entier, booléen, date, dateheure, objet, liste (forme courte : « nom: texte »)
 #   obligatoire : oui pour un champ obligatoire
 #   description : ce que contient le champ (texte libre)
-#   format      : longueurMin, longueurMax, motif (texte) ; min, max (nombre, entier) ;
+#   format      : longueurMin, longueurMax, motif (texte) ; min, max (nombre, entier) ; décimalesMax (nombre) ;
 #                 dateMin, dateMax (date, ex. 2026-01-31) ; élémentsMin, élémentsMax (liste) ;
+#                 formatDate (date, dateheure) : JJ/MM/AAAA, AAAA-MM-JJ, JJ/MM/AAAA HH:mm… (sans format : ISO) ;
 #                 listeValeurs : nom d'une liste de valeurs (valeurs autorisées)
 #   exemple     : valeur d'exemple (données du calcul d'une source sans fichier) ; une liste d'objets
 #                 peut recevoir la liste complète, ex. plusieurs commandes
@@ -96,11 +107,12 @@ export const yamlHelp = () =>
 # Les mots-clés anglais (required, fields, string…) sont aussi acceptés.
 `,
     `# Data model: one field per key.
-#   type     : string, number, integer, boolean, date, object, array (short form: “name: string”)
+#   type     : string, number, integer, boolean, date, datetime, object, array (short form: “name: string”)
 #   required : true for a required field
 #   description : what the field holds (free text)
-#   format   : minLength, maxLength, pattern (text); min, max (number, integer);
+#   format   : minLength, maxLength, pattern (text); min, max (number, integer); maxDecimals (number);
 #              minDate, maxDate (date, e.g. 2026-01-31); minItems, maxItems (list);
+#              dateFormat (date, datetime): DD/MM/YYYY, YYYY-MM-DD, DD/MM/YYYY HH:mm… (none: ISO);
 #              library: name of a value list (allowed values)
 #   example  : example value (data used by a source without a file); a list of objects
 #              can receive the full list, e.g. several orders
@@ -117,7 +129,7 @@ function describe(f, value, libs) {
   if (f.type === 'array') node[word('items')] = typeWord(f.item ?? 'string');
   if (f.required) node[word('required')] = lang.value === 'fr' ? 'oui' : true;
   if (f.description) node[word('description')] = f.description;
-  for (const [k, v] of Object.entries(f.format ?? {})) node[word(k)] = k === 'library' ? (libs.get(v)?.label ?? v) : v;
+  for (const [k, v] of Object.entries(f.format ?? {})) node[word(k)] = k === 'library' ? (libs.get(v)?.label ?? v) : k === 'dateFormat' ? displayDateFormat(v) : v;
   if (f.type === 'object') {
     node[word('fields')] = toPlain(f.children ?? [], isPlainObject(value) ? value : undefined, libs);
   } else if (f.type === 'array' && f.item === 'object') {
@@ -273,6 +285,12 @@ function readField(name, raw, old, path, libs) {
       format[k.key] = libs.get(old?.format?.library) === lib ? old.format.library : libraryRef(lib);
       continue;
     }
+    if (k.kind === 'dateFormat') {
+      const norm = normalizeDateFormat(v, field.type === 'array' ? field.item : field.type);
+      if (norm.error) fail(`${word(k.key)} « ${v} » : ${dateFormatError(norm.error, t)}`);
+      format[k.key] = norm.format;
+      continue;
+    }
     if (k.kind === 'text') {
       if (typeof v !== 'string') fail(t(`${word(k.key)} doit être un texte`, `${k.key} must be a text`));
       try {
@@ -280,7 +298,7 @@ function readField(name, raw, old, path, libs) {
       } catch {
         fail(t(`${word(k.key)} : expression régulière invalide`, `${k.key}: invalid regular expression`));
       }
-    } else if (k.kind === 'date') {
+    } else if (k.kind === 'date' || k.kind === 'datetime') {
       if (typeof v !== 'string' || Number.isNaN(new Date(v).getTime())) fail(t(`${word(k.key)} doit être une date (ex. 2026-01-31)`, `${k.key} must be a date (e.g. 2026-01-31)`));
     } else if (typeof v !== 'number' || (k.kind !== 'number' && !Number.isInteger(v)) || (k.kind === 'int' && v < 0)) {
       fail(
