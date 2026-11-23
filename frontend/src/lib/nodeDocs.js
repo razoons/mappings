@@ -41,7 +41,10 @@ export const NODE_DOCS = {
   },
   remove_field: {
     summary: 'Retire une ou plusieurs clés d’un objet, ou de chaque objet d’une liste.',
-    details: ['Clés séparées par des virgules ; un chemin pointé retire une clé imbriquée (« address.zip »).'],
+    details: [
+      'Clés séparées par des virgules ; un chemin pointé retire une clé imbriquée (« address.zip »), aussi dans chaque élément d’une liste (« lignes.sku »).',
+      'Sur une source entière (ligne « Toute la source »), le nœud liste ses champs : décocher ceux à retirer. Le champ Objet ou Liste d’objets de la cible relié à sa sortie reprend la structure ainsi réduite.',
+    ],
   },
   list_create: {
     summary: 'Construit une liste à partir de ses entrées A, B, C…',
@@ -212,15 +215,12 @@ export const NODE_DOCS = {
   },
 
   // ── Date ────────────────────────────────────────────────
-  date_format: {
-    summary: 'Écrit une date sous forme de texte dans le format choisi.',
-    details: ['Calculé en UTC.', 'Date invalide : texte vide.'],
-  },
   date_reformat: {
-    summary: 'Indique dans quel format la date doit être écrite : à placer entre deux dates de formats différents.',
+    summary: 'Lit une date dans un format d’entrée et la donne dans un format de sortie : à placer entre deux dates de formats différents.',
     details: [
-      'La date ne change pas : le champ cible l’écrit dans son propre format.',
-      'Le format choisi doit être celui du champ cible, sinon le contrôle signale toujours des formats différents.',
+      'Format d’entrée : « date ou texte ISO » pour une date (un champ Date d’une source est déjà lu dans son propre format) ; un format précis pour lire un texte (« 19/10/2026 » avec JJ/MM/AAAA). Un texte qui ne le respecte pas donne une date invalide.',
+      'Format de sortie : un champ Texte reçoit la date écrite dans ce format ; un champ Date l’écrit dans son propre format, qui doit être celui-ci, sinon le contrôle signale des formats différents.',
+      'Pour écrire une date en texte, relier sa sortie à un champ Texte, ou à « En texte » / « Concaténer ».',
     ],
   },
   date_part: {

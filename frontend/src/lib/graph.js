@@ -3,6 +3,7 @@ import { allFields, findChain, sourceSocketType, targetSocketType } from './fiel
 import { t } from './i18n';
 import { LIBRARY_OUTPUT, LIBRARY_TABLE, tableOf } from './libraries';
 import { bindsOf, isPlainObject, tagList } from './lists';
+import { isRootCopy, SOURCE_DOC } from './structure';
 import { inputsOf, inputSocket, paramsWithDefaults, TRANSFORMS, variadicId } from './transforms';
 import { baseOf, coerce, isList, isNumeric, listOf } from './types';
 
@@ -11,6 +12,8 @@ export function getSocket(node, handleId, side) {
   if (!node || !handleId) return undefined;
   if (node.type === 'source' || node.type === 'target') {
     if ((node.type === 'source') !== (side === 'source')) return undefined;
+    // Le document entier d'une source, ou la cible entière (sockets de leur en-tête).
+    if (handleId === SOURCE_DOC) return { name: node.data.label || t('Document', 'Document'), type: 'object' };
     const chain = findChain(node.data.fields, handleId);
     if (!chain) return undefined;
     const field = chain.at(-1);
@@ -163,6 +166,7 @@ export function evaluateGraph(nodes, edges, dataFiles = new Map()) {
   }
 
   function readSource(node, handle, scope) {
+    if (handle === SOURCE_DOC) return sampleOf(node);
     const chain = findChain(node.data.fields, handle);
     if (!chain) return undefined;
     const key = (f) => `${node.id}:${f.id}`;
@@ -284,12 +288,26 @@ export function evaluateGraph(nodes, edges, dataFiles = new Map()) {
    */
   const absent = (v, f) => v === undefined || v === null || (v === '' && targetSocketType(f) !== 'string');
 
+  /** Aperçu des sous-champs repris d'un objet entier (1er élément d'une liste). */
+  function previewMirror(fields, value, preview) {
+    const item = Array.isArray(value) ? value[0] : value;
+    for (const c of fields) {
+      const cv = isPlainObject(item) ? item[c.name] : undefined;
+      if (!(c.id in preview)) preview[c.id] = cv;
+      if (c.children) previewMirror(c.children, cv, preview);
+    }
+  }
+
   function buildField(nodeId, f, scope, preview) {
     const up = upstream(nodeId, f.id, scope);
     const children = f.children ?? [];
     let v = null;
 
-    if (f.type === 'array' && f.item === 'object') {
+    if (f.mirror && up.connected) {
+      // Objet entier (structure reprise d'une source) : la valeur telle quelle ; une liste d'objets en fait un élément.
+      v = f.type === 'array' ? coerce(up.value, 'any[]') : isPlainObject(up.value) ? up.value : null;
+      previewMirror(children, v, preview);
+    } else if (f.type === 'array' && f.item === 'object') {
       const structured = children.some((c) => isMapped(nodeId, c));
       const list = up.connected ? coerce(up.value, 'any[]') : implicitDriver(nodeId, children, scope);
       if (list) {
@@ -322,10 +340,20 @@ export function evaluateGraph(nodes, edges, dataFiles = new Map()) {
     if (n.type === 'transform') outputs.set(n.id, outputsOf(n, ROOT_SCOPE));
     else if (n.type === 'library') outputs.set(n.id, libraryOutputs(n));
     else if (n.type === 'source')
-      outputs.set(n.id, Object.fromEntries(allFields(n.data.fields).map((f) => [f.id, readSource(n, f.id, ROOT_SCOPE)])));
+      outputs.set(n.id, {
+        ...Object.fromEntries(allFields(n.data.fields).map((f) => [f.id, readSource(n, f.id, ROOT_SCOPE)])),
+        [SOURCE_DOC]: readSource(n, SOURCE_DOC, ROOT_SCOPE),
+      });
     else if (n.type === 'target') {
       const preview = {};
-      targets.set(n.id, { value: buildObject(n.id, n.data.fields, ROOT_SCOPE, preview), preview });
+      const root = n.data.mirror && upstream(n.id, SOURCE_DOC, ROOT_SCOPE);
+      if (root?.connected) {
+        // Cible entière reprise d'une source : le document tel quel, plus les champs propres à la cible.
+        const doc = isPlainObject(root.value) ? root.value : {};
+        previewMirror(n.data.fields.filter(isRootCopy), doc, preview);
+        const own = buildObject(n.id, n.data.fields.filter((f) => !isRootCopy(f)), ROOT_SCOPE, preview);
+        targets.set(n.id, { value: { ...doc, ...own }, preview });
+      } else targets.set(n.id, { value: buildObject(n.id, n.data.fields, ROOT_SCOPE, preview), preview });
     }
   }
   return { outputs, targets };

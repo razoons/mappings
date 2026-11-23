@@ -253,7 +253,8 @@ import { fitGroup, groupAround, groupAt, groupsFirst, isGroup, newGroup, removeK
 import { createsCycle, evaluateGraph, getSocket, originsOf } from '../lib/graph';
 import { librariesOf, LIBRARY_OUTPUT, LIBRARY_TABLE } from '../lib/libraries';
 import { validateTargets } from '../lib/rules';
-import { initialParams, inputsOf, TRANSFORMS } from '../lib/transforms';
+import { isRootCopy, SOURCE_DOC, syncMirrors } from '../lib/structure';
+import { initialParams, inputsOf, migrateGraphs, TRANSFORMS } from '../lib/transforms';
 import { canConnect, isList, typeMismatch, uid } from '../lib/types';
 import { download, exportFile, openFile } from '../services/files';
 import { doc, markSaved, renameDocument } from '../services/document';
@@ -427,6 +428,7 @@ let fitPending = false;
 function load(graph, { fit = true } = {}) {
   const copy = JSON.parse(JSON.stringify(graph));
   for (const n of copy.nodes) if (n.data?.fields) n.data.fields = migrateFields(n.data.fields);
+  migrateGraphs(copy);
   setNodes(groupsFirst(copy.nodes));
   setEdges(copy.edges.map((e) => ({ ...e, type: 'typed' })));
   fitPending = fit;
@@ -1066,9 +1068,16 @@ provide(LIST_LINK_KEY, libraryLink('list'));
 const fieldOrigins = computed(() => {
   const map = new Map();
   const fill = (nodeId, fields, graph, outputId) => {
+    // Sous-champs repris d'un objet entier : ils viennent de la même source que leur champ.
+    const parentOf = new Map();
+    const out = graph.nodes.find((n) => n.id === outputId);
+    for (const f of allFields(out?.data.fields ?? [])) {
+      if (out.data.mirror && isRootCopy(f)) parentOf.set(f.id, SOURCE_DOC);
+      else if (f.mirror) for (const c of allFields(f.children ?? [])) parentOf.set(c.id, f.id);
+    }
     const origins = new Map();
     for (const f of allFields(fields)) {
-      const names = originsOf(graph.nodes, graph.edges, outputId, f.id);
+      const names = originsOf(graph.nodes, graph.edges, outputId, parentOf.get(f.id) ?? f.id);
       if (names.length) origins.set(f.id, names.join(' + '));
     }
     map.set(nodeId, origins);
@@ -1345,6 +1354,26 @@ const results = computed(() => {
   };
 });
 provide(RESULTS_KEY, results);
+
+/**
+ * Objets entiers : un champ cible Objet ou Liste d'objets relié au document d'une source (éventuellement via
+ * « Retirer des champs ») en reprend la structure, tenue à jour ici (voir lib/structure.js). Les liens vers des
+ * sous-champs remplacés sont retirés.
+ */
+const mirrorChanges = computed(() => syncMirrors(nodes.value, edges.value));
+watch(
+  mirrorChanges,
+  (changes) => {
+    for (const [id, change] of changes) {
+      const kept = new Set([SOURCE_DOC, ...allFields(change.fields).map((f) => f.id)]);
+      const gone = edges.value.filter((e) => e.target === id && !kept.has(e.targetHandle));
+      if (gone.length) removeEdges(gone);
+      updateNodeData(id, { fields: change.fields, mirror: change.mirror || undefined });
+      nextTick(() => updateNodeInternals([id]));
+    }
+  },
+  { immediate: true },
+);
 
 /** Centre la vue sur un nœud (clic sur un problème du panneau Contrôles) et le sélectionne. */
 function focusNode(id) {

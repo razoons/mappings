@@ -2,7 +2,7 @@ import { bindsOf, isPlainObject, pickItems, tagList } from './lists';
 import { bilingual, t } from './i18n';
 import { tableKey } from './libraries';
 import { coerce } from './types';
-import { DATE_FORMAT_PRESETS, displayDateFormat } from './dateFormats';
+import { DATE_FORMAT_PRESETS, displayDateFormat, parseDate } from './dateFormats';
 import { GUARANTEES, roundDecimals } from './transformGuarantees';
 
 /**
@@ -59,8 +59,9 @@ function setPath(obj, path, value) {
   return { ...base, [key]: rest.length ? setPath(base[key], rest.join('.'), value) : value };
 }
 
-/** Copie de `obj` sans le chemin `a.b.c`. */
+/** Copie de `obj` sans le chemin `a.b.c` (une liste rencontrée en chemin : retiré de chacun de ses éléments). */
 function removePath(obj, path) {
+  if (Array.isArray(obj)) return obj.map((o) => removePath(o, path));
   if (!isPlainObject(obj)) return obj;
   const [key, ...rest] = path.split('.');
   if (!(key in obj)) return obj;
@@ -172,7 +173,7 @@ export const TRANSFORMS = {
     outputs: out('any', 'Objet(s)'),
     params: [{ id: 'keys', label: 'Clés (a, b.c)', default: 'id' }],
     compute: ({ obj }, p) => {
-      const paths = p.keys.split(',').map((k) => k.trim()).filter(Boolean);
+      const paths = p.keys.split(',').map((k) => k.trim().replace(/\[\]/g, '')).filter(Boolean);
       const one = (o) => paths.reduce(removePath, o);
       return { result: Array.isArray(obj) ? tagList(obj.map(one), bindsOf(obj)) : one(obj) };
     },
@@ -638,48 +639,40 @@ export const TRANSFORMS = {
   },
 
   // ── Date ────────────────────────────────────────────────
-  date_format: {
-    label: 'Formater date',
-    category: 'Date',
-    inputs: [{ id: 'date', label: 'Date', type: 'date' }],
-    outputs: out('string'),
-    params: [
-      {
-        id: 'format',
-        label: 'Format',
-        default: 'JJ/MM/AAAA',
-        options: ['ISO 8601', 'AAAA-MM-JJ', 'JJ/MM/AAAA', 'MM/JJ/AAAA', 'Timestamp (ms)'],
-      },
-    ],
-    compute: ({ date }, p) => {
-      if (isNaN(date.getTime())) return { result: '' };
-      const [y, m, j] = [String(date.getUTCFullYear()).padStart(4, '0'), pad(date.getUTCMonth() + 1), pad(date.getUTCDate())];
-      const formats = {
-        'ISO 8601': date.toISOString(),
-        'AAAA-MM-JJ': `${y}-${m}-${j}`,
-        'JJ/MM/AAAA': `${j}/${m}/${y}`,
-        'MM/JJ/AAAA': `${m}/${j}/${y}`,
-        'Timestamp (ms)': String(date.getTime()),
-      };
-      return { result: formats[p.format] };
-    },
-  },
   date_reformat: {
     label: 'Changer le format de date',
     category: 'Date',
-    inputs: [{ id: 'date', label: 'Date', type: 'date' }],
+    // Une date, ou un texte lu selon le format d'entrée.
+    inputs: [{ id: 'date', label: 'Date', type: 'any' }],
     outputs: out('date'),
     params: [
       {
+        id: 'from',
+        label: 'Format d’entrée',
+        default: 'auto',
+        options: ['auto', ...DATE_FORMAT_PRESETS.date, ...DATE_FORMAT_PRESETS.datetime],
+        optionLabel: (o) => `${t('Entrée', 'Input')} : ${o === 'auto' ? t('date ou texte ISO', 'date or ISO text') : displayDateFormat(o)}`,
+      },
+      {
         id: 'format',
-        label: 'Format',
+        label: 'Format de sortie',
         default: 'DD/MM/YYYY',
         options: [...DATE_FORMAT_PRESETS.date, ...DATE_FORMAT_PRESETS.datetime],
-        optionLabel: (o) => displayDateFormat(o),
+        optionLabel: (o) => `${t('Sortie', 'Output')} : ${displayDateFormat(o)}`,
       },
     ],
-    // La date est transmise telle quelle : le champ cible l'écrit dans son format, que ce nœud garantit.
-    compute: ({ date }) => ({ result: date }),
+    // La sortie est une date marquée de son format de sortie : un champ Texte l'écrit dans ce format, un champ
+    // Date dans le sien (que le nœud garantit, voir le contrôle des formats de date).
+    compute: ({ date }, p) => {
+      let d = date;
+      if (!(d instanceof Date)) {
+        const text = d == null ? '' : String(d).trim();
+        d = text === '' ? new Date(NaN) : p.from && p.from !== 'auto' ? parseDate(text, p.from) : new Date(text);
+      }
+      const result = new Date(d.getTime());
+      if (!Number.isNaN(result.getTime())) result.dateFormat = p.format;
+      return { result };
+    },
   },
   date_part: {
     label: 'Partie de date',
@@ -834,8 +827,7 @@ const EN = {
   to_integer: { label: 'To integer', sockets: { value: 'Value', result: 'Result' }, params: { mode: 'Mode' } },
   to_bool: { label: 'To boolean', sockets: { value: 'Value', result: 'Result' } },
   transcode: { label: 'Transcode', sockets: { table: 'Table', value: 'Value', fallback: 'If missing', result: 'Result' } },
-  date_format: { label: 'Format date', sockets: { date: 'Date', result: 'Result' }, params: { format: 'Format' } },
-  date_reformat: { label: 'Change date format', sockets: { date: 'Date', result: 'Result' }, params: { format: 'Format' } },
+  date_reformat: { label: 'Change date format', sockets: { date: 'Date', result: 'Result' }, params: { from: 'Input format', format: 'Output format' } },
   date_part: { label: 'Date part', sockets: { date: 'Date', result: 'Number', name: 'Name' }, params: { part: 'Part', days: 'Days', months: 'Months' } },
   age: { label: 'Age (years)', sockets: { date: 'Date', ref: 'Reference', result: 'Years' } },
 };
@@ -884,4 +876,26 @@ export function paramsWithDefaults(def, params) {
   const result = {};
   for (const p of def.params ?? []) result[p.id] = params[p.id] ?? p.default;
   return result;
+}
+
+// ── Migration des anciens schémas ──────────────────────────
+
+/** Ancien nœud « Formater date » → « Changer le format de date » (son format de sortie ; l'horodatage devient AAAA-MM-JJ). */
+const OLD_DATE_FORMATS = { 'ISO 8601': 'YYYY-MM-DDTHH:mm:ss', 'AAAA-MM-JJ': 'YYYY-MM-DD', 'JJ/MM/AAAA': 'DD/MM/YYYY', 'MM/JJ/AAAA': 'MM/DD/YYYY', 'Timestamp (ms)': 'YYYY-MM-DD' };
+
+/**
+ * Met à jour, en place, les nœuds des schémas contenus dans `value` (espace de travail, collection, mapping, modèle
+ * composite, fichier importé…) : les nœuds supprimés sont remplacés par leur équivalent.
+ */
+export function migrateGraphs(value) {
+  if (Array.isArray(value)) return value.forEach(migrateGraphs);
+  if (!isPlainObject(value)) return;
+  if (Array.isArray(value.nodes)) {
+    for (const n of value.nodes) {
+      if (n?.data?.kind !== 'date_format') continue;
+      n.data.kind = 'date_reformat';
+      n.data.params = { from: 'auto', format: OLD_DATE_FORMATS[n.data.params?.format ?? 'JJ/MM/AAAA'] ?? 'DD/MM/YYYY' };
+    }
+  }
+  for (const key of ['graph', 'items', 'collections', 'library', 'models', 'mapping', 'collection']) migrateGraphs(value[key]);
 }

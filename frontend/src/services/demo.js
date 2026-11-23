@@ -170,7 +170,7 @@ function mappingGraph(composite, menu) {
       { id: 'menu', type: 'library', position: { x: 0, y: 440 }, data: { label: menu.name, ...listContent(menu), listId: menu.id } },
       // Référence du bon : « LBP-W-20481 » ; date de la commande
       transform('ref', 560, 0, { kind: 'concat', params: { sep: '-' }, values: { a: 'LBP' } }),
-      transform('date', 560, 150, { kind: 'date_format', params: { format: 'JJ/MM/AAAA' } }),
+      transform('date', 560, 150, { kind: 'date_reformat', params: { from: 'auto', format: 'DD/MM/YYYY' } }),
       // Articles : libellé transcodé via la carte, montant par ligne, total
       transform('label', 560, 300, { kind: 'transcode' }),
       transform('amount', 560, 470, { kind: 'math', params: { op: 'Multiplication' } }),

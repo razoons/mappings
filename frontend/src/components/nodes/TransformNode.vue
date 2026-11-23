@@ -36,7 +36,17 @@
         <Handle :id="o.id" type="source" :position="Position.Right" v-bind="socketAttrs(o.type)" />
       </div>
 
-      <div v-for="p in shownParams" :key="p.id" class="row">
+      <!-- Retirer des champs d'un objet entier : ses champs, à décocher. -->
+      <div v-if="structure" class="keep-fields">
+        <div class="keep-title">{{ t('Champs gardés (décocher pour retirer)', 'Kept fields (untick to remove)') }}</div>
+        <label v-for="r in structureRows" :key="r.path" class="keep-row nodrag" :style="{ paddingLeft: `${r.depth * 12}px` }" :title="r.path">
+          <input type="checkbox" :disabled="readOnly" :checked="!r.removed" @change="toggleKey(r.path)" />
+          <span :class="{ removed: r.removed }">{{ r.name }}</span>
+        </label>
+        <div v-if="!structureRows.length" class="keep-title">{{ t('Aucun champ', 'No field') }}</div>
+      </div>
+
+      <div v-for="p in structure ? [] : shownParams" :key="p.id" class="row">
         <select v-if="p.options" class="nodrag" :disabled="readOnly" :title="p.label" :value="params[p.id]" @change="setParam(p.id, $event.target.value)">
           <option v-for="o in p.options" :key="o" :value="o">{{ p.optionLabel ? p.optionLabel(o, params) : o }}</option>
         </select>
@@ -89,6 +99,7 @@ import CollapseButton from './CollapseButton.vue';
 import LockButton from './LockButton.vue';
 import { t } from '../../lib/i18n';
 import { inputsOf, paramsWithDefaults, TRANSFORMS } from '../../lib/transforms';
+import { keyPaths, structureOf } from '../../lib/structure';
 import { coerce, formatValue, HEADER_COLORS, isList, isNumeric } from '../../lib/types';
 import { socketAttrs, useReadOnly, useResults, widthStyle } from './shared';
 import WidthHandle from './WidthHandle.vue';
@@ -101,7 +112,7 @@ const props = defineProps({
   selected: Boolean,
 });
 
-const { updateNodeData, updateNodeInternals, edges } = useVueFlow();
+const { updateNodeData, updateNodeInternals, edges, nodes } = useVueFlow();
 const { outputsOf, issuesOf } = useResults();
 const issueOf = (i) => issuesOf(props.id).get(i.id)?.[0];
 
@@ -123,6 +134,43 @@ watch(
 /** Valeur saisie directement sur une entrée simple non connectée. */
 const hasInlineValue = (i) => !connected.value.has(i.id) && !isList(i.type) && (i.default !== undefined || !i.perItem);
 const valueOf = (i) => props.data.values[i.id] ?? i.default ?? '';
+
+// ── « Retirer des champs » sur un objet entier (document d'une source) : ses champs se décochent un à un.
+
+/** Structure de l'objet reçu, si elle est connue (voir lib/structure.js). */
+const structure = computed(() => {
+  if (props.data.kind !== 'remove_field') return null;
+  const byId = new Map(nodes.value.map((n) => [n.id, n]));
+  const incoming = new Map(edges.value.map((e) => [`${e.target}:${e.targetHandle}`, e]));
+  const e = incoming.get(`${props.id}:obj`);
+  return e ? structureOf(byId, incoming, e.source, e.sourceHandle) : null;
+});
+const removedKeys = computed(() => keyPaths(params.value.keys).map((p) => p.join('.')));
+/** Lignes à cocher : chaque champ avec son chemin ; les sous-champs d'un champ retiré ne sont pas listés. */
+const structureRows = computed(() => {
+  const rows = [];
+  const walk = (fields, prefix, depth) => {
+    for (const f of fields) {
+      const path = prefix ? `${prefix}.${f.name}` : f.name;
+      const removed = removedKeys.value.includes(path);
+      rows.push({ name: f.name, path, depth, removed });
+      if (!removed && f.children) walk(f.children, path, depth + 1);
+    }
+  };
+  walk(structure.value ?? [], '', 0);
+  return rows;
+});
+// La liste change de hauteur : Vue Flow doit re-mesurer les sockets.
+watch(
+  () => structureRows.value.length,
+  () => nextTick(() => updateNodeInternals([props.id])),
+);
+function toggleKey(path) {
+  const keys = removedKeys.value.includes(path)
+    ? removedKeys.value.filter((k) => k !== path)
+    : [...removedKeys.value.filter((k) => !k.startsWith(`${path}.`)), path];
+  setParam('keys', keys.join(', '));
+}
 
 const setParam = (key, v) => updateNodeData(props.id, { params: { ...props.data.params, [key]: v } });
 const setValue = (key, v) => updateNodeData(props.id, { values: { ...props.data.values, [key]: v } });

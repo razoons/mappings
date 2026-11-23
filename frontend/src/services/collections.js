@@ -1,5 +1,6 @@
 import { reactive, watch } from 'vue';
 import { t } from '../lib/i18n';
+import { migrateGraphs } from '../lib/transforms';
 import { uid } from '../lib/types';
 
 /**
@@ -41,7 +42,10 @@ export const isContainer = (item) => Array.isArray(item.items);
 function initial() {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY));
-    if (Array.isArray(saved?.collections)) return { library: makeLibrary(), ...saved };
+    if (Array.isArray(saved?.collections)) {
+      migrateGraphs(saved);
+      return { library: makeLibrary(), ...saved };
+    }
   } catch {
     /* sauvegarde illisible : on repart de l'ancien brouillon */
   }
@@ -417,6 +421,7 @@ function readItem(raw) {
  */
 export function readFile(text, fileName = '') {
   const data = JSON.parse(text);
+  migrateGraphs(data);
   const base = fileName.replace(/\.json$/i, '');
   if (data?.format === WORKSPACE_FORMAT) {
     if (!Array.isArray(data.collections) || !Array.isArray(data.library?.items)) throw new Error(t('sauvegarde incomplète', 'incomplete backup'));

@@ -13,7 +13,9 @@
       <button v-if="modelLink && !data.modelId && !readOnly" class="icon-btn nodrag mdi mdi-database-plus-outline" :title="t('Enregistrer ce modèle dans la bibliothèque, pour le réutiliser dans d’autres mappings', 'Save this model to the library, to reuse it in other mappings')" @click="modelLink.create(id)" />
       <HideUnusedButton :node-id="id" :on="data.hideUnused" />
       <LockButton :node-id="id" :locked="data.locked" />
+      <span v-if="data.mirror" class="mirror-mark" :title="t(`Champs repris tels quels de « ${rootSource} » (en tête de liste, en lecture seule) : ils se modifient dans la source, et « Retirer des champs » sur le lien en enlève. Les champs ajoutés ensuite sont propres à la cible.`, `Fields taken as is from “${rootSource}” (first in the list, read-only): change them in the source, and “Remove fields” on the link removes some. Fields added after them belong to the target.`)">⧉</span>
       <template v-if="data.collapsed">
+        <Handle :id="SOURCE_DOC" type="target" :position="Position.Left" :connectable="false" class="socket hidden-socket" />
         <Handle
           v-for="f in allFields(data.fields)"
           :id="f.id"
@@ -27,6 +29,13 @@
     </div>
     <ModelLink v-if="modelLink" :node-id="id" :data="data" :read-only="readOnly" />
     <div v-if="!data.collapsed" class="node-body">
+      <!-- Toute la cible : y relier une source entière pour en reprendre tous les champs. -->
+      <div class="row doc-row target" :title="t('Toute la cible : y relier une source entière (ligne « Toute la source ») pour en reprendre tous les champs, en lecture seule', 'The whole target: link a whole source to it (“Whole source” row) to take all its fields, read-only')">
+        <Handle :id="SOURCE_DOC" type="target" :position="Position.Left" v-bind="socketAttrs('object')" />
+        <span class="mdi mdi-link-variant" />
+        <span>{{ t('Toute la cible', 'Whole target') }}</span>
+        <span v-if="data.mirror" class="doc-row-source">← {{ rootSource }}</span>
+      </div>
       <FieldTree :node-id="id" :data="data" side="target" :locked="readOnly" :values="previewOf(id)" :connected="connected" :issues="issues" :linked="connected" :hide-unused="!!data.hideUnused" @show-unused="updateNodeData(id, { hideUnused: false })" />
     </div>
 
@@ -49,7 +58,7 @@
       "
       :initial="model.initial()"
       :actions="model.actions"
-      :read-only="readOnly"
+      :read-only="readOnly || !!data.mirror"
     />
   </div>
 </template>
@@ -65,10 +74,11 @@ import HideUnusedButton from './HideUnusedButton.vue';
 import FieldTree from './FieldTree.vue';
 import ModelLink from './ModelLink.vue';
 import { allFields } from '../../lib/fields';
+import { SOURCE_DOC } from '../../lib/structure';
 import { t } from '../../lib/i18n';
 import { countIssues } from '../../lib/rules';
 import { HEADER_COLORS } from '../../lib/types';
-import { DATA_FILES_KEY, MODEL_LINK_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults, widthStyle } from './shared';
+import { DATA_FILES_KEY, MODEL_LINK_KEY, socketAttrs, useFieldEditor, useModelEditor, useReadOnly, useResults, widthStyle } from './shared';
 import WidthHandle from './WidthHandle.vue';
 
 defineOptions({ inheritAttrs: false });
@@ -104,6 +114,17 @@ const countLabel = computed(
       `${counts.value.errors} error(s), ${counts.value.warnings} warning(s) — details in the Checks panel`,
     ),
 );
+
+/** Nom de la source reliée à la cible entière (en remontant les « Retirer des champs »). */
+const rootSource = computed(() => {
+  let e = edges.value.find((x) => x.target === props.id && x.targetHandle === SOURCE_DOC);
+  for (let i = 0; e && i < 50; i++) {
+    const n = nodes.value.find((x) => x.id === e.source);
+    if (n?.type !== 'transform') return n?.data.label ?? '';
+    e = edges.value.find((x) => x.target === n.id && x.targetHandle === 'obj');
+  }
+  return '';
+});
 
 const connected = computed(() => new Set(edges.value.filter((e) => e.target === props.id).map((e) => e.targetHandle)));
 </script>

@@ -2,6 +2,7 @@ import { allFields, findChain, pathLabel, reshapeSample, typeKey, TYPE_OPTIONS }
 import { evaluateGraph } from '../lib/graph';
 import { t } from '../lib/i18n';
 import { isPlainObject } from '../lib/lists';
+import { SOURCE_DOC, syncMirrors, unmirror, withMirror } from '../lib/structure';
 import { uid } from '../lib/types';
 import { addToLibrary, allMappings, find, isComposite, locate, remove, rename, workspace } from './collections';
 
@@ -64,13 +65,24 @@ export function createComposite(name, graph = null, folderId = null) {
 
 /** Champs et exemple que donne le schéma `graph` d'un modèle composite : `{ fields, sample }`. */
 export function compositeContent(graph) {
-  const out = compositeOutput(graph);
-  const value = out ? (evaluateGraph(graph.nodes, graph.edges).targets.get(out.id)?.value ?? {}) : {};
-  return { fields: stripFields(out?.data.fields ?? []), sample: JSON.stringify(value, null, 2) };
+  const nodes = withMirrors(graph);
+  const out = compositeOutput({ nodes });
+  const value = out ? (evaluateGraph(nodes, graph.edges).targets.get(out.id)?.value ?? {}) : {};
+  return { fields: unmirror(stripFields(out?.data.fields ?? [])), sample: JSON.stringify(value, null, 2) };
 }
 
-/** Champs et exemple d'un modèle composite, d'après son schéma. */
+/** Nœuds du schéma, les champs cibles reliés à un objet entier alignés sur sa structure (voir lib/structure.js). */
+function withMirrors(graph) {
+  const changes = syncMirrors(graph.nodes, graph.edges);
+  return graph.nodes.map((n) => (changes.has(n.id) ? { ...n, data: withMirror(n.data, changes.get(n.id)) } : n));
+}
+
+/** Champs et exemple d'un modèle composite, d'après son schéma (aligné au passage sur les objets entiers qu'il reprend). */
 function computeComposite(item) {
+  item.graph.nodes = withMirrors(item.graph);
+  const kept = new Set(item.graph.nodes.flatMap((n) => (n.type === 'target' ? allFields(n.data.fields).map((f) => `${n.id}:${f.id}`) : [])));
+  const targets = new Set(item.graph.nodes.filter((n) => n.type === 'target').map((n) => n.id));
+  item.graph.edges = item.graph.edges.filter((e) => !targets.has(e.target) || e.targetHandle === SOURCE_DOC || kept.has(`${e.target}:${e.targetHandle}`));
   Object.assign(item, compositeContent(item.graph));
 }
 

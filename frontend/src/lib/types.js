@@ -1,4 +1,5 @@
 import { t } from './i18n';
+import { formatDate } from './dateFormats';
 import { bindsOf, isPlainObject, tagList } from './lists';
 
 /**
@@ -102,7 +103,7 @@ function coerceScalar(v, type) {
       return v;
     case 'string':
       if (v == null) return '';
-      if (v instanceof Date) return isNaN(v.getTime()) ? '' : v.toISOString();
+      if (v instanceof Date) return isNaN(v.getTime()) ? '' : v.dateFormat ? formatDate(v, v.dateFormat) : v.toISOString();
       if (typeof v === 'object') return JSON.stringify(v);
       return String(v);
     case 'number':
@@ -142,6 +143,7 @@ export function formatValue(v, depth = 0) {
   if (v === null) return 'null';
   if (v instanceof Date) {
     if (isNaN(v.getTime())) return t('Date invalide', 'Invalid date');
+    if (v.dateFormat) return formatDate(v, v.dateFormat);
     const iso = v.toISOString();
     return iso.endsWith('T00:00:00.000Z') ? iso.slice(0, 10) : iso.slice(0, 16).replace('T', ' ');
   }

@@ -19,6 +19,7 @@
       <HideUnusedButton :node-id="id" :on="data.hideUnused" />
       <LockButton :node-id="id" :locked="data.locked" />
       <template v-if="data.collapsed">
+        <Handle :id="SOURCE_DOC" type="source" :position="Position.Right" :connectable="false" class="socket hidden-socket" />
         <Handle
           v-for="f in allFields(data.fields)"
           :id="f.id"
@@ -39,6 +40,12 @@
     </div>
     <div v-if="fileOver" class="data-file-drop">{{ t('Déposer pour utiliser ce fichier comme données', 'Drop to use this file as data') }}</div>
     <div v-if="!data.collapsed" class="node-body">
+      <!-- Toute la source, d'un bloc : se relie à la cible entière, ou à un champ Objet ou Liste d'objets d'une cible. -->
+      <div class="row doc-row" :title="t('Toute la source, d’un bloc : la relier à une cible entière, ou à un champ Objet ou Liste d’objets d’une cible, qui en reprend les champs', 'The whole source, as one block: link it to a whole target, or to an Object or List of objects field of a target, which takes its fields')">
+        <span class="mdi mdi-link-variant" />
+        <span>{{ t('Toute la source', 'Whole source') }}</span>
+        <Handle :id="SOURCE_DOC" type="source" :position="Position.Right" v-bind="socketAttrs('object')" />
+      </div>
       <FieldTree :node-id="id" :data="data" side="source" :locked="readOnly" :values="outputsOf(id)" :issues="issues" :linked="linked" :hide-unused="!!data.hideUnused" @show-unused="updateNodeData(id, { hideUnused: false })" />
     </div>
 
@@ -68,10 +75,11 @@ import HideUnusedButton from './HideUnusedButton.vue';
 import FieldTree from './FieldTree.vue';
 import ModelLink from './ModelLink.vue';
 import { allFields } from '../../lib/fields';
+import { SOURCE_DOC } from '../../lib/structure';
 import { count, t } from '../../lib/i18n';
 import { HEADER_COLORS } from '../../lib/types';
 import { openFile } from '../../services/files';
-import { DATA_FILES_KEY, MODEL_LINK_KEY, useFieldEditor, useModelEditor, useReadOnly, useResults, widthStyle } from './shared';
+import { DATA_FILES_KEY, MODEL_LINK_KEY, socketAttrs, useFieldEditor, useModelEditor, useReadOnly, useResults, widthStyle } from './shared';
 import WidthHandle from './WidthHandle.vue';
 
 defineOptions({ inheritAttrs: false });

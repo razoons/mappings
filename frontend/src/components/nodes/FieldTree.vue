@@ -9,13 +9,13 @@
     v-for="{ field: f, depth, chain, hidden } in shownRows"
     :key="f.id"
     class="row field-row tree-cols"
-    :class="[{ dragging: draggedId === f.id }, dropClass(f.id), levelOf(f) && `issue-${levelOf(f)}`]"
+    :class="[{ dragging: draggedId === f.id, mirrored: isMirrored(f) }, dropClass(f.id), levelOf(f) && `issue-${levelOf(f)}`]"
     @dragover="overTarget($event, f.id, dropPosition($event, f))"
     @dragleave="leave($event, f.id)"
     @drop="dropOn"
   >
     <div class="field-main" :style="{ paddingLeft: `${depth * 14}px` }">
-      <span v-if="locked" class="grip-space" />
+      <span v-if="locked || isMirrored(f)" class="grip-space" />
       <span
         v-else
         class="grip nodrag"
@@ -31,19 +31,20 @@
         @click="ops.toggle(f.id)"
       >{{ f.collapsed ? '▸' : '▾' }}</button>
       <span v-else class="toggle" />
-      <span v-if="originOf(f)" class="field-origin" :title="`${t('Vient de', 'Comes from')} « ${originOf(f)} »`">{{ originOf(f) }} ›</span>
-      <input class="nodrag" :disabled="locked" :value="f.name" :title="f.description || undefined" @input="ops.rename(f.id, $event.target.value)" />
+      <span v-if="originOf(f, chain)" class="field-origin mdi mdi-link-variant" :title="`${t('Vient de', 'Comes from')} « ${originOf(f, chain)} »`" />
+      <input class="nodrag" :disabled="locked || isMirrored(f)" :value="f.name" :title="mirrorTitle(f) || f.description || undefined" @input="ops.rename(f.id, $event.target.value)" />
+      <span v-if="f.mirror && side === 'target'" class="mirror-mark" :title="t('Champs repris tels quels de l’objet relié (une source entière) : ils se modifient dans la source, et « Retirer des champs » sur le lien en enlève', 'Fields taken as is from the linked object (a whole source): change them in the source, and “Remove fields” on the link removes some')">⧉</span>
       <button
         class="required-btn nodrag"
         :class="{ on: f.required }"
-        :disabled="locked"
+        :disabled="locked || isMirrored(f)"
         :title="f.required ? t('Obligatoire (cliquer pour le rendre optionnel)', 'Required (click to make it optional)') : t('Optionnel (cliquer pour le rendre obligatoire)', 'Optional (click to make it required)')"
         @click="ops.setRules(f.id, { required: !f.required })"
       >*</button>
-      <FieldRules :field="f" :locked="locked" @update="ops.setRules(f.id, $event)" />
+      <FieldRules :field="f" :locked="locked || isMirrored(f)" @update="ops.setRules(f.id, $event)" />
     </div>
 
-    <select class="type-select nodrag" :disabled="locked" :value="typeKey(f)" @change="ops.setType(f.id, $event.target.value)">
+    <select class="type-select nodrag" :disabled="locked || isMirrored(f)" :value="typeKey(f)" @change="ops.setType(f.id, $event.target.value)">
       <option v-for="[k, label] in TYPE_OPTIONS" :key="k" :value="k">{{ label }}</option>
     </select>
 
@@ -85,15 +86,15 @@
       {{ isUnmapped(f) ? t('non mappé', 'not mapped') : values[f.id] === undefined ? '—' : formatValue(values[f.id]) }}
     </span>
 
-    <span v-if="!locked" class="row-actions">
-      <button v-if="isContainer(f)" class="icon-btn nodrag" :title="t('Ajouter un sous-champ', 'Add a sub-field')" @click="ops.addChild(f.id)">+</button>
+    <span v-if="!locked && !isMirrored(f)" class="row-actions">
+      <button v-if="isContainer(f) && !(f.mirror && side === 'target')" class="icon-btn nodrag" :title="t('Ajouter un sous-champ', 'Add a sub-field')" @click="ops.addChild(f.id)">+</button>
       <button class="icon-btn danger nodrag" :title="t('Supprimer', 'Delete')" @click="ops.remove(f.id)">×</button>
     </span>
 
-    <Handle v-if="sockets" :id="f.id" :type="side" :position="position" v-bind="socketAttrs(socketType(chain))" />
+    <Handle v-if="sockets && !isMirrored(f)" :id="f.id" :type="side" :position="position" v-bind="socketAttrs(socketType(chain))" />
     <!-- Sockets des descendants repliés : invisibles, leurs liens convergent sur cette ligne. -->
     <Handle
-      v-for="h in sockets ? hidden : []"
+      v-for="h in sockets ? hidden.filter((x) => !isMirrored(x)) : []"
       :id="h.id"
       :key="h.id"
       :type="side"
@@ -130,10 +131,11 @@ import { Handle, Position, useVueFlow } from '@vue-flow/core';
 import { checkDocument, describeProblem } from '../../lib/conformity';
 import { count, t } from '../../lib/i18n';
 import { displayDateFormat, isDateType } from '../../lib/dateFormats';
-import { descendantIds, flattenRows, isContainer, sourceSocketType, targetSocketType, TYPE_OPTIONS, typeKey } from '../../lib/fields';
+import { descendantIds, findChain, flattenRows, isContainer, sourceSocketType, targetSocketType, TYPE_OPTIONS, typeKey } from '../../lib/fields';
 import { isPlainObject } from '../../lib/lists';
 import { formatValue } from '../../lib/types';
 import FieldRules from './FieldRules.vue';
+import { mirroredIds } from '../../lib/structure';
 import { DATA_FILES_KEY, dragState, FIELD_ORIGIN_KEY, socketAttrs, useFieldEditor, useLibraries } from './shared';
 
 const props = defineProps({
@@ -163,7 +165,7 @@ const { updateNodeData, updateNodeInternals } = useVueFlow();
 const files = inject(DATA_FILES_KEY, null);
 const rows = computed(() => flattenRows(props.data.fields));
 /** Champ utile : relié, ou avec une erreur ou un avertissement, lui ou l'un de ses sous-champs. */
-const isUsed = (f) => !!props.linked?.has(f.id) || !!props.issues?.get(f.id)?.length || (f.children ?? []).some(isUsed);
+const isUsed = (f) => isMirrored(f) || !!props.linked?.has(f.id) || !!props.issues?.get(f.id)?.length || (f.children ?? []).some(isUsed);
 const shownRows = computed(() => (props.hideUnused ? rows.value.filter((r) => isUsed(r.field)) : rows.value));
 const hiddenCount = computed(() => rows.value.length - shownRows.value.length);
 const position = computed(() => (props.side === 'source' ? Position.Right : Position.Left));
@@ -172,12 +174,23 @@ const drop = ref(null);
 
 // Modèle composite : la source d'où vient chaque champ, en préfixe de son nom.
 const fieldOrigin = inject(FIELD_ORIGIN_KEY, null);
-const originOf = (f) => fieldOrigin?.(props.nodeId, f.id) ?? '';
+/** Source d'où vient le champ ; rien sur un sous-champ qui vient de la même source que son parent (déjà dit par lui). */
+const originOf = (f, chain) => {
+  if (isMirrored(f)) return '';
+  const origin = fieldOrigin?.(props.nodeId, f.id) ?? '';
+  const parent = chain.at(-2);
+  return parent && origin === (fieldOrigin?.(props.nodeId, parent.id) ?? '') ? '' : origin;
+};
 
 const socketType = (chain) => (props.side === 'source' ? sourceSocketType(chain) : targetSocketType(chain.at(-1)));
 
 const isMapped = (f) => props.connected.has(f.id) || (f.children ?? []).some(isMapped);
-const isUnmapped = (f) => props.connected !== null && !isMapped(f);
+const isUnmapped = (f) => props.connected !== null && !isMirrored(f) && !isMapped(f);
+
+// Objet entier relié à un champ cible : ses sous-champs, repris de la source, sont en lecture seule.
+const mirrored = computed(() => (props.side === 'target' ? mirroredIds(props.data) : new Set()));
+const isMirrored = (f) => mirrored.value.has(f.id);
+const mirrorTitle = (f) => (isMirrored(f) ? t('Repris de l’objet relié : non modifiable ici', 'Taken from the linked object: cannot be changed here') : '');
 
 const libraries = useLibraries();
 /** Bibliothèque d'un champ simple (pas une liste), si elle existe. */
@@ -330,8 +343,10 @@ function dropPosition(e, f) {
   return 'inside-start'; // déplié : ses enfants suivent directement la ligne
 }
 
-const canDropOn = (targetId) => {
+const canDropOn = (targetId, pos) => {
   const d = dragState.current;
+  if (targetId && mirrored.value.has(targetId)) return false;
+  if (pos?.startsWith('inside') && findChain(props.data.fields, targetId ?? '')?.at(-1)?.mirror && props.side === 'target') return false;
   return d?.nodeId === props.nodeId && targetId !== d.fieldId && !d.forbidden.has(targetId ?? '');
 };
 
@@ -351,7 +366,7 @@ function endDrag() {
 }
 
 function overTarget(e, targetId, pos) {
-  if (!canDropOn(targetId)) return;
+  if (!canDropOn(targetId, pos)) return;
   e.preventDefault();
   e.stopPropagation();
   e.dataTransfer.dropEffect = 'move';

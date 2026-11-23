@@ -128,7 +128,6 @@ const itemOrValue = (input) => (input('value').connected ? inputInfo(input('valu
 
 // ── Dates ──────────────────────────────────────────────────
 
-const DATE_TEXT_LENGTH = { 'ISO 8601': 24, 'AAAA-MM-JJ': 10, 'JJ/MM/AAAA': 10, 'MM/JJ/AAAA': 10 };
 const DATE_PART_BOUNDS = { Mois: [1, 12], Jour: [1, 31], 'Jour de la semaine': [0, 6] };
 const names = (list) => String(list ?? '').split(',').map((s) => s.trim());
 
@@ -371,11 +370,6 @@ export const GUARANTEES = {
   },
 
   // ── Date ──────────────────────────────────────────────────
-  date_format: (input, p) => {
-    const v = inputInfo(input('date'));
-    const n = DATE_TEXT_LENGTH[p.format];
-    return { base: 'string', required: v?.required, format: { minLength: n, maxLength: n } };
-  },
   date_reformat: (input, p) => {
     const i = input('date');
     return { base: hasTime(p.format) ? 'datetime' : 'date', required: presence(i), format: { dateFormat: p.format } };

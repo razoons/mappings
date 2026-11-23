@@ -1200,16 +1200,13 @@ button.doc-name:hover {
   background: rgba(var(--v-theme-primary), 0.12);
 }
 
-/* Modèle composite : la source d'où vient le champ, en préfixe de son nom. */
+/* Modèle composite : la source d'où vient le champ, en icône devant son nom (son nom au survol). */
 .field-origin {
   flex: none;
-  max-width: 110px;
-  margin-right: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
+  margin-right: 2px;
+  font-size: 13px;
   color: var(--muted);
+  cursor: help;
 }
 /* ── Champs inutilisés masqués ──────────────────────────── */
 .node-header .icon-btn.hide-unused.on {
@@ -1218,4 +1215,55 @@ button.doc-name:hover {
 }
 .add-field.unused-note {
   font-style: italic;
+}
+
+/* Objet entier : socket « document » dans l'en-tête d'une source, sous-champs repris (lecture seule) dans une cible. */
+.doc-row {
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px dashed var(--muted);
+  justify-content: flex-end;
+}
+.doc-row.target {
+  justify-content: flex-start;
+}
+.doc-row .mdi {
+  font-size: 14px;
+}
+.doc-row-source {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mirror-mark {
+  flex: none;
+  margin-left: 2px;
+  font-size: 11px;
+  opacity: 0.75;
+  cursor: help;
+}
+.field-row.mirrored input:disabled,
+.field-row.mirrored select:disabled {
+  font-style: italic;
+  opacity: 0.85;
+}
+/* « Retirer des champs » sur un objet entier : champs à décocher. */
+.keep-fields {
+  padding: 4px 12px 6px;
+  font-size: 12px;
+}
+.keep-title {
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.keep-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.keep-row .removed {
+  text-decoration: line-through;
+  color: var(--muted);
 }

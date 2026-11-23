@@ -27,7 +27,10 @@ export const NODE_DOCS_EN = {
   },
   remove_field: {
     summary: 'Removes one or more keys from an object, or from each object of a list.',
-    details: ['Keys separated by commas; a dotted path removes a nested key (“address.zip”).'],
+    details: [
+      'Keys separated by commas; a dotted path removes a nested key (“address.zip”), also in each item of a list (“lines.sku”).',
+      'On a whole source (“Whole source” row), the node lists its fields: untick the ones to remove. The Object or List of objects field of the target linked to its output takes the reduced structure.',
+    ],
   },
   list_create: {
     summary: 'Builds a list from its inputs A, B, C…',
@@ -175,15 +178,12 @@ export const NODE_DOCS_EN = {
     summary: 'Converts a value to a boolean.',
     details: ['True texts: true, 1, oui, yes, vrai, y, o, x (case-insensitive). Everything else is false.', 'Number: true if it is not 0.'],
   },
-  date_format: {
-    summary: 'Writes a date as text in the chosen format.',
-    details: ['Computed in UTC.', 'Invalid date: empty text.'],
-  },
   date_reformat: {
-    summary: 'States the format the date must be written in: place it between two dates with different formats.',
+    summary: 'Reads a date in an input format and gives it in an output format: place it between two dates with different formats.',
     details: [
-      'The date does not change: the target field writes it in its own format.',
-      'The chosen format must be the target field’s, otherwise the check still reports different formats.',
+      'Input format: “date or ISO text” for a date (a Date field of a source is already read in its own format); a specific format to read a text (“19/10/2026” with DD/MM/YYYY). A text that does not match gives an invalid date.',
+      'Output format: a Text field receives the date written in this format; a Date field writes it in its own format, which must be this one, otherwise the check reports different formats.',
+      'To write a date as text, link its output to a Text field, or to “To text” / “Concatenate”.',
     ],
   },
   date_part: {

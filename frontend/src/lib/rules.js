@@ -5,6 +5,7 @@ import { getSocket, outputType } from './graph';
 import { isSet } from './formats';
 import { t } from './i18n';
 import { LIBRARY_OUTPUT, LIBRARY_TABLE, librariesOf, missingFrom } from './libraries';
+import { isRootCopy, SOURCE_DOC } from './structure';
 import { inputsOf, inputSocket, TRANSFORMS } from './transforms';
 import { baseOf, isList, socketTitle, typeMismatch } from './types';
 
@@ -39,7 +40,10 @@ function makeSocketInfo(byId, incoming, libraries) {
     const node = byId.get(nodeId);
     let info = null;
     if (depth > 50 || !node) info = null;
-    else if (node.type === 'source') {
+    else if (node.type === 'source' && handle === SOURCE_DOC) {
+      // Le document entier d'une source : toujours présent.
+      info = normalize({ label: node.data.label, base: 'object', array: false, required: true, format: {} });
+    } else if (node.type === 'source') {
       const chain = findChain(node.data.fields, handle);
       if (chain) {
         const f = chain.at(-1);
@@ -292,10 +296,13 @@ export function validateTargets(nodes, edges, sharedLists = []) {
         // Un conteneur optionnel laissé vide n'impose rien à ses sous-champs.
         if (isSet(f.format?.library) && !libraries.has(f.format.library))
           add(f, chain, 'warning', t('Liste de valeurs absente (supprimée de la bibliothèque) : valeurs non contrôlées', 'Value list missing (deleted from the library): values not checked'));
-        if (isContainer(f) && (f.required || isMapped(f))) walk(f.children ?? [], chain);
+        // Structure reprise d'un objet entier : ses sous-champs viennent avec lui, rien à contrôler un à un.
+        if (isContainer(f) && !(f.mirror && e) && (f.required || isMapped(f))) walk(f.children ?? [], chain);
       }
     };
-    walk(node.data.fields, []);
+    // Cible entière reprise d'une source : ses champs viennent avec elle ; seuls ceux propres à la cible sont contrôlés.
+    const rootMirrored = node.data.mirror && incoming.has(`${node.id}:${SOURCE_DOC}`);
+    walk(rootMirrored ? node.data.fields.filter((f) => !isRootCopy(f)) : node.data.fields, []);
     byNode.set(node.id, issues);
   }
 
