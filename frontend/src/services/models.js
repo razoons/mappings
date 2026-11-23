@@ -220,7 +220,7 @@ function fieldsForNode(modelFields, nodeFields) {
   return apply(JSON.parse(JSON.stringify(modelFields)));
 }
 
-/** Aligne un nœud d'un flux enregistré sur les champs `fields` ; les liens des champs disparus sont retirés. */
+/** Aligne un nœud d'un flux enregistré sur les champs `fields` ; les liens des champs disparus sont retirés (pas ceux du document entier). */
 function syncNode(graph, node, fields) {
   const next = fieldsForNode(fields, node.data.fields);
   if (node.type === 'source' && node.data.sample !== undefined) {
@@ -232,7 +232,8 @@ function syncNode(graph, node, fields) {
     }
     node.data.sample = JSON.stringify(reshapeSample(node.data.fields, isPlainObject(doc) ? doc : {}, next), null, 2);
   }
-  const kept = new Set(allFields(next).map((f) => f.id));
+  // Le socket « toute la source / toute la cible » n'est pas un champ : ses liens restent.
+  const kept = new Set([SOURCE_DOC, ...allFields(next).map((f) => f.id)]);
   graph.edges = graph.edges.filter((e) => !((e.source === node.id && !kept.has(e.sourceHandle)) || (e.target === node.id && !kept.has(e.targetHandle))));
   node.data.fields = next;
 }
