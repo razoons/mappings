@@ -831,6 +831,14 @@ kbd {
 .required-btn.on {
   color: var(--danger);
 }
+/* Obligatoire sous un parent optionnel : visible au survol seulement, en pointillé, pour ne pas laisser croire la valeur garantie. */
+.required-btn.latent {
+  color: var(--danger);
+  text-decoration: underline dotted;
+}
+.field-row:not(:hover) .required-btn.latent {
+  opacity: 0;
+}
 .required-btn:not(:disabled):hover {
   color: var(--text);
 }

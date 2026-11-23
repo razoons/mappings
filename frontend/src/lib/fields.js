@@ -76,6 +76,17 @@ export const setTreeCollapsed = (fields, collapsed) =>
   fields.map((f) => (f.children ? { ...f, collapsed, children: setTreeCollapsed(f.children, collapsed) } : f));
 
 /** Lignes visibles de l'arbre ; les descendants d'un nœud replié sont listés dans `hidden`. */
+/**
+ * Premier parent optionnel qui rend le champ (dernier de `chain`) absent quand il manque, `undefined` sinon.
+ * La recherche s'arrête au tableau le plus proche : au-delà, l'absence d'un tableau donne simplement zéro élément,
+ * et un champ obligatoire l'est pour chaque élément.
+ */
+export function optionalParent(chain) {
+  let i = chain.length - 1;
+  while (i > 0 && chain[i - 1].type !== 'array') i--;
+  return chain.slice(i, -1).find((f) => !f.required);
+}
+
 export function flattenRows(fields, depth = 0, parents = []) {
   return fields.flatMap((field) => {
     const chain = [...parents, field];

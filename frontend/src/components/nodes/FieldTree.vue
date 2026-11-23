@@ -36,9 +36,9 @@
       <span v-if="f.mirror && side === 'target'" class="mirror-mark" :title="t('Champs repris tels quels de l’objet relié (une source entière) : ils se modifient dans la source, et « Retirer des champs » sur le lien en enlève', 'Fields taken as is from the linked object (a whole source): change them in the source, and “Remove fields” on the link removes some')">⧉</span>
       <button
         class="required-btn nodrag"
-        :class="{ on: f.required }"
+        :class="{ on: f.required && !optionalParent(chain), latent: f.required && optionalParent(chain) }"
         :disabled="locked || isMirrored(f)"
-        :title="f.required ? t('Obligatoire (cliquer pour le rendre optionnel)', 'Required (click to make it optional)') : t('Optionnel (cliquer pour le rendre obligatoire)', 'Optional (click to make it required)')"
+        :title="requiredTitle(f, chain)"
         @click="ops.setRules(f.id, { required: !f.required })"
       >*</button>
       <FieldRules :field="f" :locked="locked || isMirrored(f)" @update="ops.setRules(f.id, $event)" />
@@ -131,7 +131,7 @@ import { Handle, Position, useVueFlow } from '@vue-flow/core';
 import { checkDocument, describeProblem } from '../../lib/conformity';
 import { count, t } from '../../lib/i18n';
 import { displayDateFormat, isDateType } from '../../lib/dateFormats';
-import { descendantIds, findChain, flattenRows, isContainer, sourceSocketType, targetSocketType, TYPE_OPTIONS, typeKey } from '../../lib/fields';
+import { descendantIds, findChain, flattenRows, isContainer, optionalParent, sourceSocketType, targetSocketType, TYPE_OPTIONS, typeKey } from '../../lib/fields';
 import { isPlainObject } from '../../lib/lists';
 import { formatValue } from '../../lib/types';
 import FieldRules from './FieldRules.vue';
@@ -308,6 +308,17 @@ function parseScalar(type, text) {
 }
 
 /** Problème de l'exemple au regard du type et du format du champ (message, ou `null`). */
+/** Infobulle de l'astérisque : un champ obligatoire sous un parent optionnel peut manquer, l'astérisque est alors éteint. */
+function requiredTitle(f, chain) {
+  if (!f.required) return t('Optionnel (cliquer pour le rendre obligatoire)', 'Optional (click to make it required)');
+  const parent = optionalParent(chain);
+  if (!parent) return t('Obligatoire (cliquer pour le rendre optionnel)', 'Required (click to make it optional)');
+  return t(
+    `Obligatoire dans « ${parent.name} », mais « ${parent.name} » est optionnel : le champ peut manquer. Rendre « ${parent.name} » obligatoire pour le garantir (cliquer ici pour rendre ce champ optionnel)`,
+    `Required within “${parent.name}”, but “${parent.name}” is optional: the field may be missing. Make “${parent.name}” required to guarantee it (click here to make this field optional)`,
+  );
+}
+
 function exampleProblem(f, chain) {
   const v = exampleOf(chain);
   if (v === undefined || v === null) return f.required ? t('Obligatoire : donnez un exemple', 'Required: give an example') : null;

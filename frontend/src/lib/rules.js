@@ -1,6 +1,6 @@
 import { displayDateFormat, effectiveDateFormat, isDateType } from './dateFormats';
 import { elementOf, MIXED_DATE_FORMAT, normalize, unknownInfo } from './guarantees';
-import { findChain, isContainer, pathLabel } from './fields';
+import { findChain, isContainer, optionalParent, pathLabel } from './fields';
 import { getSocket, outputType } from './graph';
 import { isSet } from './formats';
 import { t } from './i18n';
@@ -14,9 +14,7 @@ import { baseOf, isList, socketTitle, typeMismatch } from './types';
  * jusqu'au tableau le plus proche (au-delà, l'absence d'un tableau donne simplement zéro élément).
  */
 function sourceRequired(chain) {
-  let i = chain.length - 1;
-  while (i > 0 && chain[i - 1].type !== 'array') i--;
-  return chain.slice(i).every((f) => f.required);
+  return !!chain.at(-1).required && !optionalParent(chain);
 }
 
 const base = (f) => (f.type === 'array' ? f.item ?? 'string' : f.type);
