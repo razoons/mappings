@@ -6,8 +6,24 @@
       :title="collectionsOpen ? t('Masquer les collections', 'Hide the collections') : t('Afficher les collections', 'Show the collections')"
       @click="collectionsOpen = !collectionsOpen"
     />
-    <v-btn prepend-icon="mdi-folder-open-outline" :title="t('Ouvrir un fichier sauvegardé (Ctrl O) ; un mapping ou une collection est ajouté', 'Open a saved file (Ctrl O); a mapping or a collection is added')" @click="openDocument">{{ t('Ouvrir', 'Open') }}</v-btn>
-    <v-btn prepend-icon="mdi-download-outline" :title="t('Télécharger les collections et la bibliothèque dans un fichier (Ctrl S)', 'Download the collections and the library to a file (Ctrl S)')" @click="downloadDocument">{{ t('Télécharger', 'Download') }}</v-btn>
+    <v-menu location="bottom start">
+      <template #activator="{ props: menuProps }">
+        <v-btn v-bind="menuProps" prepend-icon="mdi-file-outline" append-icon="mdi-menu-down" class="text-none">{{ t('Fichier', 'File') }}</v-btn>
+      </template>
+      <v-list density="compact">
+        <v-list-item prepend-icon="mdi-folder-open-outline" :title="t('Ouvrir…', 'Open…')" :subtitle="t('Ctrl O — un mapping ou une collection est ajouté', 'Ctrl O — a mapping or a collection is added')" @click="openDocument" />
+        <v-list-item prepend-icon="mdi-download-outline" :title="t('Télécharger', 'Download')" :subtitle="t('Ctrl S — collections et bibliothèque', 'Ctrl S — collections and library')" @click="downloadDocument" />
+        <v-list-item
+          prepend-icon="mdi-school-outline"
+          :title="t('Ouvrir une démo', 'Open a demo')"
+          :subtitle="t('Un dossier « Démo » dans les mappings et la bibliothèque', 'A “Demo” folder in the mappings and the library')"
+          :disabled="!!editingModelId || compositeOpen"
+          @click="loadDemo"
+        />
+        <v-divider class="my-1" />
+        <v-list-item prepend-icon="mdi-delete-sweep-outline" base-color="error" :title="t('Tout supprimer', 'Delete everything')" :subtitle="t('Mappings, modèles et listes de valeurs', 'Mappings, models and value lists')" @click="clearAll" />
+      </v-list>
+    </v-menu>
     <button
       class="doc-name"
       :title="`${doc.modified ? t('Modifié depuis la dernière sauvegarde', 'Changed since the last save') : t('Sauvegardé', 'Saved')} — ${t('cliquer pour changer le nom du fichier téléchargé', 'click to change the name of the downloaded file')}`"
@@ -19,11 +35,6 @@
     </button>
     <v-divider vertical inset class="mx-2" />
     <template v-if="!editingModelId">
-      <!-- Démo : seulement avec un mapping affiché (pas un modèle composite). -->
-      <template v-if="!compositeOpen">
-        <v-btn prepend-icon="mdi-school-outline" :title="t('Ajouter la démo : un dossier « Démo » dans les mappings et dans la bibliothèque', 'Add the demo: a “Demo” folder in the mappings and in the library')" @click="loadDemo">{{ t('Démo', 'Demo') }}</v-btn>
-        <v-divider vertical inset class="mx-2" />
-      </template>
       <v-btn icon="mdi-arrow-collapse-vertical" :title="t('Tout replier', 'Collapse all')" @click="collapseAll(true)" />
       <v-btn icon="mdi-arrow-expand-vertical" :title="t('Tout déplier', 'Expand all')" @click="collapseAll(false)" />
       <v-btn icon="mdi-graph-outline" :title="t('Réorganiser le schéma (colonnes dans le sens des liens)', 'Rearrange the schema (columns following the links)')" :disabled="schemaLocked" @click="arrangeSchema" />
@@ -56,6 +67,8 @@
     @open-flow="openFlow"
     @legend="legendOpen = true"
     @shortcuts="shortcutsOpen = true"
+    @clear-collections="confirmClearCollections"
+    @clear-library="confirmClearLibrary"
   />
   <ImpactDialog :request="impactRequest" />
 
@@ -231,6 +244,7 @@ import {
   createComposite,
   createModel,
   folderOf,
+  clearLibrary,
   hooks as modelHooks,
   impactOf,
   MODEL_DRAG_TYPE,
@@ -247,7 +261,7 @@ import {
 import { checkDocument, describeProblem } from '../lib/conformity';
 import { installDemo } from '../services/demo';
 import { count, t } from '../lib/i18n';
-import { allFields, fieldFromSocket, migrateFields, parseDocument, newField, setTreeCollapsed } from '../lib/fields';
+import { allFields, fieldFromSocket, findChain, migrateFields, parseDocument, newField, setTreeCollapsed } from '../lib/fields';
 import { autoLayout } from '../lib/layout';
 import { fitGroup, groupAround, groupAt, groupsFirst, isGroup, newGroup, removeKeepingChildren, reparent } from '../lib/groups';
 import { createsCycle, evaluateGraph, getSocket, originsOf } from '../lib/graph';
@@ -266,6 +280,7 @@ import {
   addImportedLibrary,
   addImportedModels,
   allMappings,
+  clearCollections,
   collectionFile,
   collectionNamed,
   replaceCollection,
@@ -276,6 +291,7 @@ import {
   isComposite,
   makeMapping,
   leafCount,
+  leavesIn,
   mappingFile,
   readFile,
   restoreWorkspace,
@@ -730,6 +746,67 @@ async function openDocument() {
   } catch (e) {
     notify(`${t('Ouverture impossible', 'Cannot open')} : ${e.message}`, 'error');
   }
+}
+
+/** Tout supprimer : collections, modèles et listes de valeurs ; il reste un mapping vide. */
+async function clearAll() {
+  const items = [...workspace.collections, ...workspace.library.items];
+  const n = (type) => [...leavesIn(items, type)].length;
+  const ok = await askConfirm({
+    title: t('Tout supprimer ?', 'Delete everything?'),
+    text: t(
+      `${count(n('mapping'), 'mapping', 'mapping')}, ${count(n('model'), 'modèle', 'model')} et ${count(n('valuelist'), 'liste de valeurs', 'value list', 'listes de valeurs', 'value lists')} sont supprimés de ce navigateur. Téléchargez d’abord une sauvegarde pour les garder.`,
+      `${count(n('mapping'), 'mapping', 'mapping')}, ${count(n('model'), 'modèle', 'model')} and ${count(n('valuelist'), 'liste de valeurs', 'value list', 'listes de valeurs', 'value lists')} are deleted from this browser. Download a backup first to keep them.`,
+    ),
+    okLabel: t('Tout supprimer', 'Delete everything'),
+    danger: true,
+  });
+  if (!ok) return;
+  await applyWorkspace({ collections: [], library: { items: [] }, activeId: null }, { replace: true });
+  notify(t('Tout a été supprimé', 'Everything was deleted'), 'success');
+}
+
+/** Supprimer toutes les collections (bouton de l'onglet Mappings) ; la bibliothèque est gardée. */
+async function confirmClearCollections() {
+  const n = [...leavesIn(workspace.collections, 'mapping')].length;
+  const ok = await askConfirm({
+    title: t('Supprimer toutes les collections ?', 'Delete all collections?'),
+    text: t(
+      `${count(n, 'mapping', 'mapping')} et leurs dossiers sont supprimés de ce navigateur ; la bibliothèque est gardée. Téléchargez d’abord une sauvegarde pour les garder.`,
+      `${count(n, 'mapping', 'mapping')} and their folders are deleted from this browser; the library is kept. Download a backup first to keep them.`,
+    ),
+    okLabel: t('Tout supprimer', 'Delete all'),
+    danger: true,
+  });
+  if (!ok) return;
+  discardDisplayed = true;
+  clearCollections();
+  await nextTick();
+  discardDisplayed = false;
+  notify(t('Collections supprimées', 'Collections deleted'), 'success');
+}
+
+/** Vider la bibliothèque (bouton de l'onglet Bibliothèque) ; les mappings gardent leurs copies. */
+async function confirmClearLibrary() {
+  const items = workspace.library.items;
+  const models = [...leavesIn(items, 'model')].length;
+  const lists = [...leavesIn(items, 'valuelist')].length;
+  const ok = await askConfirm({
+    title: t('Vider la bibliothèque ?', 'Empty the library?'),
+    text: t(
+      `${count(models, 'modèle', 'model')} et ${count(lists, 'liste de valeurs', 'value list', 'listes de valeurs', 'value lists')} sont supprimés de ce navigateur. Les mappings qui les utilisent gardent leurs champs et leurs valeurs, mais n’y sont plus reliés.`,
+      `${count(models, 'modèle', 'model')} and ${count(lists, 'liste de valeurs', 'value list', 'listes de valeurs', 'value lists')} are deleted from this browser. Mappings that use them keep their fields and values, but are no longer linked to them.`,
+    ),
+    okLabel: t('Vider', 'Empty'),
+    danger: true,
+  });
+  if (!ok) return;
+  editingModelId.value = null;
+  discardDisplayed = true;
+  clearLibrary();
+  await nextTick();
+  discardDisplayed = false;
+  notify(t('Bibliothèque vidée', 'Library emptied'), 'success');
 }
 
 /** Charge une sauvegarde complète (tout remplacer, ou l'ajouter) et affiche le mapping ouvert. */
@@ -1418,10 +1495,51 @@ onConnect((c) => {
   connect(c);
 });
 
+/** Copie d'un champ source pour une cible : mêmes nom, type, règles et sous-champs, avec de nouveaux ids. */
+function copyField({ collapsed: _, mirror: __, ...f }) {
+  return { ...f, id: uid('f'), ...(f.children && { children: f.children.map(copyField) }) };
+}
+
+/** Nom libre parmi `siblings` : `nom`, sinon `nom_2`, `nom_3`… */
+function freeName(name, siblings) {
+  const taken = new Set(siblings.map((f) => f.name));
+  let next = name;
+  for (let i = 2; taken.has(next); i++) next = `${name}_${i}`;
+  return next;
+}
+
+/**
+ * Lien lâché sur « + Ajouter un champ » d'une cible : le champ est créé à la racine de la cible, avec les infos du
+ * socket de départ (le champ source lui-même s'il en vient), puis relié.
+ */
+function connectToNewField(p, el) {
+  const target = findNode(el.closest('.vue-flow__node')?.dataset.id);
+  if (p.side !== 'source' || target?.type !== 'target' || target.id === p.nodeId) return false;
+  const from = findNode(p.nodeId);
+  const socket = getSocket(from, p.handleId, 'source');
+  if (!socket) return false;
+  const chain = from.type === 'source' && p.handleId !== SOURCE_DOC ? findChain(from.data.fields, p.handleId) : null;
+  const base = chain
+    ? copyField(chain.at(-1))
+    : p.handleId === SOURCE_DOC
+      ? { id: uid('f'), name: socket.name, type: 'object', children: [] }
+      : fieldFromSocket(socket.name, socket.type);
+  const field = { ...base, name: freeName(base.name.replace(/\s+/g, '_'), target.data.fields) };
+  updateNodeData(target.id, { fields: [...target.data.fields, field] });
+  nextTick(() => {
+    updateNodeInternals([target.id]);
+    connect({ source: p.nodeId, sourceHandle: p.handleId, target: target.id, targetHandle: field.id });
+  });
+  return true;
+}
+
 onConnectEnd((event) => {
   const p = pending;
   pending = null;
-  if (connected || updating || !p || !event || event.target.closest?.('.vue-flow__node, .vue-flow__panel, .vue-flow__controls')) return;
+  if (connected || updating || !p || !event) return;
+  const addButton = !schemaLocked.value && event.target.closest?.('.add-field:not(.unused-note)');
+  if (addButton && connectToNewField(p, addButton)) return;
+  if (event.target.closest?.('.vue-flow__node, .vue-flow__panel, .vue-flow__controls')) return;
   const socket = getSocket(findNode(p.nodeId), p.handleId, p.side);
   if (!socket) return;
   const { clientX, clientY } = 'changedTouches' in event ? event.changedTouches[0] : event;

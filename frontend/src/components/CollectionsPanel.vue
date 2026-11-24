@@ -31,6 +31,24 @@
           <v-btn icon="mdi-folder-plus-outline" size="small" variant="text" :title="t('Nouveau dossier', 'New folder')" @click="startRename(addFolder(LIBRARY_ID).id)" />
         </template>
         <v-btn icon="mdi-import" size="small" variant="text" :title="t('Importer un fichier .json : mapping, collection, export de la bibliothèque ou sauvegarde complète', 'Import a .json file: mapping, collection, library export or full backup')" @click="$emit('import')" />
+        <v-btn
+          v-if="tab === 'flows'"
+          icon="mdi-delete-sweep-outline"
+          size="small"
+          variant="text"
+          :disabled="!workspace.collections.length"
+          :title="t('Supprimer toutes les collections (la bibliothèque est gardée)', 'Delete all collections (the library is kept)')"
+          @click="$emit('clear-collections')"
+        />
+        <v-btn
+          v-else
+          icon="mdi-delete-sweep-outline"
+          size="small"
+          variant="text"
+          :disabled="!workspace.library.items.length"
+          :title="t('Vider la bibliothèque : modèles, modèles composites et listes de valeurs (les mappings gardent leurs copies)', 'Empty the library: models, composite models and value lists (mappings keep their copies)')"
+          @click="$emit('clear-library')"
+        />
       </div>
       <v-alert v-if="storage.error" type="warning" density="compact" variant="tonal" class="mx-3 mt-2 text-caption">
         {{ t('Les données ne peuvent plus être enregistrées dans le navigateur (espace plein ?). Exportez-les pour ne rien perdre.', 'Data can no longer be saved in the browser (storage full?). Export it so nothing is lost.') }}
@@ -94,7 +112,7 @@ const props = defineProps({
  * fichier ; `edit-model` : modifier le modèle ou la liste `id` (un modèle composite s'ouvre comme un flux) ;
  * `new-composite` : `(dossier, mapping)`, nouveau modèle composite, vide ou copié d'un mapping ; `new-mapping` : nouveau mapping, à côté de celui qui est ouvert ; `use-model` : `(id, 'source' | 'target' | 'library')`, l'ajouter au flux ouvert.
  */
-const emit = defineEmits(['update:modelValue', 'export', 'image', 'import', 'edit-model', 'use-model', 'new-composite', 'new-mapping', 'open-flow', 'legend', 'shortcuts']);
+const emit = defineEmits(['update:modelValue', 'export', 'image', 'import', 'edit-model', 'use-model', 'new-composite', 'new-mapping', 'open-flow', 'legend', 'shortcuts', 'clear-collections', 'clear-library']);
 
 // ── Largeur du panneau (poignée du bord droit), gardée dans le navigateur ──
 const WIDTH_KEY = 'schemap-panel-width';

@@ -501,6 +501,12 @@ kbd {
   color: var(--text);
   border-color: var(--dashed-hover);
 }
+/* Lien en cours de tirage : « + Ajouter un champ » d'une cible le reçoit (le champ est créé et relié), en orange au survol. */
+.vue-flow:has(.vue-flow__connection) .vue-flow__node-target .add-field:not(.unused-note):hover {
+  color: var(--accent);
+  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
 
 /* Nœuds de transformation */
 .out-row {

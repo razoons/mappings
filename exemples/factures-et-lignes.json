@@ -1,0 +1,768 @@
+{
+  "version": 1,
+  "name": "Factures et lignes à plat",
+  "nodes": [
+    {
+      "id": "src_fac",
+      "type": "source",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "label": "FACTURATION_FACTURE",
+        "fields": [
+          {
+            "id": "fa_list",
+            "name": "factures",
+            "type": "array",
+            "item": "object",
+            "required": true,
+            "children": [
+              {
+                "id": "fa_id",
+                "name": "id_facture",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": "fa_num",
+                "name": "numero_facture",
+                "type": "string",
+                "required": true,
+                "format": {
+                  "maxLength": 20
+                }
+              },
+              {
+                "id": "fa_date",
+                "name": "date_facture",
+                "type": "date",
+                "required": true
+              },
+              {
+                "id": "fa_statut",
+                "name": "statut",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": "fa_ht",
+                "name": "montant_ht",
+                "type": "number",
+                "required": true
+              },
+              {
+                "id": "fa_tva",
+                "name": "montant_tva",
+                "type": "number",
+                "required": true
+              },
+              {
+                "id": "fa_ttc",
+                "name": "montant_ttc",
+                "type": "number",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "sample": "{\n  \"factures\": [\n    {\n      \"id_facture\": \"F0001\",\n      \"numero_facture\": \"FAC-2026-001\",\n      \"date_facture\": \"2026-10-05\",\n      \"statut\": \"EMISE\",\n      \"montant_ht\": 1200,\n      \"montant_tva\": 240,\n      \"montant_ttc\": 1440\n    },\n    {\n      \"id_facture\": \"F0002\",\n      \"numero_facture\": \"FAC-2026-002\",\n      \"date_facture\": \"2026-10-12\",\n      \"statut\": \"EMISE\",\n      \"montant_ht\": 500,\n      \"montant_tva\": 100,\n      \"montant_ttc\": 600\n    },\n    {\n      \"id_facture\": \"F0003\",\n      \"numero_facture\": \"FAC-2026-003\",\n      \"date_facture\": \"2026-10-20\",\n      \"statut\": \"BROUILLON\",\n      \"montant_ht\": 90,\n      \"montant_tva\": 18,\n      \"montant_ttc\": 108\n    }\n  ]\n}"
+      }
+    },
+    {
+      "id": "src_lig",
+      "type": "source",
+      "position": {
+        "x": 0,
+        "y": 520
+      },
+      "data": {
+        "label": "FACTURATION_LIGNE_FACTURE",
+        "fields": [
+          {
+            "id": "li_list",
+            "name": "lignes",
+            "type": "array",
+            "item": "object",
+            "required": true,
+            "children": [
+              {
+                "id": "li_id",
+                "name": "id_ligne_facture",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": "li_fac",
+                "name": "id_facture",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": "li_lib",
+                "name": "libelle",
+                "type": "string",
+                "format": {
+                  "maxLength": 255
+                }
+              },
+              {
+                "id": "li_qte",
+                "name": "quantite",
+                "type": "number",
+                "required": true
+              },
+              {
+                "id": "li_pu",
+                "name": "montant_unitaire",
+                "type": "number",
+                "required": true
+              },
+              {
+                "id": "li_mt",
+                "name": "montant",
+                "type": "number",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "sample": "{\n  \"lignes\": [\n    {\n      \"id_ligne_facture\": \"L0004\",\n      \"id_facture\": \"F0002\",\n      \"libelle\": \"Audit sécurité\",\n      \"quantite\": 1,\n      \"montant_unitaire\": 500,\n      \"montant\": 500\n    },\n    {\n      \"id_ligne_facture\": \"L0001\",\n      \"id_facture\": \"F0001\",\n      \"libelle\": \"Formation Power Apps\",\n      \"quantite\": 2,\n      \"montant_unitaire\": 400,\n      \"montant\": 800\n    },\n    {\n      \"id_ligne_facture\": \"L0005\",\n      \"id_facture\": \"F0003\",\n      \"libelle\": \"Frais de déplacement\",\n      \"quantite\": 3,\n      \"montant_unitaire\": 30,\n      \"montant\": 90\n    },\n    {\n      \"id_ligne_facture\": \"L0002\",\n      \"id_facture\": \"F0001\",\n      \"libelle\": \"Accompagnement\",\n      \"quantite\": 1,\n      \"montant_unitaire\": 300,\n      \"montant\": 300\n    },\n    {\n      \"id_ligne_facture\": \"L0003\",\n      \"id_facture\": \"F0001\",\n      \"libelle\": \"Support\",\n      \"quantite\": 4,\n      \"montant_unitaire\": 25,\n      \"montant\": 100\n    }\n  ]\n}"
+      }
+    },
+    {
+      "id": "fac_nature",
+      "type": "transform",
+      "position": {
+        "x": 420,
+        "y": 0
+      },
+      "data": {
+        "params": {
+          "path": "nature"
+        },
+        "values": {
+          "value": "FACTURE"
+        },
+        "kind": "set_field"
+      }
+    },
+    {
+      "id": "fac_montant",
+      "type": "transform",
+      "position": {
+        "x": 680,
+        "y": 0
+      },
+      "data": {
+        "params": {
+          "path": "montant"
+        },
+        "values": {},
+        "kind": "set_field"
+      }
+    },
+    {
+      "id": "fac_lib_txt",
+      "type": "transform",
+      "position": {
+        "x": 420,
+        "y": 170
+      },
+      "data": {
+        "params": {
+          "sep": " "
+        },
+        "values": {
+          "a": "Facture"
+        },
+        "kind": "concat"
+      }
+    },
+    {
+      "id": "fac_libelle",
+      "type": "transform",
+      "position": {
+        "x": 940,
+        "y": 0
+      },
+      "data": {
+        "params": {
+          "path": "libelle"
+        },
+        "values": {},
+        "kind": "set_field"
+      }
+    },
+    {
+      "id": "fac_tri_txt",
+      "type": "transform",
+      "position": {
+        "x": 680,
+        "y": 170
+      },
+      "data": {
+        "params": {
+          "sep": "|"
+        },
+        "values": {
+          "b": "0"
+        },
+        "kind": "concat"
+      }
+    },
+    {
+      "id": "fac_tri",
+      "type": "transform",
+      "position": {
+        "x": 1200,
+        "y": 0
+      },
+      "data": {
+        "params": {
+          "path": "tri"
+        },
+        "values": {},
+        "kind": "set_field"
+      }
+    },
+    {
+      "id": "lig_nature",
+      "type": "transform",
+      "position": {
+        "x": 420,
+        "y": 520
+      },
+      "data": {
+        "params": {
+          "path": "nature"
+        },
+        "values": {
+          "value": "LIGNE"
+        },
+        "kind": "set_field"
+      }
+    },
+    {
+      "id": "lig_num_cherche",
+      "type": "transform",
+      "position": {
+        "x": 420,
+        "y": 690
+      },
+      "data": {
+        "params": {},
+        "values": {},
+        "kind": "lookup"
+      }
+    },
+    {
+      "id": "lig_num",
+      "type": "transform",
+      "position": {
+        "x": 680,
+        "y": 520
+      },
+      "data": {
+        "params": {
+          "path": "numero_facture"
+        },
+        "values": {},
+        "kind": "set_field"
+      }
+    },
+    {
+      "id": "lig_tri_txt",
+      "type": "transform",
+      "position": {
+        "x": 680,
+        "y": 690
+      },
+      "data": {
+        "params": {
+          "sep": "|"
+        },
+        "values": {
+          "b": "1"
+        },
+        "kind": "concat"
+      }
+    },
+    {
+      "id": "lig_tri",
+      "type": "transform",
+      "position": {
+        "x": 940,
+        "y": 520
+      },
+      "data": {
+        "params": {
+          "path": "tri"
+        },
+        "values": {},
+        "kind": "set_field"
+      }
+    },
+    {
+      "id": "fusion",
+      "type": "transform",
+      "position": {
+        "x": 1460,
+        "y": 260
+      },
+      "data": {
+        "params": {},
+        "values": {},
+        "kind": "list_create"
+      }
+    },
+    {
+      "id": "tri",
+      "type": "transform",
+      "position": {
+        "x": 1700,
+        "y": 260
+      },
+      "data": {
+        "params": {},
+        "values": {},
+        "kind": "list_sort"
+      }
+    },
+    {
+      "id": "courant",
+      "type": "transform",
+      "position": {
+        "x": 1700,
+        "y": 480
+      },
+      "data": {
+        "params": {},
+        "values": {},
+        "kind": "current"
+      }
+    },
+    {
+      "id": "lire_tri",
+      "type": "transform",
+      "position": {
+        "x": 1940,
+        "y": 480
+      },
+      "data": {
+        "params": {
+          "path": "tri"
+        },
+        "values": {},
+        "kind": "get_field"
+      }
+    },
+    {
+      "id": "lire_nature",
+      "type": "transform",
+      "position": {
+        "x": 1940,
+        "y": 620
+      },
+      "data": {
+        "params": {
+          "path": "nature"
+        },
+        "values": {},
+        "kind": "get_field"
+      }
+    },
+    {
+      "id": "lire_fac",
+      "type": "transform",
+      "position": {
+        "x": 1940,
+        "y": 740
+      },
+      "data": {
+        "params": {
+          "path": "id_facture"
+        },
+        "values": {},
+        "kind": "get_field"
+      }
+    },
+    {
+      "id": "lire_num",
+      "type": "transform",
+      "position": {
+        "x": 1940,
+        "y": 860
+      },
+      "data": {
+        "params": {
+          "path": "numero_facture"
+        },
+        "values": {},
+        "kind": "get_field"
+      }
+    },
+    {
+      "id": "lire_lib",
+      "type": "transform",
+      "position": {
+        "x": 1940,
+        "y": 980
+      },
+      "data": {
+        "params": {
+          "path": "libelle"
+        },
+        "values": {},
+        "kind": "get_field"
+      }
+    },
+    {
+      "id": "lire_mt",
+      "type": "transform",
+      "position": {
+        "x": 1940,
+        "y": 1100
+      },
+      "data": {
+        "params": {
+          "path": "montant"
+        },
+        "values": {},
+        "kind": "get_field"
+      }
+    },
+    {
+      "id": "cible",
+      "type": "target",
+      "position": {
+        "x": 2240,
+        "y": 260
+      },
+      "data": {
+        "label": "Factures et lignes à plat",
+        "fields": [
+          {
+            "id": "c_lignes",
+            "name": "lignes",
+            "type": "array",
+            "item": "object",
+            "required": true,
+            "children": [
+              {
+                "id": "c_nature",
+                "name": "nature",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": "c_fac",
+                "name": "id_facture",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": "c_num",
+                "name": "numero_facture",
+                "type": "string"
+              },
+              {
+                "id": "c_lib",
+                "name": "libelle",
+                "type": "string"
+              },
+              {
+                "id": "c_mt",
+                "name": "montant",
+                "type": "number"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-src_fac-fa_list-fac_nature-obj",
+      "type": "typed",
+      "source": "src_fac",
+      "sourceHandle": "fa_list",
+      "target": "fac_nature",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-fac_nature-result-fac_montant-obj",
+      "type": "typed",
+      "source": "fac_nature",
+      "sourceHandle": "result",
+      "target": "fac_montant",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-src_fac-fa_ht-fac_montant-value",
+      "type": "typed",
+      "source": "src_fac",
+      "sourceHandle": "fa_ht",
+      "target": "fac_montant",
+      "targetHandle": "value"
+    },
+    {
+      "id": "e-fac_montant-result-fac_libelle-obj",
+      "type": "typed",
+      "source": "fac_montant",
+      "sourceHandle": "result",
+      "target": "fac_libelle",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-src_fac-fa_num-fac_lib_txt-b",
+      "type": "typed",
+      "source": "src_fac",
+      "sourceHandle": "fa_num",
+      "target": "fac_lib_txt",
+      "targetHandle": "b"
+    },
+    {
+      "id": "e-fac_lib_txt-result-fac_libelle-value",
+      "type": "typed",
+      "source": "fac_lib_txt",
+      "sourceHandle": "result",
+      "target": "fac_libelle",
+      "targetHandle": "value"
+    },
+    {
+      "id": "e-fac_libelle-result-fac_tri-obj",
+      "type": "typed",
+      "source": "fac_libelle",
+      "sourceHandle": "result",
+      "target": "fac_tri",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-src_fac-fa_id-fac_tri_txt-a",
+      "type": "typed",
+      "source": "src_fac",
+      "sourceHandle": "fa_id",
+      "target": "fac_tri_txt",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e-fac_tri_txt-result-fac_tri-value",
+      "type": "typed",
+      "source": "fac_tri_txt",
+      "sourceHandle": "result",
+      "target": "fac_tri",
+      "targetHandle": "value"
+    },
+    {
+      "id": "e-src_lig-li_list-lig_nature-obj",
+      "type": "typed",
+      "source": "src_lig",
+      "sourceHandle": "li_list",
+      "target": "lig_nature",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-lig_nature-result-lig_num-obj",
+      "type": "typed",
+      "source": "lig_nature",
+      "sourceHandle": "result",
+      "target": "lig_num",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-src_lig-li_fac-lig_num_cherche-key",
+      "type": "typed",
+      "source": "src_lig",
+      "sourceHandle": "li_fac",
+      "target": "lig_num_cherche",
+      "targetHandle": "key"
+    },
+    {
+      "id": "e-src_fac-fa_id-lig_num_cherche-keys",
+      "type": "typed",
+      "source": "src_fac",
+      "sourceHandle": "fa_id",
+      "target": "lig_num_cherche",
+      "targetHandle": "keys"
+    },
+    {
+      "id": "e-src_fac-fa_num-lig_num_cherche-values",
+      "type": "typed",
+      "source": "src_fac",
+      "sourceHandle": "fa_num",
+      "target": "lig_num_cherche",
+      "targetHandle": "values"
+    },
+    {
+      "id": "e-lig_num_cherche-result-lig_num-value",
+      "type": "typed",
+      "source": "lig_num_cherche",
+      "sourceHandle": "result",
+      "target": "lig_num",
+      "targetHandle": "value"
+    },
+    {
+      "id": "e-lig_num-result-lig_tri-obj",
+      "type": "typed",
+      "source": "lig_num",
+      "sourceHandle": "result",
+      "target": "lig_tri",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-src_lig-li_fac-lig_tri_txt-a",
+      "type": "typed",
+      "source": "src_lig",
+      "sourceHandle": "li_fac",
+      "target": "lig_tri_txt",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e-src_lig-li_id-lig_tri_txt-c",
+      "type": "typed",
+      "source": "src_lig",
+      "sourceHandle": "li_id",
+      "target": "lig_tri_txt",
+      "targetHandle": "c"
+    },
+    {
+      "id": "e-lig_tri_txt-result-lig_tri-value",
+      "type": "typed",
+      "source": "lig_tri_txt",
+      "sourceHandle": "result",
+      "target": "lig_tri",
+      "targetHandle": "value"
+    },
+    {
+      "id": "e-fac_tri-result-fusion-a",
+      "type": "typed",
+      "source": "fac_tri",
+      "sourceHandle": "result",
+      "target": "fusion",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e-lig_tri-result-fusion-b",
+      "type": "typed",
+      "source": "lig_tri",
+      "sourceHandle": "result",
+      "target": "fusion",
+      "targetHandle": "b"
+    },
+    {
+      "id": "e-fusion-result-tri-list",
+      "type": "typed",
+      "source": "fusion",
+      "sourceHandle": "result",
+      "target": "tri",
+      "targetHandle": "list"
+    },
+    {
+      "id": "e-courant-item-lire_tri-obj",
+      "type": "typed",
+      "source": "courant",
+      "sourceHandle": "item",
+      "target": "lire_tri",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-lire_tri-result-tri-key",
+      "type": "typed",
+      "source": "lire_tri",
+      "sourceHandle": "result",
+      "target": "tri",
+      "targetHandle": "key"
+    },
+    {
+      "id": "e-tri-result-cible-c_lignes",
+      "type": "typed",
+      "source": "tri",
+      "sourceHandle": "result",
+      "target": "cible",
+      "targetHandle": "c_lignes"
+    },
+    {
+      "id": "e-courant-item-lire_nature-obj",
+      "type": "typed",
+      "source": "courant",
+      "sourceHandle": "item",
+      "target": "lire_nature",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-courant-item-lire_fac-obj",
+      "type": "typed",
+      "source": "courant",
+      "sourceHandle": "item",
+      "target": "lire_fac",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-courant-item-lire_num-obj",
+      "type": "typed",
+      "source": "courant",
+      "sourceHandle": "item",
+      "target": "lire_num",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-courant-item-lire_lib-obj",
+      "type": "typed",
+      "source": "courant",
+      "sourceHandle": "item",
+      "target": "lire_lib",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-courant-item-lire_mt-obj",
+      "type": "typed",
+      "source": "courant",
+      "sourceHandle": "item",
+      "target": "lire_mt",
+      "targetHandle": "obj"
+    },
+    {
+      "id": "e-lire_nature-result-cible-c_nature",
+      "type": "typed",
+      "source": "lire_nature",
+      "sourceHandle": "result",
+      "target": "cible",
+      "targetHandle": "c_nature"
+    },
+    {
+      "id": "e-lire_fac-result-cible-c_fac",
+      "type": "typed",
+      "source": "lire_fac",
+      "sourceHandle": "result",
+      "target": "cible",
+      "targetHandle": "c_fac"
+    },
+    {
+      "id": "e-lire_num-result-cible-c_num",
+      "type": "typed",
+      "source": "lire_num",
+      "sourceHandle": "result",
+      "target": "cible",
+      "targetHandle": "c_num"
+    },
+    {
+      "id": "e-lire_lib-result-cible-c_lib",
+      "type": "typed",
+      "source": "lire_lib",
+      "sourceHandle": "result",
+      "target": "cible",
+      "targetHandle": "c_lib"
+    },
+    {
+      "id": "e-lire_mt-result-cible-c_mt",
+      "type": "typed",
+      "source": "lire_mt",
+      "sourceHandle": "result",
+      "target": "cible",
+      "targetHandle": "c_mt"
+    }
+  ]
+}

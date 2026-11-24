@@ -214,8 +214,17 @@ export function rename(id, name) {
   if (item && name.trim()) item.name = name.trim();
 }
 
+/**
+ * Supprime toutes les collections (mappings et dossiers) ; la bibliothèque reste. Un nouveau mapping vide est ouvert,
+ * sauf si c'est un modèle composite qui est affiché.
+ */
+export function clearCollections() {
+  workspace.collections.splice(0);
+  if (!find(workspace.activeId)) ensureActive();
+}
+
 /** Garantit un flux ouvert : le premier qui reste, ou un nouveau. */
-function ensureActive() {
+export function ensureActive() {
   const first = firstMapping();
   if (first) workspace.activeId = first.id;
   else insertMapping(makeMapping());

@@ -4,7 +4,7 @@ import { t } from '../lib/i18n';
 import { isPlainObject } from '../lib/lists';
 import { SOURCE_DOC, syncMirrors, unmirror, withMirror } from '../lib/structure';
 import { uid } from '../lib/types';
-import { addToLibrary, allMappings, find, isComposite, locate, remove, rename, workspace } from './collections';
+import { addToLibrary, allMappings, ensureActive, find, isComposite, locate, remove, rename, workspace } from './collections';
 
 /**
  * Modèles de données partagés : un nœud source ou cible relié à un modèle de la bibliothèque porte `data.modelId`
@@ -311,6 +311,23 @@ export function deleteLibraryFolder(folderId) {
     }
   }
   remove(folderId);
+  hooks.reload();
+}
+
+/**
+ * Vide la bibliothèque (modèles, modèles composites, listes de valeurs, dossiers) : les nœuds des flux qui y
+ * étaient reliés gardent leurs copies. Un modèle composite ouvert est quitté pour un mapping.
+ */
+export function clearLibrary() {
+  hooks.flush();
+  for (const { mapping } of allMappings()) {
+    for (const node of mapping.graph.nodes) {
+      delete node.data?.modelId;
+      delete node.data?.listId;
+    }
+  }
+  workspace.library.items.splice(0);
+  if (!find(workspace.activeId)) ensureActive();
   hooks.reload();
 }
 

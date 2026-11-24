@@ -53,15 +53,19 @@ const { findNode, edges, onEdgeMouseEnter, onEdgeMouseLeave } = useVueFlow();
 const schemaLocked = inject(SCHEMA_LOCK_KEY);
 const insertOn = inject(EDGE_INSERT_KEY);
 
-// Survol : le bouton reste un instant après la sortie du lien, le temps d'y amener le pointeur.
+// Survol : le bouton reste un instant après la sortie du lien, le temps d'y amener le pointeur ;
+// la mise en évidence du lien, elle, suit le pointeur sans délai.
 const hover = ref(false);
+const over = ref(false);
 let hideTimer;
 const enter = () => {
   clearTimeout(hideTimer);
   hover.value = true;
+  over.value = true;
 };
 const leave = () => {
   clearTimeout(hideTimer);
+  over.value = false;
   hideTimer = setTimeout(() => (hover.value = false), 300);
 };
 const hooks = [
@@ -75,6 +79,7 @@ onBeforeUnmount(() => {
 
 function insert(e) {
   hover.value = false;
+  over.value = false;
   const r = e.currentTarget.getBoundingClientRect();
   insertOn(props.id, { x: r.left + r.width / 2, y: r.top + r.height / 2 });
 }
@@ -113,7 +118,7 @@ const style = computed(() => {
   const type = outputType(findNode, incoming, props.sourceNode.id, props.sourceHandleId) ?? 'any';
   const into = getSocket(props.targetNode, props.targetHandleId, 'target')?.type;
   // Survol du bouton « + » : le lien reste en évidence comme sous le pointeur.
-  const highlight = hover.value ? { stroke: 'var(--edge-highlight)' } : {};
+  const highlight = over.value ? { stroke: 'var(--edge-highlight)' } : {};
   // Formats de date différents : signalé comme des types incompatibles.
   const dateGap = results?.value.issues.byNode.get(props.targetNode.id)?.get(props.targetHandleId)?.some((i) => i.kind === 'date-format');
   if ((into && typeMismatch(type, into) === 'incompatible') || dateGap) return { stroke: 'var(--danger)', strokeWidth: 2, strokeDasharray: '2 4', ...highlight };
