@@ -9,7 +9,7 @@
     v-for="{ field: f, depth, chain, hidden } in shownRows"
     :key="f.id"
     class="row field-row tree-cols"
-    :class="[{ dragging: draggedId === f.id, mirrored: isMirrored(f) }, dropClass(f.id), levelOf(f) && `issue-${levelOf(f)}`]"
+    :class="[{ dragging: draggedId === f.id, mirrored: isMirrored(f), 'container-row': isContainer(f) }, dropClass(f.id), levelOf(f) && `issue-${levelOf(f)}`]"
     @dragover="overTarget($event, f.id, dropPosition($event, f))"
     @dragleave="leave($event, f.id)"
     @drop="dropOn"

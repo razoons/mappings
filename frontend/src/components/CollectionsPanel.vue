@@ -334,7 +334,10 @@ provide('collection-tree', {
   countOf(item) {
     if (item.type === 'model' || item.type === 'valuelist') {
       const n = usage.value.get(item.id) ?? 0;
-      return n ? { value: n, title: t(`Utilisé par ${count(n, 'mapping', 'mapping')}`, `Used by ${count(n, 'mapping', 'mapping')}`) } : null;
+      if (!n) return null;
+      // Les mappings eux-mêmes, pour retrouver celui qui l'utilise encore.
+      const names = flowNames(item.type === 'valuelist' ? listUsage(item.id) : usageOf(item.id));
+      return { value: n, title: [t(`Utilisé par ${count(n, 'mapping', 'mapping')} :`, `Used by ${count(n, 'mapping', 'mapping')}:`), ...names.map((s) => `• ${s}`)].join('\n') };
     }
     if (isContainer(item)) return { value: leafCount(item), title: '' };
     return null;

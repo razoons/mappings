@@ -338,6 +338,23 @@ kbd {
   grid-template-columns: minmax(0, 1.6fr) 104px minmax(0, 1fr) 34px;
   gap: 4px;
 }
+/*
+ * Objet ou liste d'objets (titre d'un bloc) : son nom prend toute la largeur jusqu'au type, calé à droite, sans
+ * toucher aux colonnes des autres lignes. L'aperçu de valeur ({…}) n'y est gardé qu'en cas d'erreur ou d'avertissement.
+ */
+.field-row.container-row {
+  grid-template-columns: minmax(0, 1fr) 104px auto 34px;
+}
+.field-row.container-row > .field-value {
+  display: none;
+  max-width: 110px;
+}
+.field-row.container-row:is(.issue-error, .issue-warning) > .field-value {
+  display: block;
+}
+.field-row.container-row > .row-actions {
+  grid-column: 4;
+}
 .col-labels {
   padding: 0 12px 2px;
   font-size: 10px;
@@ -479,6 +496,11 @@ kbd {
   color: rgba(255, 255, 255, 0.8);
   font-family: ui-monospace, Consolas, monospace;
   font-size: 11px;
+}
+/* Boutons et badges de l'en-tête : jamais rétrécis ni sur deux lignes ({ }, Résultat…) ; seul le titre cède la place. */
+.node-header > :not(.node-title, .node-title-static) {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .node-header .icon-btn:hover {
   background: rgba(255, 255, 255, 0.18);
@@ -797,14 +819,17 @@ kbd {
   pointer-events: none !important;
 }
 
-/* Titre éditable : aussi large que son texte (plafonné) ; l'espace libre à sa droite sert à attraper le nœud. */
+/*
+ * Titre éditable : aussi large que son texte, jusqu'aux boutons de l'en-tête (il ne se coupe que si le nœud est trop
+ * étroit) ; l'espace libre à sa droite et l'étiquette du type servent à attraper le nœud.
+ */
 .node-header input.node-title,
 .group-header input.node-title {
   flex: 0 1 auto;
   width: auto !important;
   field-sizing: content;
   min-width: 48px;
-  max-width: 200px;
+  max-width: none;
 }
 .node-header input.node-title + *,
 .group-header input.node-title + * {
@@ -892,6 +917,19 @@ kbd {
 .in-row.issue-warning {
   background: color-mix(in srgb, var(--warning) var(--issue-mix), transparent);
   box-shadow: inset 3px 0 0 var(--warning);
+}
+/* Glisser-déposer d'un champ : le repère bleu reste visible sur une ligne en erreur ou en avertissement. */
+.field-row.issue-error { --issue-bar: inset 3px 0 0 var(--danger); }
+.field-row.issue-warning { --issue-bar: inset 3px 0 0 var(--warning); }
+.field-row:is(.issue-error, .issue-warning).drop-before {
+  box-shadow: inset 0 2px 0 var(--primary), var(--issue-bar);
+}
+.field-row:is(.issue-error, .issue-warning).drop-after {
+  box-shadow: inset 0 -2px 0 var(--primary), var(--issue-bar);
+}
+.field-row:is(.issue-error, .issue-warning):is(.drop-inside-start, .drop-inside-end) {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  box-shadow: inset 0 0 0 1px var(--primary), var(--issue-bar);
 }
 .issue-mark {
   margin-right: 3px;

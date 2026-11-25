@@ -4,7 +4,7 @@
       <WidthHandle :node-id="id" :read-only="readOnly" />
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
       <span class="node-kind">{{ t('Liste de valeurs', 'Value list') }}</span>
-      <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
+      <input class="node-title nodrag" :disabled="readOnly" :value="data.label" :title="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
       <a v-if="!standalone" class="icon-btn help-link nodrag" href="/noeuds#library" :title="t('Documentation de ce nœud', 'Documentation of this node')">?</a>
       <button class="icon-btn nodrag" :title="mapped ? t('Éditer toutes les lignes (une par ligne : valeur ; correspondance)', 'Edit all the rows (one per line: value ; mapping)') : t('Éditer toutes les valeurs (une par ligne)', 'Edit all the values (one per line)')" @click="editing = true">≡</button>
       <button

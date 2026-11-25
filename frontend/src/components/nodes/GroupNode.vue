@@ -2,7 +2,7 @@
   <div class="group-node" :class="{ selected, collapsed: data.collapsed, colored: !!data.color }" :style="data.color && { '--group-color': data.color }">
     <div class="group-header">
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
-      <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
+      <input class="node-title nodrag" :disabled="readOnly" :value="data.label" :title="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
       <v-menu location="bottom" :disabled="readOnly">
         <template #activator="{ props: menu }">
           <button v-bind="menu" class="color-swatch nodrag" :disabled="readOnly" :title="t('Couleur du groupe', 'Group color')" />

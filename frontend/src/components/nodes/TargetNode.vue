@@ -4,7 +4,7 @@
       <WidthHandle :node-id="id" :read-only="readOnly" />
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
       <span class="node-kind">{{ t('Cible', 'Target') }}</span>
-      <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
+      <input class="node-title nodrag" :disabled="readOnly" :value="data.label" :title="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
       <span v-if="counts.errors || counts.warnings" class="issue-count" :class="{ error: counts.errors }" :title="countLabel">
         {{ counts.errors ? '⛔' : '⚠' }} {{ counts.errors + counts.warnings }}
       </span>

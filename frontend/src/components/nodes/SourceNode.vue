@@ -11,7 +11,7 @@
       <WidthHandle :node-id="id" :read-only="readOnly" />
       <CollapseButton :node-id="id" :collapsed="data.collapsed" />
       <span class="node-kind">{{ t('Source', 'Source') }}</span>
-      <input class="node-title nodrag" :disabled="readOnly" :value="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
+      <input class="node-title nodrag" :disabled="readOnly" :value="data.label" :title="data.label" @input="updateNodeData(id, { label: $event.target.value })" />
       <span v-if="sampleError" class="warn" :title="`${t('Modèle de données JSON invalide', 'Invalid JSON data model')} : ${sampleError}`">⚠</span>
       <button class="icon-btn nodrag" :title="t('Charger un fichier de données (ou le déposer sur le nœud)', 'Load a data file (or drop it on the node)')" @click="pickFile">⤒</button>
       <button class="icon-btn nodrag" :title="t('Modèle de données (YAML : type, obligatoire, format de chaque champ)', 'Data model (YAML: type, required, format of each field)')" @click="editing = true">{ }</button>
