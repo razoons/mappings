@@ -567,6 +567,8 @@ kbd {
   flex-direction: column;
   gap: 10px;
   width: 280px;
+  /* Ne déborde jamais du schéma : le panneau des contrôles défile à l'intérieur. */
+  max-height: calc(100% - 30px);
 }
 .side-block {
   width: 100%;
@@ -582,8 +584,10 @@ kbd {
 .checks-collapsed .v-btn__content {
   width: 100%;
 }
-.checks-panel {
-  max-height: calc(100dvh - var(--v-layout-top) - 100px);
+/* Spécificité renforcée : le style de v-card (display: block) passerait sinon devant. */
+.v-card.checks-panel {
+  flex: 0 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -601,7 +605,9 @@ kbd {
   background: var(--hover-overlay);
 }
 .checks-content {
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   padding: 4px 10px 10px;
   font-size: 12px;
 }

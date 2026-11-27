@@ -7,7 +7,8 @@
     <v-spacer />
     <v-icon icon="mdi-chevron-down" end />
   </v-btn>
-  <v-card v-else class="checks-panel side-block" rounded="lg" elevation="4">
+  <!-- nowheel : la molette fait défiler la liste au lieu de zoomer le schéma. -->
+  <v-card v-else class="checks-panel side-block nowheel" rounded="lg" elevation="4">
     <!-- Tout l'en-tête replie le panneau, comme le bouton replié le déplie. -->
     <div class="checks-header clickable" role="button" tabindex="0" :title="t('Replier', 'Collapse')" @click="open = false" @keydown.enter="open = false">
       <v-icon :icon="status.icon" :color="status.color" />
@@ -18,7 +19,7 @@
       <v-icon icon="mdi-chevron-up" class="mr-1" />
     </div>
     <v-divider />
-    <div v-if="issues.length" class="checks-content">
+    <div v-if="issues.length" class="checks-content nowheel">
       <ul class="checks">
         <li v-for="(i, k) in issues" :key="k" :class="i.level" :title="t('Afficher le nœud', 'Show the node')" @click="emit('focus', i.nodeId)">
           <span class="issue-mark">{{ i.level === 'error' ? '⛔' : '⚠' }}</span>
