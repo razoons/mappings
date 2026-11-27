@@ -4,7 +4,7 @@
       <button
         v-bind="menu"
         class="rules-btn nodrag"
-        :class="{ set: !!summary || !!field.description }"
+        :class="{ set: !!summary || !!field.description || !!field.generated }"
         :title="buttonTitle"
       >{{ summary || (field.description ? '💬' : '⚙') }}</button>
     </template>
@@ -32,6 +32,15 @@
           density="compact"
           hide-details
           @update:model-value="emit('update', { required: $event })"
+        />
+        <v-checkbox
+          :model-value="!!field.generated"
+          :disabled="locked"
+          :label="t('Auto-généré', 'Self-generated')"
+          :title="t('Valeur produite par le système cible (identifiant, horodatage…) : le champ n’a pas besoin d’être mappé, même obligatoire', 'Value produced by the target system (identifier, timestamp…): the field does not need to be mapped, even if required')"
+          density="compact"
+          hide-details
+          @update:model-value="emit('update', { generated: $event })"
         />
         <template v-for="k in keys" :key="k.key">
           <v-checkbox
@@ -118,6 +127,7 @@ const summary = computed(() => formatSummary(props.field, libraries.value));
 const buttonTitle = computed(() => {
   const parts = [];
   if (props.field.description) parts.push(props.field.description);
+  if (props.field.generated) parts.push(t('Auto-généré', 'Self-generated'));
   if (summary.value) parts.push(`Format : ${summary.value}`);
   return parts.length ? parts.join('\n') : t('Règles du champ (description, obligatoire, format)', 'Field rules (description, required, format)');
 });

@@ -230,7 +230,7 @@ export function linkMismatch(byId, e, incoming) {
 /**
  * Contrôle statique des champs cibles. Renvoie `byNode` (nœud → champ → problèmes) et `list`.
  * Un problème : `{ level: 'error' | 'warning', message }`.
- * - obligatoire et non mappé : erreur ;
+ * - obligatoire et non mappé : erreur, sauf s'il est auto-généré (`generated` : valeur produite par le système cible) ;
  * - obligatoire mais alimenté par un champ source optionnel : avertissement ;
  * - format non garanti par ce qui alimente le champ : avertissement ;
  * - types différents : avertissement si la valeur est convertie, erreur si les types sont incompatibles
@@ -263,7 +263,7 @@ export function validateTargets(nodes, edges, sharedLists = []) {
       for (const f of fields) {
         const chain = [...parents, f];
         const e = linkOf(f);
-        if (f.required && !isMapped(f)) add(f, chain, 'error', t('Obligatoire mais non mappé', 'Required but not mapped'));
+        if (f.required && !f.generated && !isMapped(f)) add(f, chain, 'error', t('Obligatoire mais non mappé', 'Required but not mapped'));
         const mismatch = e && linkMismatch(byId, e, incoming);
         if (mismatch) add(f, chain, mismatch.level, mismatch.message);
         const raw = e && (infoOf(e.source, e.sourceHandle ?? '') ?? { ...unknownInfo(), label: byId.get(e.source)?.data?.label ?? '?' });
@@ -295,7 +295,7 @@ export function validateTargets(nodes, edges, sharedLists = []) {
         if (isSet(f.format?.library) && !libraries.has(f.format.library))
           add(f, chain, 'warning', t('Liste de valeurs absente (supprimée de la bibliothèque) : valeurs non contrôlées', 'Value list missing (deleted from the library): values not checked'));
         // Structure reprise d'un objet entier : ses sous-champs viennent avec lui, rien à contrôler un à un.
-        if (isContainer(f) && !(f.mirror && e) && (f.required || isMapped(f))) walk(f.children ?? [], chain);
+        if (isContainer(f) && !(f.mirror && e) && ((f.required && !f.generated) || isMapped(f))) walk(f.children ?? [], chain);
       }
     };
     // Cible entière reprise d'une source : ses champs viennent avec elle ; seuls ceux propres à la cible sont contrôlés.

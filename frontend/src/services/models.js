@@ -172,6 +172,7 @@ export function fieldChanges(before, after) {
     else if (oldPath !== newPath) details.push(t(`déplacé vers « ${newPath} »`, `moved to “${newPath}”`));
     if (typeKey(old) !== typeKey(now)) details.push(t(`type ${typeLabel(old)} → ${typeLabel(now)}`, `type ${typeLabel(old)} → ${typeLabel(now)}`));
     if (!!old.required !== !!now.required) details.push(now.required ? t('devenu obligatoire', 'now required') : t('devenu facultatif', 'now optional'));
+    if (!!old.generated !== !!now.generated) details.push(now.generated ? t('devenu auto-généré', 'now self-generated') : t('n’est plus auto-généré', 'no longer self-generated'));
     if (canonical(old.format ?? null) !== canonical(now.format ?? null)) details.push(t('format modifié', 'format changed'));
     if (details.length) changes.set(old.id, { path: oldPath, kind: 'modified', details });
   }

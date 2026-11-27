@@ -41,6 +41,13 @@
         :title="requiredTitle(f, chain)"
         @click="ops.setRules(f.id, { required: !f.required })"
       >*</button>
+      <button
+        v-if="f.generated"
+        class="generated-mark mdi mdi-flash nodrag"
+        :disabled="locked || isMirrored(f)"
+        :title="t('Auto-généré : valeur produite par le système cible, le champ n’a pas besoin d’être mappé (cliquer pour retirer)', 'Self-generated: value produced by the target system, the field does not need to be mapped (click to remove)')"
+        @click="ops.setRules(f.id, { generated: false })"
+      />
       <FieldRules :field="f" :locked="locked || isMirrored(f)" @update="ops.setRules(f.id, $event)" />
     </div>
 
@@ -83,7 +90,7 @@
     </span>
     <span v-else class="field-value" :class="{ empty: isUnmapped(f) }" :title="issueText(f) || formatValue(values[f.id])">
       <span v-if="levelOf(f)" class="issue-mark" :class="levelOf(f)">{{ levelOf(f) === 'error' ? '⛔' : '⚠' }}</span>
-      {{ isUnmapped(f) ? t('non mappé', 'not mapped') : values[f.id] === undefined ? '—' : formatValue(values[f.id]) }}
+      {{ isUnmapped(f) ? (f.generated ? t('auto-généré', 'self-generated') : t('non mappé', 'not mapped')) : values[f.id] === undefined ? '—' : formatValue(values[f.id]) }}
     </span>
 
     <span v-if="!locked && !isMirrored(f)" class="row-actions">

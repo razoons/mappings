@@ -89,7 +89,7 @@
       <table class="legend-table">
         <tbody>
           <tr v-for="m in MARK_DOCS" :key="m.cls">
-            <td class="sample"><span class="lg-mark" :class="m.cls">{{ t(...m.mark) }}</span></td>
+            <td class="sample"><span v-if="m.icon" class="lg-mark mdi" :class="[m.cls, m.icon]" /><span v-else class="lg-mark" :class="m.cls">{{ t(...m.mark) }}</span></td>
             <td class="name">{{ t(...m.name) }}</td>
             <td class="note">{{ t(...m.text) }}</td>
           </tr>
@@ -170,6 +170,15 @@ const MARK_DOCS = [
     cls: 'required',
     name: ['Obligatoire', 'Required'],
     text: ['Le champ doit être présent. Cliquer l’étoile bascule obligatoire / optionnel.', 'The field must be present. Clicking the star toggles required / optional.'],
+  },
+  {
+    icon: 'mdi-flash',
+    cls: 'generated',
+    name: ['Auto-généré', 'Self-generated'],
+    text: [
+      'Valeur produite par le système cible (identifiant, horodatage…) : le champ n’a pas besoin d’être mappé, même obligatoire. Se coche dans les règles ⚙ ; cliquer le symbole le retire.',
+      'Value produced by the target system (identifier, timestamp…): the field does not need to be mapped, even if required. Set it in the ⚙ rules; clicking the symbol removes it.',
+    ],
   },
   {
     mark: ['≤ 25 car.', '≤ 25 chars'],
@@ -303,6 +312,10 @@ const MARK_DOCS = [
 .lg-mark.required {
   color: var(--danger);
   font-weight: 700;
+}
+.lg-mark.generated {
+  color: var(--primary);
+  font-size: 14px;
 }
 .lg-mark.rule {
   background: var(--hover-overlay);

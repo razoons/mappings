@@ -44,7 +44,8 @@ export function checkDocument(fields, doc, libraries = new Map()) {
 
   function checkField(f, v, path) {
     if (missing(v)) {
-      if (f.required) add('error', f.id, path, t('Obligatoire mais absent', 'Required but missing'));
+      // Auto-généré : la valeur vient du système qui reçoit le document, son absence est normale.
+      if (f.required && !f.generated) add('error', f.id, path, t('Obligatoire mais absent', 'Required but missing'));
       return;
     }
     if (f.type === 'object') {

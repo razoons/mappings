@@ -1293,6 +1293,21 @@ button.doc-name:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Champ auto-généré : sa valeur vient du système cible, il n'a pas besoin d'être mappé. */
+.generated-mark {
+  flex: none;
+  margin-left: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--primary);
+  cursor: pointer;
+}
+.generated-mark:disabled {
+  cursor: default;
+}
 .mirror-mark {
   flex: none;
   margin-left: 2px;

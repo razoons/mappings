@@ -120,11 +120,12 @@ export function useFieldEditor(nodeId, getData, { reshape = true } = {}) {
       if (!isContainer(next)) dropEdgesOf(descendantIds(field));
       update(id, () => next);
     },
-    /** Règles du champ (`required`, `format`) : sans effet sur le modèle de données JSON. */
+    /** Règles du champ (`required`, `generated`, `format`) : sans effet sur le modèle de données JSON. */
     setRules: (id, rules) =>
       updateNodeData(nodeId, { fields: mapField(getData().fields, id, (f) => {
         const next = { ...f, ...rules };
         if (!next.required) delete next.required;
+        if (!next.generated) delete next.generated;
         if (typeof next.description === 'string') next.description = next.description.trim();
         if (!next.description) delete next.description;
         const format = cleanFormat(next);
